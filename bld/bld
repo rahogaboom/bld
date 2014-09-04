@@ -142,10 +142,10 @@ BEGIN
     $BFFN   = "bld.fatal";
 
     $USAGE = "\n".
-             " bld($VERSION) is a simple flexible non-hierarchical program that builds a single C/C++/Objective\n".
-             " C/Objective C++/Assembler target(executable or library(static or shared)) and, unlike\n".
-             " 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for automatic\n".
-             " header file dependency checking.  The operation of bld depends entirely on the\n".
+             " bld($VERSION) is a simple flexible non-hierarchical perl program that builds a single C/C++/\n".
+             " Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,\n".
+             " unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for\n".
+             " automatic header file dependency checking.  The operation of bld depends entirely on the\n".
              " construction of the Bld(bld specification) and Bld.gv(bld global values) files.  See\n".
              " the bld.README file.  There are no cmd line options(except for -h(this msg)) or\n".
              " \$HOME/.bldrc or ./.bldrc files and no environment variables are used.  Complex\n".
