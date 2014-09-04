@@ -1,0 +1,96 @@
+
+Comment(s)
+
+EVAL
+# this section will define perl variables to be interpolated into DIRS section cmd fields
+
+# the compiler
+$CC = "gcc";
+
+# mandatory defined variables
+
+    # the target to built e.g. executable, libx.a, libx.so
+    $bld="exec-c";
+
+    # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+    $bldcmd = "$CC -lm -o \$bld \$O";
+
+    # space separated list of directories to search for libraries
+    $lib_dirs = "example/lib /usr/lib /lib /usr/local/lib";
+
+    # use system header files in dependency checking("system" or "nosystem")
+    $opt_s = "system";
+
+    # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+    $opt_r = "rebuild";
+
+    # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+    $opt_lib = "warnlibcheck";
+
+# some examples of variables that will be interpolated into DIRS section cmd fields
+$INCLUDE = "-I bld.example/example/include";
+$LSOPTIONS = "-l";
+
+# "a" or "b" to conditionally compile main.c
+$COND = "a";
+
+DIRS
+# this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications
+
+# example of use of conditional compilation
+bld.example/example/C : ^main\.c$ : {
+                          # can have comments here too
+                          if [ "$COND" == 'a' ];
+                          then
+                              $CC -S $INCLUDE $s;
+                          fi
+                          if [ "$COND" == 'b' ];
+                          then
+                              $CC -O4 -S $INCLUDE $s;
+                          fi
+                      }
+
+# example of execution of a bare block of cmds - '{' and '}' may be on seperate lines
+{
+    ls $LSOPTIONS;
+}
+
+# the cmd field may be put on another line(s) and indented
+bld.example/example/C : ^g\.x\.C$ :
+    {
+        $CC -c $INCLUDE $s;
+    }
+
+# all three fields - dir, regex and cmd - may be put on seperate lines(even with extra blank lines).
+# directories may have embedded blanks('a b').
+bld.example/example/C/a b :
+^m\.c$      :
+
+{$CC -c $INCLUDE $s;}
+
+# example of regex field that captures multiple source files(h.c and i.c) and example of a
+# cmd field with multiple cmds - white space is irrelevant(a change should not cause a rebuild)
+# example of cmd fields with multiple cmds(ls and $CC)
+bld.example/example/C     : ^(h|i)\.c$    : {  ls -l $s;  $CC -c $INCLUDE $s;  }
+
+# example of assembler source
+# Note: the $CC compile produces .o output by changing the c to an o.
+#       the as output needs to be specified by the -o option.
+bld.example/example/C     : ^main\.s$ : {as -c -o main.o $s;}
+
+bld.example/example/C/ww  : ^u\.c$    : {$CC -c $INCLUDE $s;}
+
+# example of use of recursive directory search - the same regex and cmd fields
+# are applied to all subdirectories of the specified dir field(right after the 'R')
+R bld.example/example/C/y : ^.*\.c$   : {$CC -c $INCLUDE $s;}
+
+bld.example/example/C/x   : ^t\.c$    : {$CC -c $INCLUDE $s;}
+
+bld.example/example/C/z   : ^(w|w1)\.c$    : {$CC -c $INCLUDE $s;}
+
+# cmd blocks may execute multiple cmds(ls and pwd)
+{
+    ls -lfda; pwd;
+    ls;
+}
+

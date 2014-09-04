@@ -1,0 +1,35 @@
+
+Bit Field Insertion and Extraction(bfix)
+
+Files:
+
+  bfix.h    - declaration header file for both bfix.c and bfix.cpp
+
+in . directory:
+  bfix.article.1999.doc - article
+
+in c directory:
+  bfix.mk           - build script, builds static and dynamic libraries,
+                         builds and executes test program.
+  bfix.c            - C implementation
+  bfix.o            - C object file
+  bfix_test.c       - C test code
+  bfix_test         - C test executable
+  bfix_test.results - test program results file
+  libbfix.a         - C static library
+  libbfix.so.1.0.1  - C dynamic library
+
+in cpp directory:
+  bfix.mk           - build script, builds static and dynamic libraries,
+                         builds and executes test program.
+  bfix.cpp          - C++ implementation
+  bfix.o            - C++ object file
+  bfix_test.cpp     - C++ test code
+  bfix_test         - C++ test executable
+  bfix_test.results - test program results file
+  libbfix.a         - C++ static library
+  libbfix.so.1.0.1  - C++ dynamic library
+
+Please send requests/bugs/comments/porting issues to:
+   richard.hogaboom@gmail.com
+

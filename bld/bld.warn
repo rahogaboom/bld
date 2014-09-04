@@ -1,0 +1,21 @@
+line: 2919 - WID 11: Multiple(2) '$s' variables specified in DIRS line command field: {!!!if [ "$COND" == 'a' ];!!!then!!!gcc -S -I bld.example/example/include $s;!!!fi!!!if [ "$COND" == 'b' ];!!!then!!!gcc -O4 -S -I bld.example/example/include $s;!!!fi!!!}
+
+line: 2919 - WID 11: Multiple(2) '$s' variables specified in DIRS line command field: {ls -l $s;gcc -c -I bld.example/example/include $s;}
+
+line: 3138 - WID 16: EVAL defined variable(s) not used in DIRS cmds: $LSOPTIONS $COND
+
+line: 2158 - WID 9: Multiple instances of '-S' detected in compile options(might just be conditional compilation).
+--->\nif [ "a" == 'a' ];\nthen\ngcc -S -I bld.example/example/include "bld.example/example/C/main.c";\nfi\nif [ "a" == 'b' ];\nthen\ngcc -O4 -S -I bld.example/example/include "bld.example/example/C/main.c";\nfi\n
+
+line: 1547 - WID 6: Multiple source files with the same signature:
+--------------------------------------------------------------------------------------
+
+line: 1558 - WID 7:                               3  7354a1b2a464cb3a0f6444d4363c4aae7e40b362
+                                               bld.example/example/C/../include/head.h
+                                                          bld.example/example/C/head.h
+                                                    bld.example/example/include/head.h
+
+line: 1558 - WID 7:                               2  9811db426524b5cc3e453961e3294a9eb713ae60
+                                                           bld.example/example/C/z/w.c
+                                                          bld.example/example/C/z/w1.c
+

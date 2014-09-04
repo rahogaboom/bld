@@ -1,0 +1,277 @@
+#!/usr/bin/perl
+
+# remove cmd line arg specified library/executable bld related files:
+#     e.g. './bld.$project.rm credential-store lib.a' - remove the 'credential-store' and 'lib.a' files and bld.<warn|info|fatal>.<credential-store|lib.a> files
+#     e.g. './bld.$project.rm --all' - remove all files not in selected subsets e.g. bld.$project, bld.$project.rm etc.  see 'ls -aF' below.
+
+# standard modules
+use strict;
+use warnings;
+use diagnostics;
+use autodie;
+use Getopt::Long;
+
+# croak() - die with better info than die()
+use Carp qw(
+               croak
+           );
+
+my
+(
+    $opt_all,
+
+    # the bld.$project.targets file
+    @TargetsFile,
+
+    # hash(set to undef) and array of all possible valid targets from bld.$project.targets file
+    %ValidTargets,
+    @ValidTargets,
+
+    # valid targets specified on the cmd line
+    @ValidTargetsCmdLine,
+
+    # any not valid targets specified on the cmd line
+    @notValidTargetsCmdLine,
+
+    # the project name
+    $project,
+
+    # regexs
+    $RGX_BLANK_LINE,
+    $RGX_COMMENT_LINE,
+    $RGX_VALID_TARGET_CHARS,
+
+    # file names
+    $TARGETSFN,
+    $BFN,
+    $BGVFN,
+    $BIFN,
+    $BWFN,
+    $BFFN,
+);
+
+BEGIN
+{
+    # get the project name from the bld.$project.rm middle part of the name of this script
+    ($project) = $0 =~ m{bld\.([^.]*)\.rm?$};
+
+    if ( not defined $project )
+    {
+        croak("$0: project name not matched at end of $0\n");
+    }
+
+    $RGX_BLANK_LINE         = qr{ ^\s*$ }x;
+    $RGX_COMMENT_LINE       = qr{ ^\s*\# }x;
+    $RGX_VALID_TARGET_CHARS = qr{ [A-Za-z0-9-_.] }x;
+
+    $TARGETSFN = "bld.$project.targets";
+    $BFN       = "Bld";
+    $BGVFN     = "Bld.gv";
+    $BIFN      = "bld.info";
+    $BWFN      = "bld.warn";
+    $BFFN      = "bld.fatal";
+}
+
+GetOptions
+(    
+    "all" => \$opt_all,
+) or croak("GetOptions() failed(only --all option allowed).");
+
+if ( $opt_all )
+{
+    croak("No arguments allowed if --all option specified.") if @ARGV > 0;
+}
+else
+{
+    croak("One or more arguments required if --all option not specified.") if @ARGV <= 0;
+}
+
+# each not blank or not a comment line is a valid target argument to bld.$project e.g. './bld.$project $target'
+# and will build one(that named) library or executable
+if ( not -e $TARGETSFN )
+{
+    croak("$TARGETSFN cannot be opened.");
+}
+open my $fh, "<", $TARGETSFN;
+@TargetsFile = <$fh>;
+close $fh;
+chomp @TargetsFile;
+
+foreach my $target ( @TargetsFile )
+{
+    # ignore if comment or blank line
+    next if ( $target =~ $RGX_COMMENT_LINE or $target =~ $RGX_BLANK_LINE );
+
+    # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
+    if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
+    {
+        print "bld.$project.rm: Invalid target line: \'$target\' in $TARGETSFN file.\n";
+        exit 1;
+    }
+
+    push @ValidTargets, $target;
+    $ValidTargets{$target} = undef;
+}
+
+if ( $opt_all )
+{
+    # remove all files that are not in specific subsets of bld related files
+
+    my ( @ls );
+
+    # the -aF options will list executables with a '*' at the end
+    @ls = `ls -aF`;
+    foreach my $file ( @ls )
+    {
+        chomp($file);
+        if (
+               not $file =~ m{^\./$|^\.\./$} and               # . and .. directories
+               not $file =~ m{^bld\.$project\*$} and           # the bld.$project file
+               not $file =~ m{^bld\.$project\.targets$} and    # the bld.$project.targets file
+               not $file =~ m{^bld\.$project\.script.*\*$} and # the bld.$project.script.* file(s)
+               not $file =~ m{^bld\.$project\.README$} and     # the bld.$project.README file
+               not $file =~ m{^bld\.$project\.install\*$} and  # the bld.$project.install file
+               not $file =~ m{^bld\.$project\.rm\*$} and       # the bld.$project.rm file
+               not $file =~ m{^$BGVFN\.$project$} and          # the Bld.gv.$project file
+               not $file =~ m{^$BFN\.$project\..*$}            # the Bld.$project.* file(s)
+           )
+        {
+            `rm -f $file`;
+        }
+    }
+}
+else
+{
+    # remove only files that end with specific valid target names
+
+    # add valid cmd line targets to @ValidTargetsCmdLine and not valid cmd line targets to @notValidTargetsCmdLine
+    foreach my $arg ( @ARGV )
+    {
+        if ( exists $ValidTargets{$arg} )
+        {
+            push @ValidTargetsCmdLine, $arg;
+        }
+        else
+        {
+            push @notValidTargetsCmdLine, $arg;
+        }
+    }
+
+    # if a cmd line specified target is not valid, exit
+    if ( @notValidTargetsCmdLine )
+    {
+        print "bld.$project.rm: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
+        exit 1;
+    }
+
+    # remove $target and bld.<warn|info|fatal>.$target files
+    foreach my $target ( @ValidTargetsCmdLine )
+    {
+        `rm -f $BIFN.$project.$target`;
+        `rm -f $BWFN.$project.$target`;
+        `rm -f $BFFN.$project.$target`;
+        `rm -f $target`;
+    }
+}
+
+1;
+
+__END__
+
+=head1 NAME
+
+ bld.<project>.rm
+
+=head1 VERSION
+
+ bld.<project>.rm version 1.0.0
+
+=head1 USAGE
+
+ usage: bld.<project>.rm <[--all] | [target] [target] ...>
+     --all    - remove all files not matching:
+                bld.<project>
+                bld.<project>.targets
+                bld.<project>.script.*
+                bld.<project>.README
+                bld.<project>.install
+                bld.<project>.rm
+                Bld.gv.<project>
+                Bld.<project>.*
+                mutually exclusive of specifying any cmd line targets.
+     [target] - remove all files matching:
+                bld.warn.<project>.<target>
+                bld.info.<project>.<target>
+                bld.fatal.<project>.<target>
+                <target>
+                mutually exclusive of specifying --all.
+
+=head1 REQUIRED ARGUMENTS
+
+ None
+
+=head1 OPTIONS
+
+ --all - remove all files not matching:
+         see above usage msg
+
+=head1 DESCRIPTION
+
+ bld.<project>.rm is used for removing project files.  see above usage msg.
+
+=head1 CONFIGURATION AND ENVIRONMENT
+
+ No configuration files or environment variables are used.
+
+=head1 FILES
+
+ bld.<project>.targets - all of the project targets are specified, one to a line.
+
+=head1 DEPENDENCIES
+
+ None
+
+=head1 SEE ALSO
+
+ Bld.gv.<project>
+ bld.<project>
+ bld.<project>.README
+ bld.<project>.install
+ bld.<project>.targets
+ bld.<project>.script.*
+
+=head1 AUTHOR
+
+ Richard A Hogaboom
+ richard.hogaboom@gmail.com
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (c) 1998-2014, Richard A Hogaboom
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the {organization} nor the names of its 
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+

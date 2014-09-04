@@ -1,0 +1,4718 @@
+#!/usr/bin/perl
+
+# bld - a simple flexible non-hierarchical program that uses SHA1 signatures
+#       to build a single target(executable or library(static or shared)).
+#       Complex multi-target projects may be built with the help of the
+#       bld.<project> and bld.<project>.rm scripts and uses standard <project>
+#       directory structures for the placement of code and Bld files. see
+#       bld.README.  do "bld -h" for command help or "perldoc bld" for the
+#       full man page
+
+# use modern perl
+use 5.018.2;
+
+#
+# standard modules
+#
+
+use warnings;
+use diagnostics;
+use autodie;
+use English;
+use Getopt::Long;
+use File::Find;
+use Data::Dumper;
+
+# extract_multiple - for parsing the $BFN DIRS section
+# extract_bracketed - used by extract_multiple for finding '{}''s
+use Text::Balanced qw(
+                         extract_multiple
+                         extract_bracketed
+                     );
+
+# croak() - used in fatal() to die with better info than die()
+# cluck() - used for full stack trace debugging, outputs to stdout
+# shortmess() - used for full stack trace debugging, returns stack trace
+use Carp qw(
+               croak
+               cluck
+               shortmess
+           );
+
+# sha1_hex - the bld program SHA1 generator
+use Digest::SHA qw(
+                      sha1_hex
+                  );
+
+#
+# installed modules
+#
+
+#use Modern::Perl 2011;
+
+# this module allows the use of experimental perl language features(given, when, ~~) without generating warnings.
+# to see exactly where smartmatch features are being used just comment out this line.  bld will run, but with warnings
+# everyplace an experimental smartmatch feature is used.
+use experimental 'smartmatch';
+
+# file scope global constants
+my
+(
+    # bld version
+    $VERSION,
+
+    # file names
+    $SIGFN,       # SIGnature File Name
+    $BFN,         # Bld File Name
+    $BGVFN,       # Bld Global Variable File Name
+    $BIFN,        # Bld Info File Name
+    $BWFN,        # Bld Warn File Name
+    $BFFN,        # Bld Fatal File Name
+
+    # usage msg
+    $USAGE,
+
+    # signature related
+        # the following are constants used to index the second subscript of the %Sigdata($Sigdata{}[])
+        # and %SigdataNew($SigdataNew{}[]) hashes.  the first index(the {}) is the full path or
+        # relative path file name starting at the bld home directory of the source(code or header or library) file.
+        $SIG_SRC,     # constant subscript indexing the signature of the source, header file or library
+        $SIG_CMD,     # constant subscript indexing the signature of the build command
+        $SIG_TGT,     # constant subscript indexing the signature of the target file
+        $HDR_DEP,     # constant subscript indexing header file dependencies in the next level hash
+        $LIB_DEP,     # constant subscript indexing library file dependencies in the next level hash
+
+    # regex related
+        $RGX_HDR_EXT,           # match all header file extensions(without the period)
+        $RGX_SRC_EXT,           # match all source file extensions(without the period)
+        $RGX_FILE_EXT,          # match any file name extension(without the period)
+        $RGX_VALID_PATH_CHARS,  # match all valid chars for full and relative path file names e.g. "/usr/include/_G_config.h"  or  "src/C/a b/m.c"
+        $RGX_VALID_DIRS_LINE,   # match a valid $BFN file DIRS section line
+        $RGX_BLANK_LINE,        # match a blank line
+        $RGX_COMMENT_LINE,      # match a comment line
+        $RGX_CMD_BLOCK,         # match a DIRS section cmd block
+        $RGX_LIBS,              # match all valid libraries
+
+    # constant strings
+    $COLON,
+    $EMPTY,
+    $SPACE,
+
+    # primary program data structures
+        %Depend,
+            # dependencies - specify valid relationships between different file types(identified by file extensions)
+            #
+            # the hash will be five levels:
+            # $Depend{'<hdr or nothdr>'}{'<cmd line option or n>'}{'<source file name extension>'}{'<ext or file>'}{'<target file name extension or file name>'} = undef
+            #     a. the first level hash has a key of 'hdr' or 'nothdr' indicating if the source is/is not hdr processible
+            #        e.g. 'c'(header processible) or 's'(not header processible)
+            #     b. the second level hash has a key of the cmd line option(without the -) or n for no option e.g. 'c' - generate object file
+            #     c. the third level hash has a key of the source file name extension(without the .) e.g. 'c' - a C source file
+            #     d. the fourth level hash has a key of 'ext' or 'file' indicating that the next level(fifth) keys are file name extensions(ext) or file names(file)
+            #     e. the fifth level hash has a key of the target file name extension for the generated file e.g. 'o' - an object file
+            #     f. the values are undef
+            #
+            # Example: # C(hdr dependencies) code with .c extension and -S cmd line option and target file extension of 's'
+            #          $Depend{'hdr'}{'S'}{'c'}{'ext'}{'s'} = undef;
+            #
+            #          # yacc specification(hdr dependencies) with .y file extension and with no cmd line option and target file of 'y.tab.c'
+            #          $Depend{'hdr'}{'n'}{'y'}{'file'}{'y.tab.c'} = undef;
+            #
+            #          # yacc specification(hdr dependencies) with .y file extension and no cmd line option and target file extension of 'c'
+            #          $Depend{'hdr'}{'n'}{'y'}{'ext'}{'c'} = undef;
+            #
+            #          # assembler code(no hdr dependencies) with .s extension and -c cmd line option and target file extension of 'o'
+            #          $Depend{'nothdr'}{'c'}{'s'}{'ext'}{'o'} = undef;
+            #
+            #          # C(no hdr dependencies) code with .i extension and -c cmd line option and target file extension of 'o'
+            #          $Depend{'nothdr'}{'c'}{'i'}{'ext'}{'o'} = undef;
+            #
+            # Purpose: to specify the valid processing path of source files to produce the correct target file from a given cmd line option.
+);
+
+BEGIN
+{
+    $VERSION = "1.0.0";
+
+    $BFN    = "Bld";
+    $SIGFN  = "Bld.sig";
+    $BGVFN  = "Bld.gv";
+    $BIFN   = "bld.info";
+    $BWFN   = "bld.warn";
+    $BFFN   = "bld.fatal";
+
+    $USAGE = "\n".
+             " bld($VERSION) is a simple flexible non-hierarchical program that builds a single C/C++/Objective\n".
+             " C/Objective C++/Assembler target(executable or library(static or shared)) and, unlike\n".
+             " 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for automatic\n".
+             " header file dependency checking.  The operation of bld depends entirely on the\n".
+             " construction of the Bld(bld specification) and Bld.gv(bld global values) files.  See\n".
+             " the bld.README file.  There are no cmd line options(except for -h(this msg)) or\n".
+             " \$HOME/.bldrc or ./.bldrc files and no environment variables are used.  Complex\n".
+             " multi-target projects are built with the use of:\n\n".
+             "     Bld.<project>         - Bld files and target bld output files directory\n".
+             "     bld.<project>         - project source directory\n".
+             "     bld.<project>         - target construction script\n".
+             "     bld.<project>.rm      - target and bld.<info|warn|fatal>.<target> file removal script\n".
+             "     Bld.<project>.gv      - project global values file\n".
+             "     bld.<project>.install - target and file install script\n".
+             "     bld.<project>.README  - project specific documentation file\n\n".
+             " Current example projects:\n\n".
+             "     Bld.example - several examples intended to show how to create Bld and Bld.gv files\n\n".
+             "     The following are examples of bld'ing complex multi-target projects.  They are\n".
+             "     provided with releases. Unpack them in the main bld directory in the same place as\n".
+             "     the bld.examples and Bld.examples directories:\n".
+             "         bld.git.git-1.9.rc0.tar.gz -\n".
+             "             the git project http://git-scm.com/\n".
+             "         bld.svn.subversion-1.8.5.tar.gz -\n".
+             "             the subversion project http://subversion.apache.org/\n".
+             "         bld.systemd.systemd-208.tar.gz -\n".
+             "             the systemd project http://www.freedesktop.org/wiki/Software/systemd/\n\n".
+             " cd bld\n".
+             " Read bld.README.\n".
+             " Do './bld -h' for the usage msg.\n".
+             " Do 'perldoc bld' for the full man page.\n".
+             " Do './bld' to build the exec-c executable \"Hello, world!\" program.  This creates the\n".
+             "     bld.info, bld.warn and Bld.sig files which along with the Bld file gives an\n".
+             "     illustration of how to construct Bld files and the output that bld creates.\n\n";
+
+    $SIG_SRC = 0;
+    $SIG_CMD = 1;
+    $SIG_TGT = 2;
+    $HDR_DEP = 3;
+    $LIB_DEP = 4;
+
+    $RGX_HDR_EXT          = qr{
+                                  (?:
+                                      h   | # C
+                                      hh  | # C++
+                                      hp  | # C++
+                                      hxx | # C++
+                                      hpp | # C++
+                                      HPP | # C++
+                                      h++ | # C++
+                                      tcc   # C++
+                                  )
+                              }x;
+
+    $RGX_SRC_EXT          = qr{
+                                  (?:
+                                      c   | # C
+                                      cc  | # C++
+                                      cp  | # C++
+                                      cxx | # C++
+                                      cpp | # C++
+                                      CPP | # C++
+                                      c++ | # C++
+                                      C   | # C++
+                                      m   | # ObjC
+                                      mm  | # ObjC++
+                                      M   | # ObjC++
+                                      S   | # Assembler
+                                      sx  | # Assembler
+                                      i   | # C - no headers
+                                      ii  | # C++ - no headers
+                                      mi  | # ObjC - no headers
+                                      mii | # ObjC++ - no headers
+                                      s   | # Assembler - no headers
+                                      l   | # lex
+                                      y     # yacc
+                                  )
+                              }x;
+
+    $RGX_FILE_EXT         = qr{
+                                  (
+                                      [^.\/\\\ ]+? # file extension - no periods, forward/back slashes or spaces
+                                  )$
+                              }x;
+
+    $RGX_VALID_DIRS_LINE  = qr{
+                                  ^.*: # directory field
+                                   .*: # regex field
+                                   .*$ # cmd field
+                              }x;
+
+    $RGX_LIBS             = qr{
+                                  (?:
+                                      lib.*?[.]so.*? | # shared object libraries
+                                      lib.*?[.]a       # static libraries
+                                  )
+                              }x;
+
+    $RGX_VALID_PATH_CHARS = qr{ [\]\[\\\ \/A-Za-z0-9(){}'!@#$%^&_+-=;,.~`] }x;
+    $RGX_CMD_BLOCK        = qr{ ^{.*}$ }x;
+    $RGX_BLANK_LINE       = qr{ ^\s*$ }x;
+    $RGX_COMMENT_LINE     = qr{ ^\s*\# }x;
+
+    $COLON = q{:};
+    $EMPTY = q{};
+    $SPACE = q{ };
+
+    # hdr processible files
+
+        # C source code
+        $Depend{'hdr'}{'c'}{'c'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'c'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'c'}{'ext'}{'i'} = undef;
+
+        # C++ source code
+        $Depend{'hdr'}{'c'}{'cc'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'cc'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'cc'}{'ext'}{'ii'} = undef;
+
+        $Depend{'hdr'}{'c'}{'cp'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'cp'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'cp'}{'ext'}{'ii'} = undef;
+
+        $Depend{'hdr'}{'c'}{'cxx'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'cxx'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'cxx'}{'ext'}{'ii'} = undef;
+
+        $Depend{'hdr'}{'c'}{'cpp'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'cpp'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'cpp'}{'ext'}{'ii'} = undef;
+
+        $Depend{'hdr'}{'c'}{'CPP'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'CPP'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'CPP'}{'ext'}{'ii'} = undef;
+
+        $Depend{'hdr'}{'c'}{'c++'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'c++'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'c++'}{'ext'}{'ii'} = undef;
+
+        $Depend{'hdr'}{'c'}{'C'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'C'}{'ext'}{'s'} = undef;
+        $Depend{'hdr'}{'E'}{'C'}{'ext'}{'ii'} = undef;
+
+        # objective C source code
+        $Depend{'hdr'}{'c'}{'m'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'m'}{'ext'}{'s'} = undef;
+
+        # objective C++ source code
+        $Depend{'hdr'}{'c'}{'mm'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'mm'}{'ext'}{'s'} = undef;
+
+        $Depend{'hdr'}{'c'}{'M'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'S'}{'M'}{'ext'}{'s'} = undef;
+
+        # assembler source code
+        $Depend{'hdr'}{'c'}{'S'}{'ext'}{'o'} = undef;
+        $Depend{'hdr'}{'c'}{'sx'}{'ext'}{'o'} = undef;
+
+        # lex specification
+        $Depend{'hdr'}{'n'}{'l'}{'ext'}{'c'} = undef;
+        $Depend{'hdr'}{'n'}{'l'}{'ext'}{'cc'} = undef;
+        $Depend{'hdr'}{'n'}{'l'}{'file'}{'lex.yy.c'} = undef;
+
+        # yacc specification
+        $Depend{'hdr'}{'n'}{'y'}{'ext'}{'c'} = undef;
+        $Depend{'hdr'}{'n'}{'y'}{'file'}{'y.tab.c'} = undef;
+
+    # not hdr processible files
+
+        # C source code
+        $Depend{'nothdr'}{'c'}{'i'}{'ext'}{'o'} = undef;
+
+        # C++ source code
+        $Depend{'nothdr'}{'c'}{'ii'}{'ext'}{'o'} = undef;
+
+        # objective C source code
+        $Depend{'nothdr'}{'c'}{'mi'}{'ext'}{'o'} = undef;
+
+        # objective C++ source code
+        $Depend{'nothdr'}{'c'}{'mii'}{'ext'}{'o'} = undef;
+
+        # assembler source code
+        $Depend{'nothdr'}{'c'}{'s'}{'ext'}{'o'} = undef;
+}
+
+
+# START: main bld program block
+{
+    my
+    (
+        # file related
+        @eval,    # contents of the $BFN file EVAL section
+        $dirs,    # contents of the $BFN file DIRS section before \s+ compression
+        @dirs,    # contents of the $BFN file DIRS section after \s+ compression
+
+        $opt_h,   # -h cmd line help option, do ./bld -h
+
+        $comment_section, # holds comment section in Bld file for printing in $BIFN file
+
+        # mandatory variable definitions in the EVAL section of $BFN
+            $bld,        # the target to built e.g. executable, libx.a, libx.so
+            $bldcmd,     # cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+            $lib_dirs,   # space separated list of directories to search for libraries
+
+            # mandatory option related in the EVAL section of $BFN
+                $opt_s,     # to use system header files in dependency checking("system" or "nosystem")
+                $opt_r,     # to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+                $opt_lib,   # to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
+
+        # booleans
+        $rebuild_chgsrc, # boolean to indicate a source file has changed
+        $rebuild_nosrc,  # boolean to indicate a(any) source file has been deleted
+        $rebuild_target, # boolean to indicate the target has:
+                         #     1. target is missing
+                         #     2. signature of target does not exist in $SIGFN signature file
+                         #     3. signature of target exists in signature file but is changed from actual existing target
+
+        # primary program data structures
+            %Sigdata,
+                # signature data and build target library dependency data
+                #
+                # the hash will be two levels(for source file signature, build cmd signature and build target signature data):
+                # $Sigdata{<full path or relative path file source>}[<$SIG_SRC or $SIG_CMD or $SIG_TGT>] = '<signature>'
+                #     a. the first level hash has a key of the source file full path or relative path name e.g. 'src/source.c' or '/usr/include/fcntl.h'
+                #     b. the second level array has one of three index values:
+                #         1. $SIG_SRC - source signature e.g. signature of 'source.c' or 'header.h' or 'libx.so'
+                #         2. $SIG_CMD - build cmd signature e.g. signature of 'clang -c source.c -lm'
+                #         3. $SIG_TGT - target signature e.g. signature of 'source.o'
+                #     c. the values are signatures
+                #
+                # Example: # signature of source file
+                #          $Sigdata{'src/C/main.c'}[$SIG_SRC] = 'e8bc19c1ccd64bbbe71e6a73a3a017bbaafd33e5';
+                #
+                #          # signature of source file build cmd
+                #          $Sigdata{'src/C/main.c'}[$SIG_CMD] = 'f951dd4b3366670d9fc8d71da1b74b3b5d5fade8';
+                #
+                #          # signature of source file target file e.g. main.o
+                #          $Sigdata{'src/C/main.c'}[$SIG_TGT] = '4a62b30b41272438b3575822223877457366c8db';
+                #
+                #          # signature of full path header file
+                #          $Sigdata{'/usr/include/wchar.h'}[$SIG_SRC] = '587c23d7ebd0856b9a9a59c8b0c6469bf0c75963';
+                #
+                #          # signature of relative path header file
+                #          $Sigdata{'src/C/head.h'}[$SIG_SRC] = '7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
+                #
+                #          # signature of build target
+                #          $Sigdata{'exec-c'}[$SIG_SRC] = '7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
+                #
+                # the hash will have three levels(for build target library file dependency data):
+                # $Sigdata{<build target>}[<$LIB_DEP>]{<library file name>} = undef
+                #     a. the first level hash has a key of the build target file name e.g. exec-c
+                #     b. the second level array has an index values of $LIB_DEP - a library dependency e.g. libm.so
+                #     c. the third level hash has a key of the library file name
+                #     d. the values are undef
+                #
+                # Example: # library dependency of build target
+                #          $Sigdata{'exec-c'}[$LIB_DEP]{'/lib64/libc.so.6'} = undef;
+                #
+                #          # library dependency of build target
+                #          $Sigdata{'exec-c'}[$LIB_DEP]{'/lib64/libm.so.6'} = undef;
+                #
+                # Purpose: holds $SIGFN file signature data read in at program start for comparison to %SigdataNew program calculated data to
+                #          determine what, if anything, to rebuild
+
+            %SigdataNew,
+                # signature and dependency information
+                #
+                # the hash will have two levels(for signature data):
+                # $SigdataNew{<full path or relative path file source>}[<$SIG_SRC or $SIG_CMD or $SIG_TGT>] = '<signature>'
+                #     a. the first level hash has a key of the source file full path or relative path name e.g. 'src/source.c' or '/usr/include/fcntl.h'
+                #     b. the second level array has one of three index values:
+                #         1. $SIG_SRC - source signature e.g. signature of source.c or header.h or libx.so
+                #         2. $SIG_CMD - build cmd signature e.g. signature of "clang -c source.c -lm"
+                #         3. $SIG_TGT - target signature e.g. signature of source.o
+                #     c. the values are signatures
+                #
+                # Example: # library signature
+                #          $SigdataNew{'/lib64/libc.so.6'}[$SIG_SRC] = '7c135fc5b3aca5ef9064bdbd51608cf1aad6feee';
+                #
+                #          # build target signature
+                #          $SigdataNew{'exec-c'}[$SIG_SRC] = '95b0de6b76a336aed5bfb1a5fa1d757ccf1eabfc';
+                #
+                #          # signature of source file
+                #          $SigdataNew{'src/C/main.c'}[$SIG_SRC] = 'e8bc19c1ccd64bbbe71e6a73a3a017bbaafd33e5';
+                #
+                #          # signature of source file build cmd
+                #          $SigdataNew{'src/C/main.c'}[$SIG_CMD] = 'f951dd4b3366670d9fc8d71da1b74b3b5d5fade8';
+                #
+                #          # signature of source file target file e.g. main.o
+                #          $SigdataNew{'src/C/main.c'}[$SIG_TGT] = '4a62b30b41272438b3575822223877457366c8db';
+                #
+                #          # signature of full path header file
+                #          $SigdataNew{'/usr/include/stdc-predef.h'}[$SIG_SRC] = '51eecd0afe5466d0ea173369fbe0c91657f92d53';
+                #
+                #          # signature of relative path header file
+                #          $SigdataNew{'src/include/head.h'}[$SIG_SRC] = 'i7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
+                #
+                # the hash will have three levels(for header file or library file dependency data):
+                # $SigdataNew{<full path or relative path file source>}[<$HDR_DEP or $LIB_DEP>]{<file name>} = undef
+                #     a. the first level hash has a key of the source file full path or relative path name e.g. 'src/source.c' or '/usr/include/fcntl.h'
+                #     b. the second level array has one of two index values:
+                #         1. $HDR_DEP - a header dependency - the source depends on a header e.g. header.h
+                #         2. $LIB_DEP - a library dependency - the $bldcmd for the $bld target depends on a library e.g. libm.so
+                #     c. the third level hash has a key of the header or library file name
+                #     d. the values are undef
+                #
+                # Example: # library dependency of build target
+                #          $SigdataNew{'exec-c'}[$LIB_DEP]{'/lib64/libm.so.6'} = undef;
+                #
+                #          # library dependency of build target
+                #          $SigdataNew{'exec-c'}[$LIB_DEP]{'/lib64/libc.so.6'} = undef;
+                #
+                #          # source file full path header dependency
+                #          $SigdataNew{'src/C/main.c'}[$HDR_DEP]{'/usr/include/_G_config.h'} = undef;
+                #
+                #          # source file relative path header dependency
+                #          $SigdataNew{'src/C/main.c'}[$HDR_DEP]{'src/C/l.hh'} = undef;
+                #
+                # Purpose: holds program calculated data - command, source, header, library and target file signature data as well as source file header dependencies and build
+                #          cmd library dependencies.  data in this structure is compared with data in the %Sigdata structure to determine what, if anything, to rebuild.  just
+                #          before program exit the $SIG_SRC, $SIG_CMD and $SIG_TGT signatures of %SigdataNew are written to $SIGFN and becomes the %Sigdata for the next run.
+
+            %Objects,
+                # object files
+                #
+                # the hash will be one level:
+                # $Objects{<relative path object file>} = undef
+                #     a. the keys are the object file relative path name starting from the bld home directory e.g. src/somefile.o
+                #     b. the values are undef
+                #
+                # Example: # the tt.o object file
+                #          $Objects{"\'src/C/y/tt.o\'"} = undef;
+                #
+                #          # the main.o object file
+                #          $Objects{"\'src/C/main.o\'"} = undef;
+                #
+                #          Note: the inclusion of literal single quotes around the source to avoid problems with directories that have embedded spaces
+                #
+                # Purpose: used in the $bldcmd required variable to build the $bld target
+
+            %SourceSig,
+                # source file signatures - signatures for all source files(code or header) or libraries in the build
+                #
+                # the hash will be two levels:
+                # $SourceSig{'<signature>'}{'<full path or relative path file source>'} = undef
+                #     a. the first level hash has a key of the source signature e.g. signature of source.c or header.h or libx.so
+                #     b. the second level hash has a key of the full or relative path file
+                #     c. the values are undef
+                #
+                # Example: # w.c has same signature as w1.c
+                #          $SourceSig{'9811db426524b5cc3e453961e3294a9eb713ae60'}{'src/C/z/w.c'} = undef;
+                #
+                #          # w1.c has same signature as w.c
+                #          $SourceSig{'9811db426524b5cc3e453961e3294a9eb713ae60'}{'src/C/z/w1.c'} = undef;
+                #
+                #          # main.c has a unique signature
+                #          $SourceSig{'e8bc19c1ccd64bbbe71e6a73a3a017bbaafd33e5'}{'src/C/main.c'} = undef;
+                #
+                #          # the head.h file is in three different places
+                #          $SourceSig{'7354a1b2a464cb3a0f6444d4363c4aae7e40b362'}{'src/C/head.h'} = undef;
+                #
+                #          # the head.h file is in three different places
+                #          $SourceSig{'7354a1b2a464cb3a0f6444d4363c4aae7e40b362'}{'src/C/../include/head.h'} = undef;
+                #
+                #          # the head.h file is in three different places
+                #          $SourceSig{'7354a1b2a464cb3a0f6444d4363c4aae7e40b362'}{'src/include/head.h'} = undef;
+                #
+                # Purpose: if %SourceSig has, for a given $signature(first subscript), has more than one source or library file entry(second subscript)
+                #          then there is a source or library of the same signature in two different places
+
+            %Targets,
+                # target files - relative path(from the bld directory)
+                #
+                # the hash will be one level:
+                # $Targets{'<relative path file target>'} = undef
+                #     a. the first level hash has a key of the relative path(from the bld directory) build file target e.g. src/C/main.o(from main.c) or src/C/lex.c(from lex.l)
+                #     b. the values are undef
+                #
+                # Example: # build target of m.c source
+                #          $Targets{'src/C/a b/m.o'} = undef;
+                #
+                #          # build target of main.c source using gcc
+                #          $Targets{'src/C/main.o'} = undef;
+                #
+                #          # build target of main.c source using as
+                #          $Targets{'src/C/main.s'} = undef;
+                #
+                # Purpose: for each source picked up by a DIRS section regex and built by the corresponding cmd a single target file will be produced.
+                #          these files in relative path form from the build directory are used as hash keys.  if two identical target file names are created
+                #          (both path and file name) they would overwriting one another.  as targets are added to the build, a new hash key that
+                #          already exists will fatal().  if a source is not rebuilt then it will not be added to %Targets.  only rebuilt targets are added.
+    );
+
+    # initially interrupts just croak(); after the $BFN file has been processed and the $SIGFN has been read in, int_sig_handler()
+    # will handle them and first write out any partially accumulated new signatures to $SIGFN and then croak().
+    local $SIG{INT} = sub {
+                              my (
+                                     $signame,
+                                 ) = @_;
+
+                                 croak("\nInterrupted with signal $signame");
+                          };
+
+    GetOptions
+    (
+        "h" => \$opt_h,
+    ) or fatal("FID 1: GetOptions() failed(use bld -h).");
+
+    fatal("FID 2: Arguments specified - takes only options.") if @ARGV > 0;
+
+    # help msg
+    opt_help() if $opt_h;
+
+    {
+        # clear $BIFN, $BWFN and $BFFN files
+
+        open my $bifnfh, ">", $BIFN;
+        close $bifnfh;
+        open my $bwfnfh, ">", $BWFN;
+        close $bwfnfh;
+        open my $bffnfh, ">", $BFFN;
+        close $bffnfh;
+    }
+
+    # scan $BFN file accumulating EVAL lines(in @eval) and DIRS lines(in $dirs) for later processing.
+    my ( @tmp ) = Bld_section_extract();
+    $comment_section = shift @tmp;
+    $dirs = pop @tmp;
+    @eval = @tmp;
+
+    if ( @eval == 0 )
+    {
+        fatal("FID 5: $BFN EVAL section is empty.");
+    }
+
+    {
+        # if a $BGVFN file exists read in as an array and prepend to the @eval array.
+        # this allows the $BGVFN file to serve as a source of global variable defines.
+
+        my @bldrc;
+
+        # slurp in $BGVFN file to array
+        if ( -f "$BGVFN" and -r "$BGVFN" )
+        {
+            open my $bldrcfh, "<", "$BGVFN";
+            @bldrc = <$bldrcfh>;
+            close $bldrcfh;
+        }
+
+        unshift @eval, @bldrc;
+    }
+
+    {
+        # eval() the EVAL section code of the $BFN file.  this must be 'no strict' or
+        # interpolation will complain about undefined variables.
+
+        no strict;
+        eval "@eval";
+        use strict;
+
+        # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
+        if ( $EVAL_ERROR )
+        {
+            fatal("FID 6: $BFN EVAL section: Fatal eval error: $EVAL_ERROR");
+        }
+
+        fatal("FID 7: Invalid value for \$opt_s: \'$opt_s\'") if $opt_s ne "system" and $opt_s ne "nosystem";
+        fatal("FID 8: Invalid value for \$opt_r: \'$opt_r\'") if $opt_r ne "rebuild" and $opt_r ne "norebuild";
+        fatal("FID 9: Invalid value for \$opt_lib: \'$opt_lib\'") if
+            $opt_lib ne "nolibcheck" and
+            $opt_lib ne "libcheck" and
+            $opt_lib ne "warnlibcheck" and
+            $opt_lib ne "fatallibcheck";
+    }
+
+    if ( not defined $bld or not defined $bldcmd or not defined $lib_dirs )
+    {
+        fatal("FID 10: One or more of $BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
+    }
+
+    if ( not defined $opt_s or not defined $opt_r or not defined $opt_lib )
+    {
+        fatal("FID 11: One or more of $BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
+    }
+
+    $bld =~ s{^\s*|\s*$}{}g; # strip pre/post white space
+    $bldcmd =~ s{^\s*|\s*$}{}g; # strip pre/post white space
+    $bldcmd =~ s{\s+}{ }g; # compress white space to a single space
+    $lib_dirs =~ s{^\s*|\s*$}{}g; # strip pre/post white space
+    $lib_dirs =~ s{\s+}{ }g; # compress white space to a single space
+
+    # if "nosystem" remove library search directories that start with '/'
+    if ( $opt_s eq "nosystem" )
+    {
+        my @tmp = grep { /^[^\/]/ } split /\s+/, $lib_dirs;
+        $lib_dirs = join $SPACE, @tmp;
+    }
+
+    # write initial info to the bld.info file
+    init_blddotinfo( $bld, $bldcmd, $lib_dirs, $opt_s, $opt_r, $opt_lib, $comment_section );
+
+    # process $BFN file DIRS section
+    @dirs = dirs_pro( $dirs, $opt_s );
+
+    # scan EVAL and DIRS sections for variables.  if variables in EVAL but not in DIRS do warning().
+    # if variables in DIRS but not in EVAL, do warning() and fatal().
+    variable_match( \@eval, \@dirs );
+
+    # read $SIGFN file data into %Sigdata
+    read_Blddotsig( $bld, \%Sigdata );
+
+    # enable ^C interruption
+    local $SIG{INT} = \&int_sig_handler;
+
+    # 
+    # Usage      : ^C
+    #            : kill INT => $PID;
+    #
+    # Purpose    : interrupt handler, not called directly, but by the program receiving at INT signal.
+    #            : this may happen in two ways - a. a ^C is typed at the keyboard during program execution and
+    #            : b. during a call to the fatal() routine.  fatal() prints it's calling msg to the $BFFN file
+    #            : and then signals an INT to the program.
+    #
+    # Parameters : called with the SIG name of the interrupt
+    #
+    # Returns    : None
+    #
+    # Globals    : %Sigdata
+    #            : %SigdataNew
+    #
+    # Throws     : croak()'s
+    #
+    # Notes      : None
+    #
+    # See Also   : None
+    #
+    sub int_sig_handler
+    {
+        #requires global variables:
+        my (
+               $signame,
+           ) = @_;
+
+        %SigdataNew = ( %SigdataNew, %Sigdata );
+
+        sig_file_update( $bld, \%SigdataNew );
+
+        croak("\nInterrupted with signal $signame");
+    }
+
+
+    #
+    # CHECK COMPILATION UNITS
+    #
+
+    # boolean to indicate that any source file was rebuilt and thus $bld will need rebuilding
+    $rebuild_chgsrc = "false";
+
+    # for each directory line in $BFN, check sources and if needed rebuild with $cmd
+    # for that directory.  a source file will be rebuilt if a $SIGFN file signature entry
+    # does not exist for this source file, indicating a new source file, or the source
+    # file signature has changed.
+
+    foreach my $line ( @dirs )
+    {
+        given ( $line )
+        {
+            when ( m{$RGX_CMD_BLOCK} )
+            {
+                # DIRS section cmd block
+                my $cmd = $line;
+
+                $cmd =~ s{^\{|\}$}{}g; # remove $cmd delimiters
+
+                my $cmd_var_sub = var_sub( $cmd );
+
+                if ( $cmd_var_sub ne $EMPTY )
+                {
+                    my ( $status, $error_msg );
+
+                    $cmd_var_sub =~ s{!!!}{\n}g;
+
+                    # execute $cmd's
+                    $status = system "$cmd_var_sub";
+
+                    if ( $status != 0 )
+                    {
+                        $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                        fatal("FID 17: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
+                    }
+                }
+
+                print "{$cmd_var_sub}\n";
+                next;
+            }
+            when ( m{$RGX_VALID_DIRS_LINE} )
+            {
+                # DIRS section three field specification line - dir:regex:{cmd}
+
+                # split dir lines on ":" and remove $regex_srcs enclosing '{' and '}', and $cmd enclosing '{' and '}'
+                my ($dir, $regex_srcs, $cmd) = split $COLON, $line;
+
+                # add double quotes around the source file $s in order to handle spaces in the file name
+                $cmd =~ s{\$s}{"\$s"}g;
+
+                $regex_srcs =~ s{^\{|\}$}{}g; # remove $regex_srcs regex delimiters
+                $cmd =~ s{^\{|\}$}{}g; # remove $cmd delimiters
+
+                opendir my ( $dirfh ), $dir;
+
+                # a. read $dir directory b. select only ordinary files that match $regex_srcs c. map files to relative path name
+                my @Sources = map { "$dir/$_" } grep { $_ =~ m{$regex_srcs} and -f "$dir/$_" } readdir $dirfh;
+                closedir $dirfh;
+
+                foreach my $s ( @Sources )
+                {
+                    my ( $truefalse );
+
+                    $truefalse = src_pro( $s, $cmd, $bld, $opt_s, $opt_r, \%Sigdata, \%Depend, \%SigdataNew, \%SourceSig, \%Objects, \%Targets );
+
+                    # if any $s needs rebuilding set $rebuild_chgsrc to "true"
+                    if ( $truefalse eq "true" )
+                    {
+                        $rebuild_chgsrc = "true";
+                    }
+                } # END: foreach my $s (@Sources){}
+            }
+            default
+            {
+                fatal("FID 18: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+            }
+        }
+    } # END: foreach my $line ( @dirs ){}
+
+    if ( not %Objects )
+    {
+        fatal("FID 19: No source file matched in any DIRS section line regular expression.");
+    }
+
+
+    #
+    # CHECK TARGET AND REBUILD IF NECESSARY
+    #
+
+    # boolean indicating to rebuild target if any of three conditions is true:
+    #     1. target is missing
+    #     2. signature of target does not exist in $SIGFN signature file
+    #     3. signature of target exists in signature file but is changed from actual existing target
+    $rebuild_target = rebuild_target_bool( $bld, $bldcmd, $lib_dirs, $opt_lib, \%Sigdata, \%SigdataNew );
+
+    # if a(any) source has been deleted($s exists in %Sigdata and does not exist in %SigdataNew) then force rebuild
+    $rebuild_nosrc = "false";
+    foreach my $s ( keys %Sigdata )
+    {
+        if ( not $s ~~ %SigdataNew )
+        {
+            $rebuild_nosrc = "true";
+        }
+    }
+
+    # rebuild if:
+    #     1. a source file of executable has changed($rebuild_chgsrc)
+    #     2. or a source file has been deleted($rebuild_nosrc)
+    #     3. or the target is has any of the three conditions listed above($rebuild_target)
+    if ( $rebuild_chgsrc eq "true" or $rebuild_nosrc eq "true" or $rebuild_target eq "true" )
+    {
+        if ( $opt_r eq "norebuild" )
+        {
+            # print executable file name that would be rebuilt, but do not rebuild
+            print "---WILL--- be rebuilt: $bld\n";
+        }
+        else
+        {
+            rebuild_exec( $bld, $bldcmd, $lib_dirs, $opt_lib, \%Objects, \%SigdataNew );
+        }
+    }
+    else
+    {
+        if ( $opt_r eq "norebuild" )
+        {
+            # print executable file name that will not be rebuilt
+            print "$bld will NOT be rebuilt.\n";
+        }
+        else
+        {
+            print "$bld is up to date.\n";
+        }
+    }
+
+    # DEBUG
+    # if debugging, for dumping the primary program data structures
+=for
+    print "DEBUG:\n";
+    print Data::Dumper->new([\%Depend],[qw(\%Depend)])->Indent(3)->Quotekeys(0)->Dump;
+    print Data::Dumper->new([\%Sigdata],[qw(\%Sigdata)])->Indent(3)->Quotekeys(0)->Dump;
+    print Data::Dumper->new([\%SigdataNew],[qw(\%SigdataNew)])->Indent(3)->Quotekeys(0)->Dump;
+    print Data::Dumper->new([\%Objects],[qw(\%Objects)])->Indent(3)->Quotekeys(0)->Dump;
+    print Data::Dumper->new([\%SourceSig],[qw(\%SourceSig)])->Indent(3)->Quotekeys(0)->Dump;
+    print Data::Dumper->new([\%Targets],[qw(\%Targets)])->Indent(3)->Quotekeys(0)->Dump;
+    print "ENDDEBUG:\n";
+=cut
+
+    # if %SourceSig, for a given $signature(first subscript), has more than one source or library file entry(second subscript)
+    # then there is a source or library of the same signature in two different places
+    multiple_sigs( \%SourceSig );
+
+    # if $opt_r option is "norebuild" do not rebuild - do not touch $SIGFN file
+    if ( $opt_r eq "norebuild" ) { exit 0; }
+
+    # ignore interrupts while $SIGFN is being written
+    local $SIG{INT} = 'IGNORE';
+
+    # writes %SigdataNew signature data to $SIGFN and header/code file inventory to $BIFN
+    sig_file_update( $bld, \%SigdataNew );
+
+    exit 0;
+}
+# END: main bld program block
+
+
+#
+# SUBROUTINES SECTION - Global data dependent(only var_sub())
+#
+#     Note: The global data is all of the variables imported from the EVAL section of the $BFN file by the eval "" of that section
+#
+
+
+# 
+# Usage      : $cmd_var_sub = var_sub( $cmd );
+#            :     - note: called in scalar context
+#            : %dirs_vars_tmp = var_sub( $cmd, '$s' );
+#            :     - note: called in list context
+#            : %eval_vars = var_sub( $eval_vars, '$bld', '$bldcmd', '$lib_dirs', '$O', '$opt_s', '$opt_r', '$opt_lib' );
+#            :     - note: called in list context
+#
+# Purpose    : depending on the calling context do:
+#            :     1. scalar context - simple variable($name) substitution and return the substituted string.
+#            :     2. list context - create a hash of string,
+#            :        for $a = 1 - key = 'simple variable name($a -> 'a')'/value = 'simple variable value(1)',
+#            :        entries and return the hash.
+#            : exclude from processing the list of variable entries after the $cmd input string.
+#            : the return depends on calling context(see wantarray()).
+#
+# Parameters : $cmd     - command string
+#            :            Note: $cmd may have embedded newlines.  this is OK as m{\$(\w+)}g should match newlines.
+#            :
+#            : @exclude - list of variables to exclude from substitution - applies to both $cmd and %h returns.
+#            :            these variables may be specified either with or without the leading '$' sign. e.g. '$bld' or 'bld'
+#
+# Returns    :     1. if wantarray is false:
+#            :            do variable substitution on $cmd, excepting variable names
+#            :            passed in the @exclude array, and return it
+#            :     2. if wantarray is true:
+#            :            extract variable names from $cmd and build a hash with variable names
+#            :            as keys and values as the values of those variables - return that hash
+#
+# Globals    : All of the variables imported from the EVAL section by the eval "" of that section
+#
+# Throws     : None
+#
+# Notes      : 1. the exclude list may have variables listed without the scalar variable prefix $ sign e.g. 'bld'.  however,
+#            :    '$bld' seems better because it reminds the user that the exclude list is a list of variables.
+#            : 2. the @exclude arguments must not be interpolated - thus they should be of the form '$string' with single quotes
+#            : 3. ignore entirely any %hash variables($hash{a}) or @array variables($array[0]) -
+#            :    these may be used freely in the EVAL section
+#
+# See Also   : perldoc -f wantarray
+#
+sub var_sub
+{
+    my (
+           $cmd,
+           @exclude,
+       ) = @_;
+
+    # hash with variable/variable value
+    my ( %h );
+
+    # for return type
+    my ( $wantarray );
+
+
+    $wantarray = wantarray();
+
+    foreach my $exclude ( @exclude )
+    {
+        $exclude =~ s{^\$}{}; # strip leading '$' sign
+    }
+
+    # find all(except from @exclude) simple perl variables($name) and, depending on the calling context,
+    # either substitute their values or build a hash with variable/variable value entries.  ignore
+    # entirely any %hash variables($hash{a}) or @array variables($array[0])
+    while ( $cmd =~ m{ \$(\w+)(?:\s|=) }gx )
+    {
+        my $varmatch = $1;
+
+        # if $varmatch is in @exclude skip it
+        last if $varmatch ~~ @exclude;
+
+        no strict;
+        if ( $wantarray )
+        {
+            $h{"\$$varmatch"} = ${$varmatch};
+        }
+        else
+        {
+            $cmd =~ s{\$$varmatch}{${$varmatch}};
+        }
+        use strict;
+    }
+
+    return $wantarray ? %h : $cmd;
+}
+
+
+#
+# SUBROUTINES SECTION - Global data independent
+#
+#     Note: All subroutine data comes from their arguments(except globally defined constants).
+#           They return all data thru their return lists.  No global data is used.  Some routines
+#           write to files e.g. bld.warn, bld.info.  Some subroutines read files in order to
+#           calculate signatures.
+#
+
+
+# 
+# Usage      : my ( @tmp ) = Bld_section_extract();
+#
+# Purpose    : scan $BFN file accumulating EVAL lines(in @eval) and DIRS lines(in $dirs) for later processing.
+#
+# Parameters : None
+#
+# Returns    : $comment_section - 
+#            : @eval - 
+#            : $dirs - 
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub Bld_section_extract
+{
+    my (
+       ) = @_;
+
+    my ( @eval );
+    my ( $bfnfh, $bfnfile );
+    my ( $dirs, $comment_section, $eval_section, $dirs_section );
+
+
+    # slurp in whole file to scalar
+    if ( not -e $BFN )
+    {
+	fatal("FID 3: $BFN file missing.");
+    }
+    open $bfnfh, "<", $BFN;
+    $bfnfile = do { local $INPUT_RECORD_SEPARATOR = undef; <$bfnfh> };
+    close $bfnfh;
+
+    # match $BFN for EVAL and DIRS sections and extract them
+    if (
+	   $bfnfile =~ m{
+			    (.*?)  # matches comment section - minimal match guarantees that only first EVAL will match
+			    ^EVAL$ # matches ^EVAL$ line
+			    (.*?)  # matches EVAL section lines - minimal match guarantees that only first DIRS will match
+			    ^DIRS$ # matches ^DIRS$ line
+			    (.*)   # matches DIRS section lines - maximal match picks up rest of file
+			}xms
+       )
+    {
+	$comment_section = $1;
+	$eval_section = $2;
+	$dirs_section = $3;
+    }
+    else
+    {
+	fatal("FID 4: $BFN invalid format - need EVAL and DIRS sections.");
+    }
+
+    # accumulate EVAL section lines in @eval
+    while ( $eval_section =~ m{ ^(.*)$ }gxm )
+    {
+	my $eval_line = $1;
+
+	# ignore if comment or blank line(s)
+	next if ( $eval_line =~ $RGX_COMMENT_LINE or $eval_line =~ $RGX_BLANK_LINE );
+
+	push @eval, $eval_line;
+    }
+
+    # accumulate DIRS section lines in $dirs - including newlines
+    while ( $dirs_section =~ m{ ^(.*)$ }gxm )
+    {
+	my $dirs_line = $1;
+
+	# ignore if comment or blank line(s)
+	next if ( $dirs_line =~ $RGX_COMMENT_LINE or $dirs_line =~ $RGX_BLANK_LINE );
+
+	$dirs .= "$dirs_line\n";
+    }
+
+    return ( $comment_section, @eval, $dirs );
+}
+
+
+# 
+# Usage      : init_blddotinfo( $bld, $bldcmd, $lib_dirs, $opt_s, $opt_r, $opt_lib, $comment_section );
+#
+# Purpose    : write initial info to the bld.info file
+#
+# Parameters : $bld             - the target to built e.g. executable or libx.a or libx.so
+#            : $bldcmd          - cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+#            : $lib_dirs        - space separated list of directories to search for libraries
+#            : $opt_s           - to use system header files in dependency checking("system" or "nosystem")
+#            : $opt_r           - to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+#            : $opt_lib         - to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
+#            : $comment_section - holds comment section in Bld file for printing in $BIFN file
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub init_blddotinfo
+{
+    my (
+           $bld,
+           $bldcmd,
+           $lib_dirs,
+           $opt_s,
+           $opt_r,
+           $opt_lib,
+           $comment_section,
+       ) = @_;
+
+
+    open my $bifnfh, ">>", $BIFN;
+
+    print {$bifnfh} "\nOS: $OSNAME\n";
+
+    print {$bifnfh} "\nbld version: $VERSION\n\n";
+
+    my $perl = `which perl 2>&1`;
+    chomp $perl;
+    if ( $perl =~ m{which:\sno} )
+    {
+	print {$bifnfh} sprintf "perl full path: No perl in \$PATH\n";
+    }
+    else
+    {
+	print {$bifnfh} sprintf "perl full path: %s\n", $perl;
+	print {$bifnfh} sprintf "perl version: %s\n", `perl -V 2>&1`;
+    }
+
+    my $cpp = `which cpp 2>&1`;
+    chomp $cpp;
+    if ( $cpp =~ m{which:\sno} )
+    {
+	print {$bifnfh} sprintf "cpp full path: No cpp in \$PATH\n";
+    }
+    else
+    {
+	print {$bifnfh} sprintf "cpp full path: %s\n", $cpp;
+	print {$bifnfh} sprintf "cpp version: %s\n", `cpp --version 2>&1`;
+    }
+
+    my $gcc = `which gcc 2>&1`;
+    chomp $gcc;
+    if ( $gcc =~ m{which:\sno} )
+    {
+	print {$bifnfh} sprintf "gcc full path: No gcc in \$PATH\n";
+    }
+    else
+    {
+	print {$bifnfh} sprintf "gcc full path: %s\n", $gcc;
+	print {$bifnfh} sprintf "gcc version: %s\n", `gcc --version 2>&1`;
+    }
+
+    my $gpp = `which g++ 2>&1`;
+    chomp $gpp;
+    if ( $gpp =~ m{which:\sno} )
+    {
+	print {$bifnfh} sprintf "g++ full path: No g++ in \$PATH\n";
+    }
+    else
+    {
+	print {$bifnfh} sprintf "g++ full path: %s\n", $gpp;
+	print {$bifnfh} sprintf "g++ version: %s\n", `g++ --version 2>&1`;
+    }
+
+    my $clang = `which clang 2>&1`;
+    chomp $clang;
+    if ( $clang =~ m{which:\sno} )
+    {
+	print {$bifnfh} sprintf "clang full path: No clang in \$PATH\n";
+    }
+    else
+    {
+	print {$bifnfh} sprintf "clang full path: %s\n", $clang;
+	print {$bifnfh} sprintf "clang version: %s\n", `clang --version 2>&1`;
+    }
+
+    print {$bifnfh} "\n####################################################################################################\n";
+    print {$bifnfh} "comments section of Bld file:\n";
+    print {$bifnfh} "$comment_section";
+
+    print {$bifnfh} "\n####################################################################################################\n";
+    print {$bifnfh} "EVAL section expansion of \$bld, \$bldcmd and \$lib_dirs mandatory variables(\$O is object files):\n\n";
+    print {$bifnfh} "\$bld = $bld\n";
+    print {$bifnfh} "\$bldcmd = \"$bldcmd\"\n";
+    print {$bifnfh} "\$lib_dirs = \"$lib_dirs\"\n\n";
+    print {$bifnfh} "EVAL section expansion of \$opt_s and \$opt_r and \$opt_lib mandatory option variables:\n\n";
+    print {$bifnfh} "\$opt_s = \"$opt_s\"\n";
+    print {$bifnfh} "\$opt_r = \"$opt_r\"\n";
+    print {$bifnfh} "\$opt_lib = \"$opt_lib\"\n";
+    close $bifnfh;
+}
+
+
+# 
+# Usage      : read_Blddotsig( $bld, \%Sigdata );
+#
+# Purpose    : read $SIGFN file data into %Sigdata
+#
+# Parameters : $bld      - the target to built e.g. executable or libx.a or libx.so
+#            : \%Sigdata - hash holding $SIGFN file signature data
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub read_Blddotsig
+{
+    my (
+           $bld,
+           $Sigdata_ref,
+       ) = @_;
+
+
+    if ( not -e "$SIGFN" )
+    {
+        return;
+    }
+
+    my $RGX_SHA1 = "[0-9a-f]\{40\}";  # regex to validate SHA1 signatures - 40 chars and all 0-9a-f
+
+    # open $SIGFN signature file
+    open my $sigfn, "<", $SIGFN;
+
+    # build hash of $SIGFN file signatures with source file names as keys
+    while ( my $line = <$sigfn> )
+    {
+	next if $line =~ $RGX_BLANK_LINE;
+
+	given ( $line )
+	{
+	    when ( m{^'(.*?)'\s($RGX_SHA1)$} )
+	    {
+		my $file = $1;
+		my $sigsource = $2;
+
+		if ( $sigsource !~ m{^$RGX_SHA1$} )
+		{
+		    fatal("FID 12: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+		}
+
+		$Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
+
+		if ( $file =~ m{$RGX_LIBS} )
+		{
+		    $Sigdata_ref->{$bld}[$LIB_DEP]{$file} = undef;
+		}
+	    }
+	    when ( m{^'(.*?)'\s($RGX_SHA1)\s($RGX_SHA1)\s($RGX_SHA1)$} )
+	    {
+		my $file = $1;
+		my $sigsource = $2;
+		my $sigcmd = $3;
+		my $sigtarget = $4;
+
+		if ( $sigsource !~ m{^$RGX_SHA1$} )
+		{
+		    fatal("FID 13: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+		}
+
+		if ( $sigcmd !~ m{^$RGX_SHA1$} )
+		{
+		    fatal("FID 14: Malformed $SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
+		}
+
+		if ( $sigtarget !~ m{^$RGX_SHA1$} )
+		{
+		    fatal("FID 15: Malformed $SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
+		}
+
+		$Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
+		$Sigdata_ref->{$file}[$SIG_CMD] = $sigcmd;
+		$Sigdata_ref->{$file}[$SIG_TGT] = $sigtarget;
+	    }
+	    default
+	    {
+		fatal("FID 16: Malformed $SIGFN file - invalid format line:\n$line");
+	    }
+	}
+    }
+    close $sigfn;
+}
+
+
+# 
+# Usage      : my $rebuild = rebuild_target_bool( $bld, $bldcmd, $lib_dirs, $opt_lib, \%Sigdata, \%SigdataNew );
+#
+# Purpose    : boolean indicating to rebuild target if any of three conditions is true:
+#            :     1. target is missing
+#            :     2. signature of target does not exit in $SIGFN signature file
+#            :     3. signature of target exists in signature file but is changed from actual existing target
+#
+# Parameters : $bld         - the target to built e.g. executable or libx.a or libx.so
+#            : $bldcmd      - cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+#            : $lib_dirs    - space separated list of directories to search for libraries
+#            : $opt_lib     - to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
+#            : \%Sigdata    - hash holding $SIGFN file signature data
+#            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
+#
+# Returns    : $rebuild - bool to rebuild target
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub rebuild_target_bool
+{
+    my (
+           $bld,
+           $bldcmd,
+           $lib_dirs,
+           $opt_lib,
+           $Sigdata_ref,
+           $SigdataNew_ref,
+       ) = @_;
+
+    my ( $rebuild ) = "false";
+
+
+    # if $bld does not exists return "true"
+    if ( not -f $bld )
+    {
+        $rebuild = "true";
+        return $rebuild;
+    }
+
+    my $sig = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
+
+    # signature of $bld is defined as the signature of the concatenation of the file $bld and "$bld . $bldcmd . $lib_dirs".
+    # this ensures that any change to the file or these mandatory defines forces a rebuild.
+    if (
+	   (not $bld ~~ %{$Sigdata_ref}) or
+	   ($Sigdata_ref->{$bld}[$SIG_SRC] ne $sig)
+       )
+    {
+	# rebuild exec if $bld signature does not exist or signature is different
+	$rebuild = "true";
+        return $rebuild;
+    }
+
+    if ( $opt_lib ne "nolibcheck" )
+    {
+	my @libs_removed;
+
+	# do ldd on target executable or library and set target library dependencies and calculate library signatures
+	my $ldd = `ldd $bld 2>&1`;
+
+	# to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
+	if ( $ldd =~ m{not a dynamic executable} )
+	{
+	    fatal("FID 20: ldd return: $bld is 'not a dynamic executable'");
+	}
+
+	# scan ldd return for full path library strings
+	while ( $ldd =~ m{ ^\s+(\S+)\s=>\s(\S+)\s.*$ }gxm )
+	{
+	    my $libname = $1;
+	    my $lib = $2;
+
+	    # the $lib variable should have either a full path library name or the word 'not'
+	    if ( $lib =~ m{not} )
+	    {
+		warning("WID 1: ldd return: $libname library is 'not found'");
+	    }
+	    else
+	    {
+		$SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
+		$SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
+	    }
+	}
+
+	# compare %Sigdata(populated from $BFN) and %SigdataNew(populated from ldd) for removed libraries
+	foreach my $l ( sort keys %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
+	{
+	    if ( not $l ~~ %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
+	    {
+		push @libs_removed, $l;
+	    }
+	}
+
+	# if removed libraries rebuild and warn/fatal
+	if ( @libs_removed )
+	{
+	    $rebuild = "true";
+	    warning("WID 2: Libraries removed: @libs_removed") if $opt_lib eq "warnlibcheck";
+	    fatal("FID 21: Libraries removed: @libs_removed") if $opt_lib eq "fatallibcheck";
+	}
+
+	# check each library file for this target and set $rebuild to true if library is new or library has changed
+	foreach my $l ( keys %{$SigdataNew_ref->{$bld}[$LIB_DEP]} )
+	{
+	    if ( $l ~~ %{$Sigdata_ref} )
+	    {
+		# rebuild if library has changed
+		if ( $Sigdata_ref->{$l}[$SIG_SRC] ne $SigdataNew_ref->{$l}[$SIG_SRC] )
+		{
+		    $rebuild = "true";
+		    warning("WID 3: Library changed: $l") if $opt_lib eq "warnlibcheck";
+		    fatal("FID 22: Library changed: $l") if $opt_lib eq "fatallibcheck";
+		}
+		next;
+	    }
+	    else
+	    {
+		# rebuild if library is new
+		$rebuild = "true";
+		warning("WID 4: Libraries added: @libs_removed") if $opt_lib eq "warnlibcheck";
+		fatal("FID 23: Libraries added: @libs_removed") if $opt_lib eq "fatallibcheck";
+		next;
+	    }
+	}
+    }
+
+    if ( $rebuild eq "false" )
+    {
+	# add old signature to %SigdataNew to output to $SIGFN file
+	$SigdataNew_ref->{$bld}[$SIG_SRC] = $Sigdata_ref->{$bld}[$SIG_SRC];
+    }
+
+    return $rebuild;
+}
+
+
+# 
+# Usage      : rebuild_exec( $bld, $bldcmd, $lib_dirs, $opt_lib, \%Objects, \%SigdataNew );
+#
+# Purpose    : use $bldcmd with $bld and $O to rebuild the target
+#
+# Parameters : $bld         - the target to built e.g. executable or libx.a or libx.so
+#            : $bldcmd      - cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+#            : $lib_dirs    - space separated list of directories to search for libraries
+#            : $opt_lib     - to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
+#            : \%Objects    - object files for the build
+#            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub rebuild_exec
+{
+    my (
+           $bld,
+           $bldcmd,
+           $lib_dirs,
+           $opt_lib,
+           $Objects_ref,
+           $SigdataNew_ref,
+       ) = @_;
+
+
+    my ( $tmp, $status, $error_msg, $O );
+
+    # extract %Objects hash object file keys and concatenate onto $O
+    foreach my $o ( sort keys %{$Objects_ref} )
+    {
+       $O .= "$o ";
+    }
+
+    $tmp = $bldcmd;
+    $tmp =~ s{(\$\w+)}{$1}gee;
+
+    $tmp =~ s{!!!}{\n}g;
+
+    # use $bld and %Objects to rebuild target
+    $status = system "$tmp";
+
+    if ( $status != 0 )
+    {
+	$error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+	fatal("FID 24: Error msg: $error_msg\nCmd: \"$tmp\"\nFail status: $status");
+    }
+
+    $SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
+
+    if ( $opt_lib ne "nolibcheck" )
+    {
+	# do ldd on target executable or library and set target library dependencies and calculate library signatures
+	my $ldd = `ldd $bld 2>&1`;
+
+	if ( $ldd =~ m{not a dynamic executable} )
+	{
+	    fatal("FID 25: ldd return: $bld is 'not a dynamic executable'");
+	}
+
+	while ( $ldd =~ m{ ^\s+(\S+)\s=>\s(\S+)\s.*$ }gxm )
+	{
+	    my $libname = $1;
+	    my $lib = $2;
+
+	    # the $lib variable should have either a full path library name or the word 'not'
+	    if ( $lib =~ m{not} )
+	    {
+		warning("WID 5: ldd return: $libname library is 'not found'");
+	    }
+	    else
+	    {
+		$SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
+		$SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
+	    }
+	}
+    }
+
+    print "$tmp\n";
+    print "$bld rebuilt.\n";
+}
+
+
+# 
+# Usage      : multiple_sigs( \%SourceSig );
+#
+# Purpose    : if %SourceSig, for a given $signature(first subscript), has more than one source or library file entry(second subscript)
+#            : then there is a source or library of the same signature in two different places
+#
+# Parameters : \%SourceSig - source signatures - see above
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : 1. adds all warnings to the bld.warn file
+#
+# See Also   : None
+#
+sub multiple_sigs
+{
+    my (
+           $SourceSig_ref,
+       ) = @_;
+
+
+    my $printonce = 0;
+
+    # loop over all unique source file signatures
+    foreach my $signature ( sort keys %{$SourceSig_ref} )
+    {
+	# get the number of unique source file paths for a given source signature
+	my $n = keys %{$SourceSig_ref->{$signature}};
+
+	if ( $n > 1 )
+	{
+	    my ( $warn );
+
+	    if ( $printonce == 0 )
+	    {
+		$warn = "Multiple source files with the same signature:\n";
+		$warn .= "--------------------------------------------------------------------------------------\n";
+		$printonce = 1;
+		chomp $warn;
+		warning("WID 6: $warn");
+	    }
+
+	    $warn = sprintf "%*d  %s\n", 31, $n, $signature;
+
+	    # loop over all source file names with $signature
+	    foreach my $file ( sort keys %{$SourceSig_ref->{$signature}} )
+	    {
+		$warn .= sprintf "%*s\n", 86, $file;
+	    }
+	    chomp $warn;
+	    warning("WID 7: $warn");
+	}
+    }
+}
+
+
+# 
+# Usage      : sig_file_update( $bld, \%SigdataNew );
+#
+# Purpose    : replace $SIGFN file with new %SigdataNew entries and write $BIFN file source files section
+#
+# Parameters : $bld         - the target to built e.g. executable or libx.a or libx.so
+#            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub sig_file_update
+{
+    my (
+           $bld,
+           $SigdataNew_ref,
+       ) = @_;
+
+    my ( @system_hdrs, @user_hdrs, @system_libraries, @user_libraries, @code, @exec );
+    my ( @bifn, @sigfn );
+    my ( $vol, $path, $file );
+
+
+    # for each source decide which array it belongs in
+    foreach my $s ( sort keys %{$SigdataNew_ref} )
+    {
+        ( $vol, $path, $file ) = File::Spec->splitpath( $s );
+
+        given ( $s )
+        {
+            when ( m{ ^\/.*[.]$RGX_HDR_EXT$ }x )
+            {
+                # collect system header files
+                push @system_hdrs, sprintf "%s", $s;
+            }
+            when ( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x )
+            {
+                # collect not full path header files
+                push @user_hdrs, sprintf "%s", $s;
+            }
+            when (
+                     (
+                         $path =~ m{^\/.*} and
+                         $file =~ m{$RGX_LIBS}
+                     )
+                     and not
+                     (
+                         # don't pick up the build target
+                         $file =~ m{$bld} and
+                         $path eq $EMPTY
+                     )
+                 )
+            {
+                # collect library files
+                push @system_libraries, sprintf "%s", $s;
+            }
+            when (
+                     (
+                         $path =~ m{^[^\/].*} and
+                         $file =~ m{$RGX_LIBS}
+                     )
+                     and not
+                     (
+                         # don't pick up the build target
+                         $file =~ m{$bld} and
+                         $path eq $EMPTY
+                     )
+                 )
+            {
+                # collect library files
+                push @user_libraries, sprintf "%s", $s;
+            }
+            when ( defined $SigdataNew_ref->{$s}[$SIG_CMD] and defined $SigdataNew_ref->{$s}[$SIG_TGT] )
+            {
+                # collect code files
+                push @code, sprintf "%s", $s;
+            }
+            default
+            {
+                # collect executable
+                push @exec, sprintf "%s", $s;
+            }
+        }
+    }
+
+    @system_hdrs = sort sourcesort @system_hdrs if ( @system_hdrs > 1 );
+    @user_hdrs = sort sourcesort @user_hdrs if ( @user_hdrs > 1 );
+    @system_libraries = sort sourcesort @system_libraries if ( @system_libraries > 1 );
+    @user_libraries = sort sourcesort @user_libraries if ( @user_libraries > 1 );
+    @code = sort sourcesort @code if ( @code > 1 );
+
+    push @bifn, "--------------------------------------------------\n";
+    push @bifn, "System headers:\n";
+    foreach my $s ( @system_hdrs )
+    {
+        push @bifn, "'$s'\n";
+        push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
+    }
+    push @bifn, "\n";
+    push @sigfn, "\n";
+
+    push @bifn, "--------------------------------------------------\n";
+    push @bifn, "User headers:\n";
+    foreach my $s ( @user_hdrs )
+    {
+        push @bifn, "'$s'\n";
+        push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
+    }
+    push @bifn, "\n";
+    push @sigfn, "\n";
+
+    push @bifn, "--------------------------------------------------\n";
+    push @bifn, "System libraries:\n";
+    foreach my $s ( @system_libraries )
+    {
+        push @bifn, "'$s'\n";
+        push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
+    }
+    push @bifn, "\n";
+    push @sigfn, "\n";
+
+    push @bifn, "--------------------------------------------------\n";
+    push @bifn, "User libraries:\n";
+    foreach my $s ( @user_libraries )
+    {
+        push @bifn, "'$s'\n";
+        push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
+    }
+    push @bifn, "\n";
+    push @sigfn, "\n";
+
+    push @bifn, "--------------------------------------------------\n";
+    push @bifn, "Source files:\n";
+    foreach my $s ( @code )
+    {
+        push @bifn, "'$s'\n";
+        push @sigfn, sprintf "'%s' %s %s %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC], $SigdataNew_ref->{$s}[$SIG_CMD], $SigdataNew_ref->{$s}[$SIG_TGT];
+    }
+    push @bifn, "\n";
+    push @sigfn, "\n";
+
+    push @bifn, "--------------------------------------------------\n";
+    push @bifn, "Build target:\n";
+    foreach my $s ( @exec )
+    {
+        push @bifn, "'$s'\n";
+        push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
+    }
+
+    open my $bifnfh, ">>", $BIFN;
+    print {$bifnfh} "\n####################################################################################################\n";
+    print {$bifnfh} "List of all build - System headers(full path)\n".
+                    "                    User headers(relative path)\n".
+                    "                    System libraries(full path)\n".
+                    "                    User libraries(relative path)\n".
+                    "                    Source files(relative path)\n".
+                    "                    Build target(bld directory):\n\n";
+
+    foreach my $line ( @bifn )
+    {
+        print {$bifnfh} "$line";
+    }
+    close $bifnfh;
+
+    open my $sigfn, ">", $SIGFN;
+    foreach my $line ( @sigfn )
+    {
+        print $sigfn "$line";
+    }
+    close $sigfn;
+}
+
+
+# 
+# Usage      : $truefalse = src_pro( $s, $cmd, $bld, $opt_s, $opt_r, \%Sigdata, \%Depend, \%SigdataNew, \%SourceSig, \%Objects, \%Targets );
+#
+# Purpose    : source file processing
+#
+# Parameters : $s           - code source file
+#            : $cmd         - rebuild cmds
+#            : $bld         - the target to built e.g. executable or libx.a or libx.so
+#            : $opt_s       - to use system header files in dependency checking("system" or "nosystem")
+#            : $opt_r       - to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+#            : \%Sigdata    - hash holding $SIGFN file signature data
+#            : \%Depend     - source file extension dependencies e.g. c -> o and m -> o
+#            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
+#            : \%SourceSig  - source signatures - see above
+#            : \%Objects    - all object files for the build - see above
+#            : \%Targets    - all target files for the build - see above
+#
+# Returns    : boolean("true"/"false") to indicate that any source file was rebuilt and thus $bld will need rebuilding
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub src_pro
+{
+    my (
+           $s,
+           $cmd,
+           $bld,
+           $opt_s,
+           $opt_r,
+           $Sigdata_ref,
+           $Depend_ref,
+           $SigdataNew_ref,
+           $SourceSig_ref,
+           $Objects_ref,
+           $Targets_ref,
+       ) = @_;
+
+    fatal("FID 26: src_pro(): wrong number of args") if @_ != 11;
+
+    my ( $cmd_var_sub );
+    my ( $hdr, $srcext, $tgtextorfile );
+    my ( $buildopt );
+    my ( $srcvol, $srcpath, $srcfile );
+    my ( %SigdataNew_tmp );
+
+
+    ( $srcvol, $srcpath, $srcfile ) = File::Spec->splitpath( $s );
+
+    # set $srcext for later use
+    if ( $srcfile =~ m{.*[.]$RGX_FILE_EXT} )
+    {
+        $srcext = $1;
+    }
+    else
+    {
+        fatal("FID 27: Valid file extension not found in $s");
+    }
+
+    # set $hdr to indicate the $s source file is or is not header processible
+    given ( $srcext )
+    {
+        when (
+                 $srcext ~~ $Depend{'hdr'}{'c'} or
+                 $srcext ~~ $Depend{'hdr'}{'S'} or
+                 $srcext ~~ $Depend{'hdr'}{'E'} or
+                 $srcext ~~ $Depend{'hdr'}{'n'}
+             )
+        {
+            # $s is a hdr processible file
+            $hdr = "hdr";
+        }
+        when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
+        {
+            # $s is a not hdr processible file
+            $hdr = "nothdr";
+        }
+        default
+        {
+            fatal("FID 28: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+        }
+    }
+
+    # calculate signature of source file and save in %SigdataNew
+    $SigdataNew_tmp{$s}[$SIG_SRC] = file_sig_calc( $s );
+
+    # find $VARIABLEs in $cmd and substitute EVAL section values for these variables.
+    # NOTE: do 'perldoc -q "How can I expand variables in text strings"' to see a discussion
+    #       of how this(s{}{}gee) works and possible alternatives.
+
+    $cmd_var_sub = $cmd;
+    no strict;
+    $cmd_var_sub =~ s{(\$\w+)}{$1}gee;
+    use strict;
+
+    # for the signature calculation only compress out '!!!'s - this makes the signature insensitive to
+    # bracketing changes or added/deleted newlines.  when the cmd is executed and printed, however, the
+    # '!!!'s will be translated back to newlines.
+    my $cmd_sig = $cmd_var_sub;
+    $cmd_sig =~ s{!!!}{}g;
+
+    # calculate signature of variable substituted source $cmd_sig
+    $SigdataNew_tmp{$s}[$SIG_CMD] = sha1_hex( $cmd_sig );
+
+    # populate source signature hash %SourceSig - see definition above
+    ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
+
+    # return which cmd line option(-c or -S or -E or (none of these)) is in effect
+    $buildopt = buildopt( $s, $cmd_var_sub, $hdr, $srcext, $Depend_ref, $Objects_ref );
+
+    # return the $s target extension or file name
+    $tgtextorfile = tgtextorfile( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, \%SigdataNew_tmp, $Depend_ref );
+
+    if ( $hdr eq "hdr" )
+    {
+        # calculate signatures of header files for this source code file($s).
+        # For each header file $h(in @hdeps):
+        #     a. add $SigdataNew{$h}[SIG_SRC] = sha1_hex( $h );
+        #     b. add $SigdataNew{$s}[HDR_DEP]{$h} = undef;
+
+        # for interpolated $cmd_var_sub of this source find the header file dependencies.
+        # do not require header files to be searched for in the path(-MG).
+        my @hdeps = hdr_depend( $cmd_var_sub, $s, "-MG" );
+
+        foreach my $h ( @hdeps )
+        {
+            if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
+
+            # calculate signature of header file
+            if ( not $h ~~ %SigdataNew_tmp )
+            {
+                $SigdataNew_tmp{$h}[$SIG_SRC] = file_sig_calc( $h );
+            }
+
+            # add header files to %SigdataNew header dependencies
+            $SigdataNew_tmp{$s}[$HDR_DEP]{$h} = undef;
+        } # END: foreach my $line ( @hdeps ){}
+    }
+
+    # DEBUG
+=for
+    print "DEBUG:\n".
+          "\$s = $s\n".
+          "\$buildopt = $buildopt\n".
+          "\$srcext = $srcext\n".
+          "\$tgtextorfile = $tgtextorfile\n".
+          "\$srcvol = $srcvol\n".
+          "\$srcpath = $srcpath\n".
+          "\$srcfile = $srcfile\n".
+          "ENDDEBUG\n";
+=cut
+
+    # see if $s should be rebuilt by testing %Sigdata against %SigdataNew
+    if ( rebuild_src_bool( $s, $tgtextorfile, $Sigdata_ref, \%SigdataNew_tmp ) eq "true" )
+    {
+        # print source file names that will be rebuilt, but do not rebuild
+        if ( $opt_r eq "norebuild" )
+        {
+            print "---WILL--- be rebuilt: $s\n";
+        }
+        else
+        {
+            my ( $status, $error_msg );
+            my ( %before, %after, @difference );
+            my ( $dirfh );
+
+            # create hash of files in the bld directory before "$cmd_var_sub" execution
+            opendir $dirfh, ".";
+            while ( readdir $dirfh )
+            {
+                $_ =~ s{\n}{};
+                $before{"$_"} = undef;
+            }
+            closedir $dirfh;
+
+            $cmd_var_sub =~ s{!!!}{\n}g;
+
+            # execute $cmd's
+            $status = system "$cmd_var_sub";
+
+            if ( $status != 0 )
+            {
+                $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                fatal("FID 36: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
+            }
+
+            print "$cmd_var_sub\n";
+
+            # create hash of files in the bld directory after "$cmd_var_sub" execution
+            opendir $dirfh, ".";
+            while ( readdir $dirfh )
+            {
+                $_ =~ s{\n}{};
+                $after{"$_"} = undef;
+            }
+            closedir $dirfh;
+
+            # create array of new files created by "$cmd_var_sub" execution
+            foreach my $f ( keys %after )
+            {
+                if ( not exists $before{$f} )
+                {
+                    push @difference, $f;
+                }
+            }
+
+            if ( @difference == 0 )
+            {
+                fatal("FID 37: No new target files created by command:\nCmd: \"$cmd_var_sub\"");
+            }
+
+            # 
+            tgt_signature( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, \%SigdataNew_tmp, $Depend_ref, \@difference, $Targets_ref);
+
+            # move all new files in the bld directory created by "$cmd_var_sub" execution
+            # to the directory of the $s source
+            while ( @difference )
+            {
+                my $newfile = shift @difference;
+
+                $status = system "mv", "$newfile", "$srcpath";
+
+                if ( $status != 0 )
+                {
+                    $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                    fatal("FID 41: Error msg: $error_msg\n\"mv $newfile $srcpath\" fail status: $status");
+                }
+            }
+        }
+
+        # since the $cmd_var_sub has built successfully add the tmp data stored in the local
+        # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
+        $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
+        $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
+        $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
+
+        # populate source signature hash %SourceSig - see definition above
+        ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
+
+        if ( $hdr eq "hdr" )
+        {
+            foreach my $h ( keys %SigdataNew_tmp )
+            {
+                if ( $h ne $s )
+                {
+                    $SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
+                    $SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
+
+                    # populate source signature hash %SourceSig - see definition above
+                    ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
+                }
+            }
+        }
+
+        return "true";
+    }
+    else
+    {
+        # print source file names that will not be rebuilt
+        if ( $opt_r eq "norebuild" )
+        {
+            print "$s will NOT be rebuilt.\n";
+        }
+        else
+        {
+            print "$s is up to date.\n";
+        }
+
+        # since the $cmd_var_sub has built successfully add the tmp data stored in the local
+        # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
+        $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
+        $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
+        $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
+
+        # populate source signature hash %SourceSig - see definition above
+        ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
+
+        if ( $hdr eq "hdr" )
+        {
+            foreach my $h ( keys %SigdataNew_tmp )
+            {
+                if ( $h ne $s )
+                {
+                    # move header file signatures and source header file dependencies to \%SigdataNew
+                    $SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
+                    $SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
+
+                    # populate source signature hash %SourceSig - see definition above
+                    ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
+                }
+            }
+        }
+
+        return "false";
+    }
+}
+
+
+# 
+# Usage      : $buildopt = buildopt( $s, $cmd_var_sub, $hdr, $srcext, $Depend_ref, $Objects_ref );
+#
+# Purpose    : return which cmd line option(-c or -S or -E or (none of these)) is in effect
+#
+# Parameters : $s           - code source file
+#            : $cmd_var_sub - the $cmd field of rebuild cmds that has been variable substituted
+#            : $hdr         - set to 'hdr' or 'nothdr' depending on if $s is header processible
+#            : $srcext      - the extension of $s
+#            : \%Depend     - source file extension dependencies e.g. c -> o and m -> o
+#            : \%Objects    - all object files for the build - see above
+#
+# Returns    : $buildopt('c', 'S', 'E', 'n')
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub buildopt
+{
+    my (
+           $s,
+           $cmd_var_sub,
+           $hdr,
+           $srcext,
+           $Depend_ref,
+           $Objects_ref,
+       ) = @_;
+
+    my ( $buildopt );
+
+
+    # the GNU gcc documentation in chapter '3.2 Options Controlling the Kind of Output' specifies the actions taken by the -c -S -E options.
+    # -c
+    # Compile or assemble the source files, but do not link. The linking stage simply is not done. The ultimate output is in the form of an object file for each source file.
+    # By default, the object file name for a source file is made by replacing the suffix ‘.c’, ‘.i’, ‘.s’, etc., with ‘.o’.
+    # Unrecognized input files, not requiring compilation or assembly, are ignored. 
+    # 
+    # -S
+    # Stop after the stage of compilation proper; do not assemble. The output is in the form of an assembler code file for each non-assembler input file specified.
+    # By default, the assembler file name for a source file is made by replacing the suffix ‘.c’, ‘.i’, etc., with ‘.s’.
+    # Input files that don't require compilation are ignored. 
+    # 
+    # -E
+    # Stop after the preprocessing stage; do not run the compiler proper. The output is in the form of preprocessed source code, which is sent to the standard output.
+    # Input files that don't require preprocessing are ignored.
+
+    # process differently depending on which cmd line option(-c or -S or -E or (none of these)) is in effect
+    given ( $cmd_var_sub )
+    {
+        when ( m{\s-c\s} and not m{\s-S\s} and not m{\s-E\s} )
+        {
+            my ( $n );
+
+            if ( not exists ${$Depend_ref}{$hdr}{'c'}{$srcext}{'ext'} )
+            {
+                fatal("FID 29: Invalid combination of source extension: $srcext and build option: -c.");
+            }
+
+            # check if '-c' specified multiple times
+            $n++ while $cmd_var_sub =~ m{\s-c\s}gx;
+            if ( $n > 1 )
+            {
+                my ( $tmp );
+
+                $tmp = $cmd_var_sub;
+                $tmp =~ s{!!!}{\\n}g;
+                warning("WID 8: Multiple instances of '-c' detected in compile options(might just be conditional compilation).\n--->$tmp");
+            }
+
+            # change any suffix to .o suffix and push on %Objects for use in rebuild
+            my $basenametgt = $s;
+            $basenametgt =~ s{$RGX_FILE_EXT}{o}; # replace from last period to end of string with .o
+
+            # if $basenametgt is already in %Objects fail - two different sources are producing the same object file in
+            # the same place e.g. source files a.c and a.m in the same directory will both produce a.o
+            foreach my $o ( keys %{$Objects_ref} )
+            {
+                if ( $o eq $basenametgt )
+                {
+                    fatal("FID 30: Object file conflict - $s produces an object file $basenametgt that already exists.");
+                }
+            }
+
+            ${$Objects_ref}{"'$basenametgt'"} = undef;
+
+            $buildopt = 'c';
+        }
+        when ( not m{\s-c\s} and m{\s-S\s} and not m{\s-E\s} )
+        {
+            my ( $n );
+
+            if ( not exists ${$Depend_ref}{'hdr'}{'S'}{$srcext}{'ext'} )
+            {
+                fatal("FID 31: Invalid combination of source extension: $srcext and build option: -S.");
+            }
+
+            # check if '-S' specified multiple times
+            $n++ while $cmd_var_sub =~ m{\s-S\s}gx;
+            if ( $n > 1 )
+            {
+                my ( $tmp );
+
+                $tmp = $cmd_var_sub;
+                $tmp =~ s{!!!}{\\n}g;
+                warning("WID 9: Multiple instances of '-S' detected in compile options(might just be conditional compilation).\n--->$tmp");
+            }
+
+            $buildopt = 'S';
+        }
+        when ( not m{\s-c\s} and not m{\s-S\s} and m{\s-E\s} )
+        {
+            my ( $n );
+
+            if ( not exists ${$Depend_ref}{'hdr'}{'E'}{$srcext}{'ext'} )
+            {
+                fatal("FID 32: Invalid combination of source extension: $srcext and build option: -E.");
+            }
+
+            # check if '-E' specified multiple times
+            $n++ while $cmd_var_sub =~ m{\s-E\s}gx;
+            if ( $n > 1 )
+            {
+                my ( $tmp );
+
+                $tmp = $cmd_var_sub;
+                $tmp =~ s{!!!}{\\n}g;
+                warning("WID 10: Multiple instances of '-E' detected in compile options(might just be conditional compilation).\n--->$tmp");
+            }
+
+            $buildopt = 'E';
+        }
+        when ( not m{\s-c\s} and not m{\s-S\s} and not m{\s-E\s} )
+        {
+            if ( not exists ${$Depend_ref}{'hdr'}{'n'}{$srcext}{'ext'} )
+            {
+                fatal("FID 33: Invalid combination of source extension: $srcext and build option: non of -c/-S/-E exists.");
+            }
+
+            $buildopt = 'n';
+        }
+        default
+        {
+            fatal("FID 34: Multiple options -c/-S/-E specified in cmd: $cmd_var_sub.");
+        }
+    }
+
+    return $buildopt;
+}
+
+
+# 
+# Usage      : $tgtextorfile = tgtextorfile( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, $SigdataNew_tmp_ref, $Depend_ref );
+#
+# Purpose    : return the $s target extension or file name
+#            : Also:
+#            :     a. if multiple target files in the $srcpath directory fatal()
+#            :     b. if already existing target file calculate then save the signature
+#
+# Parameters : $s               - code source file
+#            : $hdr             - set to 'hdr' or 'nothdr' depending on if $s is header processible
+#            : $srcext          - the extension of $s
+#            : $srcpath         - the file path from $s from File::Spec->splitpath()
+#            : $srcfile         - the file name from $s from File::Spec->splitpath()
+#            : $buildopt        - which cmd line option(-c or -S or -E or (none of these)) is in effect
+#            : \%SigdataNew_tmp - if already existing target file calculate then save the signature
+#            : \%Depend         - source file extension dependencies e.g. c -> o and m -> o
+#
+# Returns    : $tgtextorfile - the $s target extension or file name
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub tgtextorfile
+{
+    my (
+           $s,
+           $hdr,
+           $srcext,
+           $srcpath,
+           $srcfile,
+           $buildopt,
+           $SigdataNew_tmp_ref,
+           $Depend_ref,
+       ) = @_;
+
+    my ( $tgtextorfile );
+
+
+    my ( @tgtfiles );
+    my ( $tgtfilesboolean ) = "false"; # indicates that the target file is not derived from a file name extension,
+				       # but is specified in %Depend as an actual file name
+
+    # accumulate source files in $srcpath
+    opendir my ( $dirfh ), $srcpath;
+    my @Sources = grep { -f "$srcpath/$_" } readdir $dirfh;
+    closedir $dirfh;
+
+    if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+    {
+	foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+	{
+	    if ( $tgtfile ~~ @Sources )
+	    {
+		push @tgtfiles, $tgtfile;
+		$tgtfilesboolean = "true";
+	    }
+	}
+    }
+
+    if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+    {
+	foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+	{
+	    my ( $tmp );
+
+	    $tmp = $srcfile;
+	    $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
+	    if ( $tmp ~~ @Sources )
+	    {
+		push @tgtfiles, $tmp;
+		$tgtfilesboolean = "false";
+	    }
+	}
+    }
+
+    # check for multiple target files in the $srcpath directory.  if more than one target file do fatal().
+    if ( @tgtfiles > 1 )
+    {
+	fatal("FID 35: More than one target file for $srcfile in $srcpath: @tgtfiles");
+    }
+
+    if ( @tgtfiles == 1 )
+    {
+	if ( $tgtfilesboolean eq "true" )
+	{
+	    # save file name
+	    $tgtextorfile = $tgtfiles[0];
+	}
+	else
+	{
+	    # save file name extension
+	    if ( $tgtfiles[0] =~ m{.*[.]$RGX_FILE_EXT} )
+	    {
+		$tgtextorfile = $1;
+	    }
+	}
+
+	# calculate signature of previously already existing target file - if no target file ignore.
+	# why?  if the old target file has been corrupted or compromised then it's signature will not match
+	# the signature in $BFN even if the source and the cmd to build the source have not changed.  this
+	# should cause a rebuild.  if a re-compile is triggered by either a source change, a build cmd change
+	# or a change in the target file signature then the signature calculated here will be overwritten
+	# by the after compile new signature.
+	${$SigdataNew_tmp_ref}{$s}[$SIG_TGT] = file_sig_calc( "$srcpath/$tgtfiles[0]" );
+    }
+    else
+    {
+	# no previous target file in $srcpath directory
+	$tgtextorfile = $EMPTY;
+    }
+
+    return $tgtextorfile;
+}
+
+
+# 
+# Usage      : tgt_signature( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, $SigdataNew_tmp_ref, $Depend_ref, \@difference, $Targets_ref);
+#
+# Purpose    : calculate the new target file signature and return it in the @SigdataNew_tmp array
+#            :     a. if more than one target file created by $cmd_var_sub do fatal()
+#            :     b. if an identical target file was created earlier do fatal()
+#
+# Parameters : $s               - code source file
+#            : $hdr             - set to 'hdr' or 'nothdr' depending on if $s is header processible
+#            : $srcext          - the extension of $s
+#            : $srcpath         - the file path from $s from File::Spec->splitpath()
+#            : $srcfile         - the file name from $s from File::Spec->splitpath()
+#            : $buildopt        - which cmd line option(-c or -S or -E or (none of these)) is in effect
+#            : \%SigdataNew_tmp - if already existing target file calculate then save the signature
+#            : \%Depend         - source file extension dependencies e.g. c -> o and m -> o
+#            : \@difference     - array of new files created by "$cmd_var_sub" execution
+#            : \%Targets        - all target files for the build - see above
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub tgt_signature
+{
+    my (
+           $s,
+           $hdr,
+           $srcext,
+           $srcpath,
+           $srcfile,
+           $buildopt,
+           $SigdataNew_tmp_ref,
+           $Depend_ref,
+           $difference_ref,
+           $Targets_ref,
+       ) = @_;
+
+    my ( $tgtextorfile );
+
+
+    my ( @tgtfiles );
+
+    if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+    {
+	foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+	{
+	    if ( $tgtfile ~~ @{$difference_ref} )
+	    {
+		push @tgtfiles, $tgtfile;
+	    }
+	}
+    }
+
+    if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+    {
+	foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+	{
+	    my ( $tmp );
+
+	    $tmp = $srcfile;
+	    $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
+	    if ( $tmp ~~ @{$difference_ref} )
+	    {
+		push @tgtfiles, $tmp;
+	    }
+	}
+    }
+
+    if ( @tgtfiles == 0 )
+    {
+	fatal("FID 38: No target file for $srcfile in $srcpath: @tgtfiles");
+    }
+
+    # check for multiple target files created by $cmd_var_sub.  if more than one target file created do fatal().
+    if ( @tgtfiles > 1 )
+    {
+	fatal("FID 39: More than one target file for $srcfile in $srcpath: @tgtfiles");
+    }
+
+    # calculate signature of target
+    ${$SigdataNew_tmp_ref}{$s}[$SIG_TGT] = file_sig_calc( $tgtfiles[0] );
+
+    if ( exists $Targets_ref->{"${srcpath}$tgtfiles[0]"} )
+    {
+	fatal("FID 40: An identical target file(name) has been created twice: ${srcpath}$tgtfiles[0]");
+    }
+    else
+    {
+	$Targets_ref->{"${srcpath}$tgtfiles[0]"} = undef;
+    }
+}
+
+
+# 
+# Usage      : @dirs = dirs_pro( $dirs, $opt_s );
+#
+# Purpose    : Process $BFN file DIRS section
+#            :     Sequentially, the following tasks are performed:
+#            :     1. compress the DIRS section by eliminating unnecessary white space and unnecessary newlines
+#            :        and converting the input $dirs scalar to the @dirs array with lines of format '$dir:$regex_srcs:$cmd'
+#            :     2. print @dirs lines to $BIFN - before 'R ' lines recursive expansion
+#            :     3. expand @dirs lines that start with 'R '(recursive).  this will replace the 'R ' line with one or more
+#            :        lines that have recursively the directories below the 'R ' line $dir and the same $regex_srcs and $cmd expressions
+#            :     4. check DIRS section compressed lines for valid format i.e. "^.*:.*:.*$"(DIRS section three field specification)
+#            :        or "^{.*}$"(DIRS section cmd block)
+#            :     5. accumulate lines to be printed to the $BIFN file:
+#            :        a. DIRS section specification lines with a line count number
+#            :        b. variable interpolated(except for \$s) specification line cmd field
+#            :        c. matching compilation unit source file(s)
+#            :        d. source file header dependencies
+#            :        e. check for the following error conditions:
+#            :           1. either a directory or a source file is not readable
+#            :           2. multiple build entries in $BFN file DIRS section lines matching same source file
+#            :           3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
+#            :           4. Invalid regular expression - "$regex_srcs"
+#            :           5. No '$s' variable specified in DIRS line command field
+#            :           6. No sources matched in $BFN DIRS section line $line
+#            :           7. Source file specified in more than one DIRS line specification
+#
+# Parameters : $dirs  - all the DIRS section lines of $BFN in a single scalar variable
+#            : $opt_s - to use system header files in dependency checking("system" or "nosystem")
+#
+# Returns    : @dirs - the fully processed DIRS section lines of $BFN in an array
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub dirs_pro
+{
+    my (
+           $dirs,
+           $opt_s,
+       ) = @_;
+
+    my ( @dirs );
+
+
+    if ( not defined $dirs )
+    {
+        fatal("FID 42: $BFN DIRS section is empty.");
+    }
+
+    #  convert $dirs scalar to @dirs array.  $dirs holds the entire contents of the Bld
+    # file DIRS section.  @dirs will have one cmd block({}) or one dir:regex:{cmds}
+    # specification per array element
+    @dirs = cvt_dirs_to_array( $dirs );
+
+    if ( @dirs == 0 )
+    {
+        fatal("FID 46: $BFN DIRS section is empty.");
+    }
+
+    {
+        # print @dirs lines to $BIFN - before 'R ' lines recursive expansion
+
+        open my $bifnfh, ">>", $BIFN;
+
+        print {$bifnfh} "\n####################################################################################################\n";
+        print {$bifnfh} "$BFN file DIRS section specification lines with irrelevant white space compressed out:\n\n";
+
+        foreach my $line ( @dirs )
+        {
+            my ( $tmp );
+
+            $tmp = $line;
+            $tmp =~ s{!!!}{\\n}g;
+            print {$bifnfh} "$tmp\n";
+        }
+        print {$bifnfh} "\n";
+        close $bifnfh;
+    }
+
+    # expand @dirs lines that start with 'R '(recursive)
+    @dirs = expand_R_specification( @dirs );
+
+    {
+        # print @dirs lines to $BIFN - after 'R ' lines recursive expansion
+
+        open my $bifnfh, ">>", $BIFN;
+
+        print {$bifnfh} "\n####################################################################################################\n";
+        print {$bifnfh} "R recursively expanded and numbered DIRS section specification lines:\n\n";
+
+        # log @dirs to $BIFN
+        {
+            my $count = 0;
+            foreach my $line ( @dirs )
+            {
+                my ( $tmp );
+
+                $tmp = $line;
+                $tmp =~ s{!!!}{\\n}g;
+
+                $count++;
+                printf {$bifnfh} "%4d  %s\n", $count, $tmp;
+            }
+        }
+        print {$bifnfh} "\n";
+        close $bifnfh;
+    }
+
+    # check DIRS section compressed lines for valid format i.e. "^.*:.*:.*$"(DIRS section three field specification)
+    # or "$RGX_CMD_BLOCK"(DIRS section cmd block)
+    foreach my $line ( @dirs )
+    {
+        if ( not $line =~ m{^.*:.*:.*$} and not $line =~ m{$RGX_CMD_BLOCK} )
+        {
+            fatal("FID 47: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+        }
+    }
+
+    {
+	# accumulate lines to be printed to the $BIFN file:
+	#     a. DIRS section specification lines with a line count number
+	#     b. variable interpolated(except for \$s) specification line cmd field
+	#     c. matching compilation unit source file(s)
+	#     d. source file header dependencies
+	#     e. check for the following error conditions:
+	#        1. either a directory or a source file is not readable
+	#        2. multiple build entries in $BFN file DIRS section lines matching same source file
+	#        3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
+	#        4. Invalid regular expression - "$regex_srcs"
+	#        5. No '$s' variable specified in DIRS line command field
+	#        6. No sources matched in $BFN DIRS section line $line
+	#        7. Source file specified in more than one DIRS line specification
+	my ( @tmp ) = accum_blddotinfo_output( $opt_s, @dirs );
+
+	my $fatal_not_readable = shift @tmp;
+	my $fatal_multiple_sources = shift @tmp;
+	my @bldcmds =  @tmp;
+
+	# write fatal msg to $BFFN
+	if ( $fatal_not_readable eq "true" )
+	{
+	    {
+		open my $bffnfh, ">>", $BFFN;
+		print {$bffnfh} "Directory or source file specification in $BFN file DIRS line cannot be read.\n";
+		close $bffnfh;
+	    }
+	}
+
+	# write fatal msg to $BFFN
+	if ( $fatal_multiple_sources eq "true" )
+	{
+	    {
+		open my $bffnfh, ">>", $BFFN;
+		print {$bffnfh} "Multiple build entries in $BFN file DIRS section lines matching same source file.\n";
+		close $bffnfh;
+	    }
+	}
+
+	if ( $fatal_not_readable eq "true" or $fatal_multiple_sources eq "true" )
+	{
+	    my $msg = "$BFN DIRS section has one or more of:\n".
+		      "a. Directory or source file specification cannot be read\n".
+		      "b. No sources matched\n".
+		      "c. Multiple build entries matching same source file";
+
+	    warning("WID 15: $msg");
+
+	    fatal("FID 54: $msg   - see $BWFN.\n");
+	}
+
+	{
+	    open my $bifnfh, ">>", $BIFN;
+
+	    print {$bifnfh} "\n####################################################################################################\n";
+	    print {$bifnfh} "a. DIRS section specification lines\n".
+		      "    b. variable interpolated(except for \$s) specification line cmd field\n".
+		      "        c. matching compilation unit source file(s)\n".
+		      "            d. source file header dependencies:\n\n";
+
+	    foreach my $line ( @bldcmds )
+	    {
+		$line =~ s{!!!}{\\n}g;
+		print {$bifnfh} "$line";
+	    }
+	    close $bifnfh;
+	}
+    }
+
+    return @dirs;
+}
+
+
+# 
+# Usage      : @dirs = cvt_dirs_to_array( $dirs );
+#
+# Purpose    : convert $dirs scalar to @dirs array.  $dirs holds the entire contents of the Bld
+#            : file DIRS section.  @dirs will have one cmd block({}) or one dir:regex:{cmds}
+#            : specification per array element.
+#            :     1. compress out irrelevant whitespace.  some spaces are important to preserve e.g. "-I.  -c"
+#            :     2. to "-I. -c", keeps a single space between command line options.  this also makes rebuilding
+#            :     3. insensitive to the number of spaces between command line options.  other spaces are
+#            :     4. irrelevant, such as the spaces before and after the chars "{};:\n" and are eliminated.
+#
+# Parameters : $dirs - all the DIRS section lines of $BFN in a single scalar variable
+#
+# Returns    : @dirs - @dirs will have one cmd block({}) or one dir:regex:{cmds} specification per array element
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub cvt_dirs_to_array
+{
+    my (
+           $dirs,
+       ) = @_;
+
+    my ( @dirs );
+
+
+    # this should return an array with either the '$dir:$regex:' string followed by the '$cmd' string or a cmd block string '{}' by itself
+    my @fields = extract_multiple(
+				     $dirs,                                      # extract fields from DIRS section
+				     [ sub { extract_bracketed($_[0],'{}') } ],  # extract {} stuff
+				     undef,                                      # match till end of string
+				     0                                           # return unmatched strings as well - the stuff outside of {}
+				 );
+
+    foreach my $line ( @fields )
+    {
+	if ( $line =~ m{^[{].*[}]$}s ) # matches a line of '{stuff}' exactly - a $cmd
+	{
+	    $line =~ s{\n}{!!!}gs; # translate \n's in a '{}' to '!!!'
+	}
+
+	# compress multiple whitespace chars([ \t\n\r\f\v]) to a single space
+	$line =~ s{\s+}{ }g;
+	$line =~ s{^\s+}{}g;
+	$line =~ s{!!!\s}{!!!}g;
+
+	# all of the following substitutions are designed to eliminate single spaces before/after the four chars "{};:"
+	$line =~ s{\s\{}{\{}g;
+	$line =~ s{\{\s}{\{}g;
+	$line =~ s{\s\}}{\}}g;
+	$line =~ s{\}\s}{\}}g;
+	$line =~ s{\s\;}{\;}g;
+	$line =~ s{\;\s}{\;}g;
+	$line =~ s{\s:}{:}g;
+	$line =~ s{:\s}{:}g;
+    }
+
+    # reassemble '$dir:$regex:' and '$cmd' strings to a single string '$dir:$regex:$cmd' and push on @dirs
+    # or push a cmd block string '{}' by itself onto @dirs
+    my $prevline = "cmd";
+    my $dir_regex;
+    foreach my $line ( @fields )
+    {
+	next if $line =~ $RGX_BLANK_LINE;
+
+	if ( $line =~ m{^[{].*[}]$} ) # matches a line of '{stuff}' exactly - a $cmd
+	{
+	    if ( $prevline eq "cmd" )
+	    {
+		if ( not $line =~ m{$RGX_CMD_BLOCK} )
+		{
+		    fatal("FID 43: $BFN DIRS section line is not valid(doesn't match $RGX_CMD_BLOCK): $line");
+		}
+
+		# lone cmd block string
+		push @dirs, $line;
+	    }
+	    else
+	    {
+		if ( not $dir_regex.$line =~ m{$RGX_VALID_DIRS_LINE} )
+		{
+		    fatal("FID 44: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $dir_regex.$line");
+		}
+
+		# concatenate '$dir:$regex:' and '$cmd' strings
+		push @dirs, $dir_regex.$line;
+		$prevline = "cmd";
+	    }
+	}
+	else
+	{
+	    if ( not $line =~ m{$RGX_VALID_DIRS_LINE} )
+	    {
+		fatal("FID 45: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $line");
+	    }
+
+	    # save '$dir:$regex:' line for next loop iteration
+	    $dir_regex = $line;
+	    $prevline = "dir_regex";
+	}
+    }
+
+    return @dirs;
+}
+
+
+# 
+# Usage      : @dirs = expand_R_specification( @dirs );
+#
+# Purpose    : expand DIRS section @dirs lines that start with 'R '(recursive) in the directory first field
+#
+# Parameters : @dirs - @dirs will have one cmd block({}) or one dir:regex:{cmds} specification per array element
+#
+# Returns    : @tmp - R(recursive) line specification expanded @dirs
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub expand_R_specification
+{
+    my (
+           @dirs,
+       ) = @_;
+
+
+    my ( %dirs ); # hash holding unique subdirs of the "$dir" directory
+    my ( @tmp );
+
+    # accumulate expanded and unexpanded DIRS lines in @tmp
+    foreach my $line ( @dirs )
+    {
+	# if '\s*R\s+' appears at the start of a DIRS line then do recursive build.  replace each R line with one or
+	# more lines - each line with the same regex field and build command field, but each line directory first
+	# field is the start directory and all recursive subdirectories
+	if ( $line =~ m{^\s*R\s+(.*?)\s*(:.*)} )
+	{
+	    my $dir = $1;
+	    my $restofline = $2;
+
+	    %dirs = ();
+	    # recursively find all subdirs from $dir as the start point
+	    # Note: if a directory is empty find() will not find it.  this is not a problem since a DIRS section
+	    #       line with no source files to match cause a fatal() error.
+	    find(sub {no warnings 'File::Find'; $dirs{"$File::Find::dir"} = 1;}, $dir);
+
+	    # push recursively expanded dirs onto @tmp
+	    foreach my $k ( sort keys %dirs )
+	    {
+		push @tmp, "$k$restofline";
+	    }
+	}
+	else
+	{
+	    push @tmp, $line;
+	}
+    }
+
+    # replace @dirs with new expanded array
+    return @tmp;
+}
+
+
+# 
+# Usage      : my ( @tmp ) = accum_blddotinfo_output( $opt_s, @dirs );
+#
+# Purpose    : accumulate lines to be printed to the $BIFN file:
+#            :     a. DIRS section specification lines with a line count number
+#            :     b. variable interpolated(except for \$s) specification line cmd field
+#            :     c. matching compilation unit source file(s)
+#            :     d. source file header dependencies
+#            :     e. check for the following error conditions:
+#            :        1. either a directory or a source file is not readable
+#            :        2. multiple build entries in $BFN file DIRS section lines matching same source file
+#            :        3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
+#            :        4. Invalid regular expression - "$regex_srcs"
+#            :        5. No '$s' variable specified in DIRS line command field
+#            :        6. No sources matched in $BFN DIRS section line $line
+#            :        7. Source file specified in more than one DIRS line specification
+#
+# Parameters : $opt_s - to use system header files in dependency checking("system" or "nosystem")
+#            : @dirs  - @dirs will have one cmd block({}) or one dir:regex:{cmds} specification per array element
+#
+# Returns    : $fatal_not_readable     - either a directory or a source file is not readable
+#            : $fatal_multiple_sources - multiple build entries in $BFN file DIRS section lines matching same source file
+#            : @bldcmds                - output for Bld.info
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub accum_blddotinfo_output
+{
+    my (
+           $opt_s,
+           @dirs,
+       ) = @_;
+
+    # output for Bld.info
+    my ( @bldcmds );
+
+    # either a directory or a source file is not readable
+    my ( $fatal_not_readable ) = "false";
+
+    # multiple build entries in $BFN file DIRS section lines matching same source file
+    my ( $fatal_multiple_sources ) = "false";
+
+    # hash with keys of the source file names(basename only) for detection of multiple source
+    # files of the same name in different DIRS line specifications
+    my ( %s );
+
+    # integer count of the DIRS section specification lines
+    my ( $count ) = 0;
+
+
+    foreach my $line ( @dirs )
+    {
+	$count++;
+
+	push @bldcmds, sprintf "----------\n%4d  %s\n", $count, $line;
+
+	given ( $line )
+	{
+	    when ( m{$RGX_CMD_BLOCK} )
+	    {
+		# DIRS section cmd block
+		my $cmd = $line;
+
+		# variable interpolate cmd block
+		my $cmd_var_sub = var_sub( $cmd );
+
+		push @bldcmds, "      $cmd_var_sub\n";
+		push @bldcmds, "\n";
+	    }
+	    when ( m{$RGX_VALID_DIRS_LINE} )
+	    {
+		# DIRS section three field specification line
+		my ($dir, $regex_srcs, $cmd);
+
+		chomp $line;
+		($dir, $regex_srcs, $cmd) = split $COLON, $line;
+
+		# check $dir for existence and readability
+		if ( not -e "$dir" or not -r "$dir" )
+		{
+		    {
+			open my $bffnfh, ">>", $BFFN;
+			print {$bffnfh} "Directory \"$dir\" specification in $BFN file DIRS line $count cannot be read.\n";
+			close $bffnfh;
+		    }
+
+		    $fatal_not_readable = "true";
+		    next;
+		}
+
+		# check $dir for invalid chars
+		if ( $dir !~ m{^$RGX_VALID_PATH_CHARS+$} )
+		{
+		    fatal("FID 48: Bad(really weird) char(not $RGX_VALID_PATH_CHARS) in directory specification: $dir");
+		}
+
+		# check $regex_srcs for valid regular expression
+		eval { $EMPTY =~ m{$regex_srcs} };
+		if ( $EVAL_ERROR )
+		{
+		    fatal("FID 49: Invalid regular expression - \"$regex_srcs\".");
+		}
+
+		# variable interpolate $cmd - exclude $s interpolation
+		my $cmd_var_sub = var_sub( $cmd, '$s' );
+
+		# scan $cmd_var_sub for '$s' and fatal() if none found and warning() if more than one found
+		{
+		    my ( $n );
+
+		    while ( $cmd_var_sub =~ m{ \$s }gx )
+		    {
+			$n++;
+		    }
+
+		    if ( $n == 0 )
+		    {
+			fatal("FID 50: No '\$s' variable specified in DIRS line command field: $cmd_var_sub");
+		    }
+
+		    if ( $n > 1 )
+		    {
+			warning("WID 11: Multiple($n) '\$s' variables specified in DIRS line command field: $cmd_var_sub");
+		    }
+		}
+
+		push @bldcmds, "      $cmd_var_sub\n";
+
+		# accumulate source files that match this directory search criteria
+		opendir my ( $dirfh ), $dir;
+		my @Sources = map { "$dir/$_" } grep { $_ =~ m{$regex_srcs} and -f "$dir/$_" } readdir $dirfh;
+		closedir $dirfh;
+
+		if ( @Sources == 0 )
+		{
+		    warning("WID 12: No sources matched in $BFN DIRS section line $line");
+		}
+
+		{
+		    # dummy variable
+		    my ( $vol, $path );
+
+		    # source file name(with extension)
+		    my $basename;
+
+
+		    # loop over all source files matched by this ($dir, $regex_srcs, $cmd) DIRS line specification $regex_srcs
+		    foreach my $s ( @Sources )
+		    {
+			# check $s for existence and readability
+			if ( not -e "$s" or not -r "$s" )
+			{
+			    my $string = sprintf "Source file %s does not exist or is not readable.\n   %4d  %s", $s, $count, $line;
+			    warning("WID 13: $string");
+
+			    $fatal_not_readable = "true";
+			    next;
+			}
+
+			# extract the basename
+			( $vol, $path, $basename ) = File::Spec->splitpath( $s );
+
+			# if $basename already exists in %s then the same source file has been specified in more than one DIRS line specification - warn and fatal
+			if ( $basename ~~ %s )
+			{
+			    # error msg will print the line count and the line for both DIRS line specifications
+			    my $string = sprintf "Source file %s specified in more than one DIRS line specification:\n   %s\n   %4d  %s", $s, $s{"$basename"}, $count, $line;
+			    warning("WID 14: $string");
+
+			    $fatal_multiple_sources = "true";
+			}
+			else
+			{
+			    # save $basename in %s with the line count and the line
+			    $s{"$basename"} = sprintf "%4d  %s", $count, $line;
+			}
+
+			push @bldcmds, "          $s\n";
+
+			my ( @hdeps, $srcext );
+
+			# capture file name extension
+			if ( $s =~ m{.*[.]$RGX_FILE_EXT} )
+			{
+			    $srcext = $1;
+			}
+			else
+			{
+			    fatal("FID 51: Valid file extension not found in $s");
+			}
+
+			given ( $srcext )
+			{
+			    when (
+				     $srcext ~~ $Depend{'hdr'}{'c'} or
+				     $srcext ~~ $Depend{'hdr'}{'S'} or
+				     $srcext ~~ $Depend{'hdr'}{'E'} or
+				     $srcext ~~ $Depend{'hdr'}{'n'}
+				 )
+			    {
+				# $s is a hdr processible file
+				# find all header file dependencies of source file
+				@hdeps = hdr_depend( $cmd_var_sub, $s, "" );
+			    }
+			    when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
+			    {
+				; # noop for recognizable not header file processible $srcext
+			    }
+			    default
+			    {
+				fatal("FID 52: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+			    }
+			}
+
+			# accumulate header file in @bldcmds appropriate for $opt_s
+			foreach my $h ( @hdeps )
+			{
+			    # 
+			    if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
+
+			    push @bldcmds, "              $h\n";
+			} # END: foreach my $line ( @hdeps ){}
+		    } # END: foreach my $s ( @Sources ){}
+		}
+		push @bldcmds, "\n";
+	    }
+	    default
+	    {
+		fatal("FID 53: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+	    }
+	} # END: given ( $line ){}
+    } # END: foreach my $line ( @dirs ){}
+
+    return ( $fatal_not_readable, $fatal_multiple_sources, @bldcmds );
+}
+
+
+# 
+# Usage      : variable_match( \@eval, \@dirs );
+#
+# Purpose    : scan EVAL section code for scalar variables and make %eval_vars hash.  scan DIRS section cmd fields and make %dirs_vars hash.
+#            : compare the two hashes.  if %eval_vars variables are not in %dirs_vars, issue warnings.  if %dirs_vars variables are not in
+#            : %eval_vars then issue warnings and fatal errors.
+#
+# Parameters : $eval_ref - reference to array of EVAL section lines
+#              $dirs_ref - reference to array of DIRS section lines
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub variable_match
+{
+    my (
+           $eval_ref,
+           $dirs_ref,
+       ) = @_;
+
+    my ( %eval_vars, %dirs_vars );
+
+
+    # scan EVAL section and make %eval_vars hash
+    foreach my $line ( @{$eval_ref} )
+    {
+        chomp $line;
+
+        # create hash of all variable name/variable value pairs in $eval_vars with all mandatory defines excluded
+        my %eval_vars_tmp = var_sub( $line, '$bld', '$bldcmd', '$lib_dirs', '$O', '$opt_s', '$opt_r', '$opt_lib' );
+        %eval_vars = ( %eval_vars, %eval_vars_tmp );
+
+        if ( "\$s" ~~ %eval_vars )
+        {
+            fatal("FID 55: The scalar variable \$s may not be specified in the EVAL section, as this is used in the DIRS".
+                  " section command field to signify matched source files.");
+        }
+    }
+
+    # scan DIRS section and substitute scalar variables and make %dirs_vars hash
+    foreach my $line ( @{$dirs_ref} )
+    {
+        chomp $line;
+
+        given ( $line )
+        {
+            when ( m{$RGX_CMD_BLOCK} )
+            {
+                # DIRS section cmd block
+                my $cmd = $line;
+
+                my %dirs_vars_tmp = var_sub( $cmd );
+                %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
+            }
+            when ( m{$RGX_VALID_DIRS_LINE} )
+            {
+                # DIRS section three field specification line
+                my ($dir, $regex_srcs, $cmd);
+
+                ($dir, $regex_srcs, $cmd) = split $COLON, $line;
+
+                my %dirs_vars_tmp = var_sub( $cmd, '$s' );
+                %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
+            }
+            default
+            {
+                fatal("FID 56: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+            }
+        }
+    }
+
+    {
+        # if %eval_vars variables not in %dirs_vars then issue warnings and if %dirs_vars variables not in
+        # %eval_vars then issue warnings and fatal errors
+
+        my (@evalextra, @dirsextra);
+
+        # find all variables in EVAL section that are not in DIRS cmds excluding mandatory defines
+        foreach my $key ( keys %eval_vars )
+        {
+            if ( not $key ~~ %dirs_vars )
+            {
+                push @evalextra, $key;
+            }
+        }
+
+        # find all variables in DIRS cmds that are not in EVAL section(excluding $s)
+        foreach my $key ( keys %dirs_vars )
+        {
+            if ( not $key ~~ %eval_vars )
+            {
+                push @dirsextra, $key;
+            }
+        }
+
+        if ( not @evalextra == 0 )
+        {
+            warning("WID 16: EVAL defined variable(s) not used in DIRS cmds: @evalextra");
+        }
+
+        if ( not @dirsextra == 0 )
+        {
+            warning("WID 17: DIRS cmd variable(s) not defined in EVAL section: @dirsextra");
+            fatal("FID 57: Extra unused variable(s) in DIRS section - see $BWFN.");
+        }
+    }
+
+    {
+        open my $bifnfh, ">>", $BIFN;
+
+        # print expansion of eval{} section defined variables that appear in $cmd's
+        print {$bifnfh} "\n####################################################################################################\n";
+        print {$bifnfh} "EVAL section expansion of defined variables used in DIRS section cmd fields:\n\n";
+        foreach my $key ( sort keys %eval_vars )
+        {
+            print {$bifnfh} "$key = $eval_vars{$key}\n";
+        }
+        print {$bifnfh} "\n";
+        close $bifnfh;
+    }
+
+    return;
+}
+
+
+# 
+# Usage      : @hdeps = hdr_depend( $cmd_var_sub, $s, $addoption );
+#
+# Purpose    : use the cpp cmd to determine header file dependencies
+#
+# Parameters : $cmd_var_sub - a build command that has been variable expanded(Command Variable Substitution)
+#            : $s           - source file to do dependency checking on
+#            : $addoption   - additional cpp options
+#
+# Returns    : @hdeps - list of header file dependencies of the form: 
+#            :              src/include/head.h   # header file relative to the bld directory
+#            :              /usr/include/sys/cdefs.h  # full path system header file
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : 1. cpp: -H  - print the name of each header file used
+#            :         -M  - Instead of outputting the result of preprocessing, output a rule suitable for make
+#            :               describing the dependencies of the main source file
+#            :         -MG - do not require that header file dependencies are present in the path
+#            : 2. the directives -I(include directories), -D(defines), and -U(undefines) are passed to cpp
+#            : 3. header file dependency checking is done by cpp for both the gnu gcc and clang compiler systems
+#            :    since 'clang -E' will not work on .l or .y files
+#
+# See Also   : 'man cpp'(www.gnu.org) and http://gcc.gnu.org/onlinedocs/cpp/
+#
+sub hdr_depend
+{
+    my (
+           $cmd_var_sub,
+           $s,
+           $addoption,
+       ) = @_;
+
+    my ( $IDU );
+
+
+    # copy -I(include directories), -D(define), and -U(undefine) directives from $cmd_var_sub to $IDU
+    $IDU = $EMPTY;
+    while ( $cmd_var_sub =~ m{ (-I\s*\S+|-D\s*\S+|-U\s*\S+) }gx )
+    {
+        $IDU .= $1.$SPACE;
+    }
+
+    my ( %hdr_dep, @hdr_dep );
+
+    # use cpp to determine header file dependencies - redirect stderr to stdout so `` will collect it to the $cppret return variable.
+    #
+    # if header files are missing or have syntax errors, msgs of the following form are returned - each with the word 'error' embedded.
+    #     if a header file is missing:
+    #         c/main.c:1:18: fatal error: head.h: No such file or directory
+    #         compilation terminated.
+    #     if a header file has syntax errors:
+    #         . h/head.h
+    #         h/head.h:6:2: error: invalid preprocessing directive #i
+    #
+    my $cppret = `cpp -H -M $addoption $IDU "$s" 2>/dev/null`;
+
+    # if the word ' error '(spaces required) appears in the cpp output fatal()
+    if ( $cppret =~ m{\serror\s}m )
+    {
+        my ( $cpperror );
+
+        $cpperror = "Error: 'cpp -H -M $addoption $IDU $s' return:\n";
+        $cpperror .= "BEGIN\n";
+        # indents $cppret output by four spaces
+        while ( $cppret =~ m{ ^(.*)$ }gxm )
+        {
+            $cpperror .= "    $1\n";
+        }
+        $cpperror .= "END\n\n";
+
+        print "$cpperror\n";
+
+        fatal("FID 58: $cpperror");
+    }
+
+    # populate %hdr_dep with all unique header files returned by cpp
+    while ( $cppret =~ m{ (\S+[.]$RGX_HDR_EXT)\b }gx )
+    {
+        $hdr_dep{$1} = undef;
+    }
+
+    # extract hash keys and sort them - if you don't do this then each time the hash keys are extracted, even with the same data in the hash,
+    # 'keys %hash' will return randomly ordered keys due to hash keys return uncertainty
+    @hdr_dep = sort sourcesort (keys %hdr_dep);
+
+    return @hdr_dep;
+}
+
+
+# 
+# Usage      : $boolean = rebuild_src_bool( $s, $tgtextorfile, $Sigdata_ref, \%SigdataNew_tmp )
+#
+# Purpose    : determine if source file $s needs to be rebuilt based on signature data in %Sigdata and %SigdataNew
+#
+# Parameters : $s               - relative path source file name starting from the bld home directory,
+#            :                    should only be compilation units(not header files)
+#            : $tgtextorfile    - the file name extension of the target file to be built from $s
+#            : \%Sigdata        - reference to hash holding $SIGFN file data
+#            : \%SigdataNew_tmp - hash holding bld calculated command, source, header, library and target file signature data
+#
+# Returns    : "true"(rebuild $s) or "false"(do not rebuild $s)
+#            :     the following conditions return "true" on the $s source file
+#            :     1. source is new
+#            :     2. source signature has changed
+#            :     3. build command has changed
+#            :     4. no target file extension found
+#            :     5. target file does not exist
+#            :     6. target signature does not currently exist
+#            :     7. target has changed
+#            :     8. header is new
+#            :     9. header has changed
+#            :     10. library is new
+#            :     11. library has changed
+#            : otherwise return "false"
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : None
+#
+sub rebuild_src_bool
+{
+    my (
+           $s,
+           $tgtextorfile,
+           $Sigdata_ref,
+           $SigdataNew_ref,
+       ) = @_;
+
+    my ( $tgtfile );
+
+
+    # rebuild if source is new
+    return "true" if not $s ~~ %{$Sigdata_ref};
+
+    # rebuild if source signature has changed
+    return "true" if $Sigdata_ref->{$s}[$SIG_SRC] ne $SigdataNew_ref->{$s}[$SIG_SRC];
+
+    # rebuild if build command has changed
+    return "true" if $Sigdata_ref->{$s}[$SIG_CMD] ne $SigdataNew_ref->{$s}[$SIG_CMD];
+
+    # rebuild if no target file extension found
+    return "true" if $tgtextorfile eq $EMPTY;
+
+    # if $tgtextorfile has an embedded period, then it is a full file name
+    if ( $tgtextorfile =~ m{ [.] }x )
+    {
+        my ( $vol, $path, $file ) = File::Spec->splitpath( $s );
+        $tgtfile = $path . $tgtextorfile;
+    }
+    else
+    {
+        $tgtfile = $s;
+        $tgtfile =~ s{$RGX_FILE_EXT}{$tgtextorfile}; # replace from last period to end of string with .$tgtextorfile
+    }
+
+    # rebuild if target file does not exist
+    return "true" if not -e "$tgtfile";
+
+    # rebuild if target signature does not currently exist
+    return "true" if not defined $Sigdata_ref->{$s}[$SIG_TGT] or not defined $SigdataNew_ref->{$s}[$SIG_TGT];
+
+    # rebuild if target has changed
+    return "true" if $Sigdata_ref->{$s}[$SIG_TGT] ne $SigdataNew_ref->{$s}[$SIG_TGT];
+
+    # check each header file for this source
+    foreach my $h ( keys %{$SigdataNew_ref->{$s}[$HDR_DEP]} )
+    {
+        # rebuild if header is new
+        return "true" if not $h ~~ %{$Sigdata_ref};
+
+        # rebuild if header has changed
+        return "true" if $Sigdata_ref->{$h}[$SIG_SRC] ne $SigdataNew_ref->{$h}[$SIG_SRC];
+    }
+
+    return "false";
+}
+
+
+# 
+# Usage      : $sig = file_sig_calc( $filename );
+#            : $sig = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
+#            : $sig = file_sig_calc( $filename, @otherstrings );
+#
+# Purpose    : calculate SHA1 signature of $filename and all remaining arguments concatenated together
+#
+# Parameters : $filename     - file that will be opened and read in
+#            : @otherstrings - other strings to be concatenated to $filename
+#
+# Returns    : if $filename exists
+#            :     return SHA1 signature of "$filename . @otherstrings"
+#            : else
+#            :     fatal()
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : Digest::SHA
+#
+sub file_sig_calc
+{
+    my (
+           $filename,
+           @otherstrings,
+       ) = @_;
+
+    my ( $inputfile, $inputfilesize );
+
+
+    # calculate signature of $filename . @otherstrings
+
+    if ( not -e $filename )
+    {
+        fatal("FID 59: File: $filename does not exit.");
+    }
+
+    if ( not -e $BFN )
+    {
+        fatal("FID 60: File: open() error on $filename.");
+    }
+    open my $fh, "<", $filename;
+
+    $inputfilesize = -s "$filename";
+
+    if ( $inputfilesize == 0 )
+    {
+        fatal("FID 61: File: $filename is of zero size - a useful signature cannot be taken of an empty file.");
+    }
+
+    read $fh, $inputfile, $inputfilesize;
+    close $fh;
+
+    my $otherstrings = $EMPTY;
+    foreach my $string ( @otherstrings )
+    {
+        $otherstrings .= $string;
+    }
+
+    return sha1_hex( $inputfile . $otherstrings );
+}
+
+
+# 
+# Usage      : @system_hdrs = sort sourcesort @system_hdrs if ( @system_hdrs > 1 );
+#            : @user_hdrs = sort sourcesort @user_hdrs if ( @user_hdrs > 1 );
+#            : @system_libraries = sort sourcesort @system_libraries if ( @system_libraries > 1 );
+#            : @user_libraries = sort sourcesort @user_libraries if ( @user_libraries > 1 );
+#            : @code = sort sourcesort @code if ( @code > 1 );
+#
+# Purpose    : for sorting $SIGFN and $BIFN source output - for file "base.ext" sort on base first and then on ext
+#
+# Parameters : None
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : 1. always used with the sort builtin e.g. 'sort sourcesort @array'
+#
+# See Also   : None
+#
+sub sourcesort
+{
+    my ( $vol, $path, $basea, $baseb );
+    my ( $na, $nb, $afile, $bfile, $aext, $bext );
+
+
+    $na = $nb = 0;
+
+    given( $a )
+    {
+        when( m{ ^\/.*[.]$RGX_HDR_EXT$ }x )    { $na = 1; }
+        when( m{ ^\/.*$RGX_LIBS$ }x )          { $na = 2; }
+        when( m{ ^[^\/].*$RGX_LIBS$ }x )       { $na = 3; }
+        when( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x ) { $na = 4; }
+        when( m{ .*[.]$RGX_SRC_EXT$ }x )       { $na = 5; }
+        default { fatal("FID 62: Invalid source format - $a"); }
+    }
+
+    given( $b )
+    {
+        when( m{ ^\/.*[.]$RGX_HDR_EXT$ }x )    { $nb = 1; }
+        when( m{ ^\/.*$RGX_LIBS$ }x )          { $nb = 2; }
+        when( m{ ^[^\/].*$RGX_LIBS$ }x )       { $nb = 3; }
+        when( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x ) { $nb = 4; }
+        when( m{ .*[.]$RGX_SRC_EXT$ }x )       { $nb = 5; }
+        default { fatal("FID 63: Invalid source format - $b"); }
+    }
+
+    ( $vol, $path, $basea ) = File::Spec->splitpath( $a );
+    if ( $basea =~ m{(.*)[.]$RGX_FILE_EXT} )
+    {
+        $afile = $1;
+        $aext = $2;
+    }
+    else
+    {
+        fatal("FID 64: Valid file extension not found in $basea");
+    }
+
+    ( $vol, $path, $baseb ) = File::Spec->splitpath( $b );
+    if ( $baseb =~ m{(.*)[.]$RGX_FILE_EXT} )
+    {
+        $bfile = $1;
+        $bext = $2;
+    }
+    else
+    {
+        fatal("FID 65: Valid file extension not found in $baseb");
+    }
+
+    # DEBUG
+=for
+    print "DEBUG:\n".
+          "a: %1s %16s %8s %64s     b: %1s %16s %8s %64s\n", $na, $afile, $aext, $a, $nb, $bfile, $bext, $b;
+          "ENDDEBUG\n";
+=cut
+
+    $na cmp $nb or
+    $afile cmp $bfile or
+    $aext cmp $bext;
+}
+
+
+# 
+# Usage      : $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+#
+# Purpose    : evaluate the error return from the system() call perl builtin
+#
+# Parameters : $?($CHILD_ERROR) - the special variable used to indicate the status return from the system() call
+#            : $!($OS_ERROR     - the special variable used to indicate the C(errno) value returned on error
+#
+# Returns    : $error_msg - an error msg
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : $exit_value  = $CHILD_ERROR >> 8;
+#            : $signal_num  = $CHILD_ERROR & 127;
+#            : $dumped_core = $CHILD_ERROR & 128;
+#
+# See Also   : The perldoc.perl.org perlvar "Error Variables" section
+#
+sub system_error_msg
+{
+    my (
+           $child_error,
+           $os_error,
+       ) = @_;
+
+    my ( $error_msg );
+
+
+    if ( $child_error == -1 )
+    {
+        $error_msg = "failed to execute: $os_error";
+    }
+    elsif ( $child_error & 127 )
+    {
+        my ( $signal, $dump );
+
+        $signal = ($child_error & 127);
+        $dump = ($child_error & 128) ? 'with' : 'without';
+        $error_msg = "child died with signal $signal, $dump coredump";
+    }
+    else
+    {
+        my ( $return );
+
+        $return = $child_error >> 8;
+        $error_msg = "child exited with value $return";
+    }
+
+    return $error_msg;
+}
+
+
+# 
+# Usage      : warning("warning msg");
+#
+# Purpose    : accept msg as arg and append it to $BWFN file, then return.
+#
+# Parameters : $msg - a single scalar msg
+#
+# Returns    : None
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : fatal()
+#
+sub warning
+{
+    my (
+           $msg,
+       ) = @_;
+
+    my ( $package, $filename, $line ) = caller;
+
+    open my $bwfnfh, ">>", $BWFN;
+    printf {$bwfnfh} "line: %4d - %s\n\n", $line, $msg;
+    close $bwfnfh;
+
+    return;
+}
+
+
+# 
+# Usage      : fatal("fatal msg");
+#
+# Purpose    : accept msg as arg and append it to $BFFN file, then self 'kill INT' to
+#            : call the anonymous interrupt($SIG{INT}) handler routine to croak().
+#
+# Parameters : $msg - a single scalar msg
+#
+# Returns    : Does not return
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : warning()
+#
+sub fatal
+{
+    my (
+           $msg,
+       ) = @_;
+
+    my ( $package, $filename, $line ) = caller;
+
+    open my $bffnfh, ">>", $BFFN;
+    printf {$bffnfh} "line: %4d - %s\n\n", $line, $msg;
+    close $bffnfh;
+
+    kill INT => $PID;
+
+    return;
+}
+
+
+# 
+# Usage      : bld -h
+#
+# Purpose    : help option
+#
+# Parameters : None
+#
+# Returns    : Does not return
+#
+# Globals    : None
+#
+# Throws     : None
+#
+# Notes      : None
+#
+# See Also   : Do 'perldoc bld'
+#
+sub opt_help
+{
+    print "usage: bld [-h]\n";
+    print "    -h          - this message.(exit)\n";
+
+    print "$USAGE";
+
+    exit;
+}
+
+1;
+
+__END__
+
+=head1 NAME
+
+ bld
+
+=head1 VERSION
+
+ bld version 1.0.0
+
+=head1 USAGE
+
+ usage: bld [-h]
+     -h          - this message.(exit)
+
+=head1 ARGUMENTS
+
+ None
+
+=head1 OPTIONS
+
+bld [-h]
+
+-h
+        help message(exit)
+
+=head1 ENVIRONMENT VARIABLES
+
+ None
+
+=head1 RC CONFIGURATION FILES
+
+ None
+
+=head1 DEPENDENCIES
+
+ Required for execution:
+    experimental.pm(3pm) - for smartmatch and switch features
+    cpp(1) - gnu cpp cmd is required for dependency determination
+    ldd(1) - used for library dependency determination
+
+ Required for test:
+    gcc(1)/g++(1) (http://gcc.gnu.org/)
+    clang(1) (http://llvm.org/)
+
+=head1 FEATURES AND ADVANTAGES
+
+ 1. Everything is done with SHA1 signatures.  No dates are used anywhere.  Signatures are a property of the
+    file and not meta data from the system used for the build.  Any time issues, whether related to local
+    clocks, networked host clocks or files touched by command activities are eliminated.  Modern signature
+    algorithms are strongly randomized even for small file changes - for the 160 bit SHA1 hash collisions are
+    unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
+    is small relative to the expense of programmer time.
+ 2. bld is REALLY simple to use.  There are no arguments, no options(except -h), no environment variables and
+    no rc files.  The entire bld is controlled from the Bld(and Bld.gv file) file.  Only a minimal knowledge
+    of perl is needed - variable definitions and simple regular expressions.
+ 3. Automatic dependency checking - GNU cpp is used to find the header file dependencies.  Optionally, header
+    file checking may be done for user header files only or for simultaneously both system header and user
+    header files.  All header file dependency information associated with each source is saved to the
+    bld.info file.
+ 4. bld is not hierarchical.  A single Bld file controls the construction of a single target(a target is an
+    executable or library(static or shared)).  Complex multi-target projects use one Bld.gv(global values)
+    file and many Bld files - one to a target.
+ 5. Each source file will have three signatures associated with it - one for the source file, one for the
+    corresponding object file and one for the cmds use to rebuild the source.  A change in any of these will
+    result in a rebuild.  A change in the target signature will result in a rebuild.  Optionally, the
+    signatures of dynamic libraries may be tracked.  If a library signature changes the bld may warn or stop
+    the rebuild.  If dynamic libraries are added or deleted from the bld this can ignore/warn/fatal.
+ 6. If any files in the bld have the same signature this is warned about e.g. two header or source files of
+    the same or different names.
+ 7. Complex multi-target projects are built with a standard directory setup and a standard set of scripts -
+    Directories:
+        Bld.<project>/<version>       - has all files controlling <project> <version>s blds and bld target output files
+        bld.<project>/<version>       - source code for <project> <version>s
+
+    Files:
+        bld.<project>                 - for initiating single target, multi-target or all target blds of a <project>
+        bld.<project>.rm              - for initiating single target, multi-target or all target clean of a <project>
+        bld.<project>.targets         - list of all <project> targets
+        bld.<project>.README          - <project> README
+        bld.<project>.install         - <project> install script
+        bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
+        Bld.<project>.<target>        - the Bld file for each <project> <target>
+        Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
+ 8. Security - since the signatures of everything(source, objects, libraries, executable) are checked it is
+    more difficult to insinuate an exploit into an object or library during the build process.
+ 9. The capture of the full build process in the bld.info, bld.warn and bld.fatal files allows easy access to
+    and saving of this information.  For multi-target projects with the target names appended to these files
+    it allows quick investigation of the build process of many interrelated targets at the same time.
+ 10. Perl - since bld is all perl and since all warnings and fatals have the source line number associated with
+     them, it is very easy to locate in the souce code the exact location of an error and examine the context
+     about which the error occurred and routine that the error was produced in.
+ 11. Time - programmer time; learning about, maintaining/debugging Makefiles and Makefile hierarchies, dependency
+     checking integration and formulation of Makefile strategies, automatic Makefile generation with Autotools -
+     these all dominate the programmer time and expense of 'make'.  bld only requires basic perl variables(in
+     the Bld file EVAL section) and dir:regex:{} line specifications(in the Bld file DIRS section).
+ 12. 'make' and it's difficulties:
+         http://www.scons.org/wiki/FromMakeToScons -
+             a detailed critique of make and some alternatives
+         ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3 -
+             a brief critique of make and how GNU automake from the GNU Build System contributes
+
+=head1 PROJECT STATE
+
+ State:
+ 1. The code is mostly done - unless someone finds a bug or suggests an enhancement.
+ 2. The in code documentation is done.
+ 3. The testing is 80%-90% done.
+ 4. The usage msg is done - the perldoc is 50%-60% done, needs a lot of work.
+
+ Needed:
+ 1. The code is in very good shape unless someone discovers a bug or suggests an enhancement.
+    My current focus is on the documentation and testing.
+
+ 2. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
+    no options.  How options affect the generated code and thus the Bld files is important.
+    Anyone willing to investigate configure options and how these options affect the Bld files
+    is welcome.
+
+ 3. The bld.<project>.install scripts all need to be done.  I'd prefer to partner with someone
+    knowledgeable about the installation of git, svn and systemd.
+
+ 4. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
+
+ 5. The git, svn and systemd projects will all be creating new versions eventually.  Anyone
+    that would like to add bld.<project>/<version> and Bld.<project>/<version> directories
+    with the new versions is welcome.
+
+ 6. I need someone with substantial experience building the linux kernel to advise me or partner
+    with me on the construction of 3.15 or later.
+
+ 7. If you successfully bld a new project and wish to contribute the bld, please do so.  I'm 
+    interested in how others construct/organize/document/debug projects and their Bld files.
+
+=head1 DESCRIPTION
+
+ bld(1.0.0) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses SHA1
+ signatures(no dates) for building software and GNU cpp for automatic header file dependency
+ checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
+ and Bld.gv(bld global values) files.  See the bld.README file.  There are no cmd line arguments or
+ options(except for -h(this msg)) or $HOME/.bldrc or ./.bldrc files and no environment variables are
+ used.  Complex multi-target projects are bld't with the use of a Bld.<project> (Bld files and
+ target bld output files) directory, bld.<project>(project source) directory, bld.<project>(target
+ construction) script, bld.<project>.rm(target and bld.<info|warn|fatal>.<target> file removal)
+ script, Bld.<project>.gv(project global values) file, bld.<project>.install(target and file
+ install) script and bld.<project>.README(project specific documentation) file.  Current example
+ projects:
+
+     Bld.git - the git project http://git-scm.com/
+     Bld.svn - the subversion project http://subversion.apache.org/
+     Bld.systemd - the systemd project http://www.freedesktop.org/wiki/Software/systemd/
+     Bld.example - misc examples intended to show how to create Bld and Bld.gv files
+
+ bld is based upon taking the SHA1 signature of anything that, when changed, would require a
+ rebuild of the executable/library.  It is not, like 'make', based in any way on dates.  This
+ means that source or header files may be moved about, and if the files do not change then
+ nothing needs to, or will, be rebuilt.  bld is not hierarchical; all of the information to
+ rebuild the executable is contained in the Bld(and Bld.gv) file.  The rebuild is based on Perl's
+ regex engine to specify source file patterns along with the Perl eval{} capability to bring
+ variable definitions from the Bld file into the source.
+
+ bld reads the Bld file which describes the build.  This example Bld file serves for the
+ following discussion:
+
+    Program description and Bld file explanatory comments go here.(and are ignored by bld)
+    EVAL
+    DIRS
+
+ The Bld file has three sections , a starting comment section to document the Bld, an EVAL and DIRS.
+ Variables to be used for interpolation into build commands are defined in the EVAL section.
+ The variables are all Perl variables.  The entire EVAL section is eval{}'ed in bld.  Any
+ errors will terminate the run.  The DIRS section has three field(: 0) lines which are
+ the directory, the matched files to a Perl regular expression, and a build command for the line
+ matched files.  EVAL section variable definitions are interpolated into the build commands.
+ bld will execute "$cmd $dir/$s"; for each source file, with $cmd from the interpolated third
+ field, $dir from the first field, and $s from the matched source second field of the DIRS
+ section lines.  Rebuilds will happen only if:
+
+    1. a source file is new or has changed
+    2. the corresponding object file is missing or has changed
+    3. the command that is used to compile the source has changed
+    4. a dependent header file has changed
+    5. the command to link the executable or build the library archive has changed
+    6. the executable or library has changed or is missing
+
+ The Bld.sig file, automatically built, holds the source/object/header/executable/library file
+ names and the corresponding signatures used to determine if a source should be rebuilt the
+ next time bld is run.  Normally, system header files are included in the rebuild criteria.
+ However, with the -s switch, signature testing of these files can be disabled to improve
+ performance.  It is unusual for system header files to change except after a new OS
+ installation.
+
+ add description of directory structure - o dir - build dir
+
+=head1 QUICK START
+
+ 1. Bld'ing the systemd project - http://www.freedesktop.org/wiki/Software/systemd/
+    a. cd Bld.systemd/systemd-208 # puts you into the systemd(systemd-208) project directory
+    b. ./bld.systemd --all        # bld's all of the systemd targets and bld target output files -
+                                        the bld.info.systemd.<target>,
+                                        the bld.warn.systemd.<target>,
+                                        the bld.fatal.systemd.<target>,
+                                        files
+    c. ./bld.systemd.rm --all     # cleans up everything
+
+ 2. Bld'ing the svn project - https://subversion.apache.org/
+    a. cd Bld.svn/subversion-1.8.5 # puts you into the svn(subversion-1.8.5) project directory
+    b. ./bld.svn --all             # bld's all of the svn targets and bld target output files -
+                                         the bld.info.svn.<target>,
+                                         the bld.warn.svn.<target>,
+                                         the bld.fatal.svn.<target>,
+                                         files
+    c. ./bld.svn.rm --all          # cleans up everything
+
+ 3. Bld'ing the git project - http://www.git-scm.com/
+    a. cd Bld.git/git-1.9.rc0 # puts you into the git(git-1.9.rc0) project directory
+    b. ./bld.git --all        # bld's all of the git targets and bld target output files -
+                                    the bld.info.git.<target>,
+                                    the bld.warn.git.<target>,
+                                    the bld.fatal.git.<target>,
+                                    files
+    c. ./bld.git.rm --all     # cleans up everything
+
+ 4. Bld'ing any single target
+    a. cd bld       # the main bld directory - cd here when you unpack the bld.tar.xz file
+    b. Install the source code in a sub-directory of the bld directory
+    c. Create a Bld file - the Bld file entirely controls the target bld - see example below
+    d. ./bld -h     # the bld usage msg
+    e. ./bld        # do the bld
+    f. ./bld.rm     # clean up
+    g. vi Bld.sig   # examine the bld signature file
+    h. vi bld.info  # detailed info about the stages of the bld
+    i. vi bld.warn  # warning msgs from the bld
+    j. vi bld.fatal # fatal msgs that terminated the bld - should be empty if bld is successful
+
+=head1 FILES
+
+ ~/bld directory files:
+ bld        - the bld perl script
+ bld.rm     - script to clean the bld directory
+ bld.README - for first point of contact quick start
+ Bld        - the bld file which controls bld and the construction of a target
+ Bld.gv     - the file of global values imported into the Bld file(unusually used only for multi-target builds)
+ Bld.sig    - the signature(SHA1) file created from the Bld file
+ bld.info   - information about the bld 
+ bld.warn   - warnings from the bld 
+ bld.fatal  - the fatal msg that ended the bld 
+
+ ~/bld directories:
+ Bld.<project>/<version> - has all files controlling <project> <version>s blds and bld target output files
+ bld.<project>/<version> - source code for <project> <version>s
+ aux                     - template scripts for <project> blds
+
+ ~/bld/aux files:
+ aux/bld.<project>       - template copied to Bld.<project>/<version> directories to bld multi-target projects
+ aux/bld.<project>.rm    - template copied to Bld.<project>/<version> directories to clean multi-target projects
+
+ ~/bld/Bld.<project>/<version> files:
+ bld.<project>                 - for initiating single target, multi-target or all target blds of a <project>
+ bld.<project>.rm              - for initiating single target, multi-target or all target clean of a <project>
+ bld.<project>.targets         - list of all <project> targets
+ bld.<project>.README          - <project> README
+ bld.<project>.install         - <project> install script
+ bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
+ Bld.<project>.<target>        - the Bld file for each <project> <target>
+ Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
+ Bld.sig.<project>.<target>    - the signature(SHA1) file for each <project> <target>
+ bld.info.<project>.<target>   - the bld.info file for each <project> <target>
+ bld.warn.<project>.<target>   - the bld.warn file for each <project> <target>
+ bld.fatal.<project>.<target>  - the bld.fatal file for each <project> <target>
+ bld.<project>.targets         - all of the <project> targets
+
+=head1 PRIMARY PROGRAM DATA STRUCTURES
+
+ TBD
+
+=head1 NOTES
+
+ 1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
+    have the same root name as the source.
+
+ 2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
+    into the same project directory.
+
+ 3. Some projects violate either or both of these target naming or object file naming/location
+    requirements, but reconstructing these projects with bld should be relatively easy
+    e.g. systemd.
+
+ 4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
+    source directory.
+
+
+    Very old notes - needs updating:
+
+    1. bld uses two adjunct files: Bld and Bld.sig.  The Bld file describes all the sources,
+       their locations, and the rules for building them.  Since bld is not hierarchical the
+       Bld file is the only place where build information is located.  The Bld file consists
+       of two subsection types: EVAL and DIRS.  The file must begin with one EVAL section.
+       The EVAL section is Perl code that is eval{}'ed by bld.  Variables that the user wants
+       to have interpolated into source file build commands are defined here.  Three variables
+       are mandatory: $exec(the executable name), $link(the executable building rule), and
+       $libs(the executable libraries spec).  Other variables that are to be used in the
+       expansion of source file build commands are defined here.  The EVAL keyword must start
+       the line.  An eval{} error in the EVAL section will cause the termination of the
+       program.  A DIRS section is specified after the EVAL section and at the end of the Bld
+       file.  The DIRS keyword must start the line.  This section consists of whitespace lines,
+       which are ignored, and build specification lines with three colon separated fields.  The
+       fields are the directory relative to the bld executable directory, a Perl regular
+       expression including /'s selecting the source files that this line is to control the
+       building of, and the build command for the selected source files.  A directory may have
+       several DIRS section lines selecting for different source files with different build
+       commands.  Any variables in the build commands are interpolated from variables defined
+       in the EVAL section.  All unnecessary whitespace in the command third field of DIRS
+       section lines is compressed out.  Thus changing the spacing(spaces, tabs, and \n) of
+       the command field will not affect any source rebuild.  If any source file in any of the
+       directories is not selected by some regular expression, it is not included in the build.
+       A simple and an extended example of Bld files is given below.
+    2. The Bld.sig signature file is automatically created and updated.  It contains one line
+       for each source, one line for each header file, and one line for the executable.  The
+       header file lines and the executable line have two fields: the file name and its
+       signature.  The source lines have three or four fields: the file name, the signatures
+       of the source file, the command use to build the source, and the object file.  The
+       user can modify this file to force the rebuild of files by altering the signature or
+       even by deleting a line, however, any modification to a source or header file, or build
+       command string will do the same thing.
+    3. The user should always run bld -b after completion of a new executable Bld file.
+       This option processes the Bld file and prints the expanded build command and all
+       source files that each specification line selects for.  Thus, the user can see
+       exactly what is going to be included in each build and how all files are going to
+       be rebuilt.  Any variables defined for use in the build rules are also printed out.
+    4. A bld run may be ^C interrupted.  When a normal uninterrupted run is completed the
+       Bld.sig file is rewritten using only those files that were included in the build.
+       Thus, if files were added or deleted this would reflect in the new Bld.sig file.  If a
+       run is interrupted, all files read in from the original Bld.sig file and any new files
+       already built are written out to the Bld.sig file.  This ensures that new files already
+       built and old files not yet examined will not be rebuilt.  This may result in some
+       entries in the Bld.sig file that no longer exist, but this will be corrected at the end
+       of the next normally completed run.
+    5. The -h, -r options exit without rebuilding the executable.
+    6. In the Bld file anything before the EVAL is ignored.  This allows Bld file explanatory
+       comments to be inserted at the start of this file.
+    7. There are no imported environment variables.  The mkdir, mv, and cpp commands must
+       be accessible, as well as, the commands in $cmd and $link variables.
+    8. A non C or C++ source will be rebuilt if its build command has been changed or the
+       source file itself has been changed.  The rebuilt output will be put back in the
+       directory where the source came from under the assumption that it will be a C file
+       that will then need itself to be rebuilt later on in the build sequence.
+
+=head1 Bld FILE FORMAT
+
+ The Bld file(and Bld.gv) controls the entire target bld.  It is divided into three sections -
+ Comment(s), EVAL and DIRS:
+
+ Add comments before the EVAL line
+
+ EVAL
+
+ # mandatory defined variables
+     $bld="";
+     $bldcmd = "";
+     $lib_dirs = "";
+     $opt_s = "";
+     $opt_r = "";
+     $opt_lib = "";
+
+ DIRS
+ # {cmds} cmd blocks or dir:regex:{cmds} specifications
+
+ {cmds}
+ dir:regex:{cmds}
+ dir:regex:{cmds}
+ ...
+
+ 1. a comment section
+
+ 2. An EVAL(starts a line) section - this is perl code that is eval'ed in bld.  Six variables are required.  These are:
+    e.g.
+
+        EVAL
+        # mandatory defined variables
+
+            # the target to built e.g. executable, libx.a, libx.so
+            $bld="exec-c";
+
+            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            $bldcmd = "$CC -lm -o \$bld \$O";
+
+            # space separated list of directories to search for libraries
+            $lib_dirs = "example/lib /usr/lib /lib /usr/local/lib";
+
+            # use system header files in dependency checking("system" or "nosystem")
+            $opt_s = "system";
+
+            # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+            $opt_r = "rebuild";
+
+            # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+            $opt_lib = "fatallibcheck";
+
+        Any other simple perl variables can be defined in the EVAL section and used in the DIRS section.  Environment
+        variables may be set.
+
+ 3. A DIRS(starts a line) section - this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications.
+    The {cmds} blocks are just a group of shell cmds, always executed.  A dir specification is a source directory relative
+    to the bld directory.  The regex specification is a perl regular expression that will pick up one or more of the
+    source files in dir.  The {cmds} specification describes how to build the selected source files.  Any number of
+    cmds, ';' separated, may be specified within the {} brackets.
+
+ Example Bld Files:
+
+    Simplest(Bld.example/example/Bld.example.helloworld-c):
+
+        The 'Hello World!' program with only the minimal required definitions.
+
+        Comment(s)
+
+        EVAL
+
+        $CC = "gcc";
+
+        # mandatory defined variables
+
+            # the target to built e.g. executable, libx.a, libx.so
+            $bld="helloworld-c";
+
+            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            $bldcmd = "$CC -o \$bld \$O";
+
+            # space separated list of directories to search for libraries
+            $lib_dirs = "/usr/lib /lib /usr/local/lib";
+
+            # use system header files in dependency checking("system" or "nosystem")
+            $opt_s = "system";
+
+            # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+            $opt_r = "rebuild";
+
+            # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+            $opt_lib = "warnlibcheck";
+
+        DIRS
+
+        bld.example/example : ^helloworld\.c$ : { $CC -c $s; }
+
+
+    Complex(Bld.example/example/Bld.example.exec-c):
+
+        A well commented example of all of the features of a Bld file.  The code routines are all just stubs
+        designed to illustrate a Bld file.
+
+        Comment(s)
+
+        EVAL
+        # this section will define perl variables to be interpolated into DIRS section cmd fields
+
+        # the compiler
+        $CC = "clang";
+
+        # mandatory defined variables
+
+            # the target to built e.g. executable, libx.a, libx.so
+            $bld="exec-c";
+
+            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            $bldcmd = "$CC -lm -o \$bld \$O";
+
+            # space separated list of directories to search for libraries
+            $lib_dirs = "example/lib /usr/lib /lib /usr/local/lib";
+
+            # use system header files in dependency checking("system" or "nosystem")
+            $opt_s = "system";
+
+            # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+            $opt_r = "rebuild";
+
+            # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+            $opt_lib = "fatallibcheck";
+
+        # some examples of variables that will be interpolated into DIRS section cmd fields
+        $INCLUDE = "-I bld.example/example/include";
+        $LSOPTIONS = "-l";
+
+        # "a" or "b" to conditionally compile main.c
+        $COND = "a";
+
+        DIRS
+        # this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications
+
+        # example of use of conditional compilation
+        bld.example/example/C : ^main\.c$ : {
+                                  # can have comments here too
+                                  if [ "$COND" == 'a' ];
+                                  then
+                                      $CC -S $INCLUDE $s;
+                                  fi
+                                  if [ "$COND" == 'b' ];
+                                  then
+                                      $CC -O4 -S $INCLUDE $s;
+                                  fi
+                              }
+
+        # example of execution of a bare block of cmds - '{' and '}' may be on separate lines
+        {
+            ls $LSOPTIONS;
+        }
+
+        # the cmd field may be put on another line(s) and indented
+        bld.example/example/C : ^g\.x\.C$ :
+            {
+                $CC -c $INCLUDE $s;
+            }
+
+        # all three fields - dir, regex and cmd - may be put on separate lines(even with extra blank lines).
+        # directories may have embedded blanks('a b').
+        bld.example/example/C/a b :
+        ^m\.c$      :
+
+        {$CC -c $INCLUDE $s;}
+
+        # example of regex field that captures multiple source files(h.c and i.c) and example of a
+        # cmd field with multiple cmds - white space is irrelevant(a change should not cause a rebuild)
+        # example of cmd fields with multiple cmds(ls and $CC)
+        bld.example/example/C     : ^(h|i)\.c$    : {  ls -l $s;  $CC -c $INCLUDE $s;  }
+
+        # example of assembler source
+        # Note: the $CC compile produces .o output by changing the c to an o.
+        #       the as output needs to be specified by the -o option.
+        bld.example/example/C     : ^main\.s$ : {as -c -o main.o $s;}
+
+        bld.example/example/C/ww  : ^u\.c$    : {$CC -c $INCLUDE $s;}
+
+        # example of use of recursive directory search - the same regex and cmd fields
+        # are applied to all subdirectories of the specified dir field(right after the 'R')
+        R bld.example/example/C/y : ^.*\.c$   : {$CC -c $INCLUDE $s;}
+
+        bld.example/example/C/x   : ^t\.c$    : {$CC -c $INCLUDE $s;}
+
+        bld.example/example/C/z   : ^(w|w1)\.c$    : {$CC -c $INCLUDE $s;}
+
+        # cmd blocks may execute multiple cmds(ls and pwd)
+        {
+            ls -lfda; pwd;
+            ls;
+        }
+
+=head1 DIAGNOSTICS
+
+ Warnings(Warning ID(WID)):
+
+ # routine: rebuild_target_bool()
+ # ldd return has a library 'not found' entry
+ warning("WID 1: ldd return: $libname library is 'not found'");
+
+ # routine: rebuild_target_bool()
+ # warn if libraries have been removed from the bld
+ warning("WID 2: Libraries removed: @libs_removed") if $opt_lib eq "warnlibcheck";
+
+ # routine: rebuild_target_bool()
+ # warn if a library has changed
+ warning("WID 3: Library changed: $l") if $opt_lib eq "warnlibcheck";
+
+ # routine: rebuild_target_bool()
+ # warn if a library has been added to the bld
+ warning("WID 4: Libraries added: @libs_removed") if $opt_lib eq "warnlibcheck";
+
+ # routine: rebuild_exec()
+ # ldd return has a library 'not found' entry
+ warning("WID 5: ldd return: $libname library is 'not found'");
+
+ # routine: multiple_sigs()
+ # if there are multiple source files with the same signature print this header
+ $warn = "Multiple source files with the same signature:\n";
+ $warn .= "--------------------------------------------------------------------------------------\n";
+ warning("WID 6: $warn");
+
+ # routine: multiple_sigs()
+ # warn if there are multiple source files with the same signature
+ $warn = sprintf "%*d  %s\n", 31, $n, $signature;
+ # loop over all source file names with $signature
+ foreach my $file ( sort keys %{$SourceSig{$signature}} )
+ {
+     $warn .= sprintf "%*s\n", 86, $file;
+ }
+ warning("WID 7: $warn");
+
+ # routine: buildopt()
+ # warn if multiple instances of '-c' option detected in {} cmds; this can occur if conditional compilation is used
+ warning("WID 8: Multiple instances of '-c' detected in compile options(might just be conditional compilation).\n--->$tmp");
+
+ # routine: buildopt()
+ # warn if multiple instances of '-S' option detected in {} cmds; this can occur if conditional compilation is used
+ warning("WID 9: Multiple instances of '-S' detected in compile options(might just be conditional compilation).\n--->$tmp");
+
+ # routine: buildopt()
+ # warn if multiple instances of '-E' option detected in {} cmds; this can occur if conditional compilation is used
+ warning("WID 10: Multiple instances of '-E' detected in compile options(might just be conditional compilation).\n--->$tmp");
+
+ # routine: accum_blddotinfo_output()
+ # multiple $s variables specified in {} cmd field - not necessarily a problem
+ warning("WID 11: Multiple($n) '\$s' variables specified in DIRS line command field: $cmd_var_sub");
+
+ # routine: accum_blddotinfo_output()
+ # the regex field of the cmd line specification did not match any source files
+ warning("WID 12: No sources matched in $BFN DIRS section line $line");
+
+ # routine: accum_blddotinfo_output()
+ # warn if a source file does not exist or is not readable
+ my $string = sprintf "Source file %s does not exist or is not readable.\n   %4d  %s", $s, $count, $line;
+ warning("WID 13: $string");
+
+ # routine: accum_blddotinfo_output()
+ # warn and fatal if the same source file has been specified in multiple DIRS regex specifications
+ my $string = sprintf "Source file %s specified in more than one DIRS line specification:\n   %s\n   %4d  %s", $s, $s{"$basename"}, $count, $line;
+ warning("WID 14: $string");
+
+ # routine: dirs_pro()
+ # warn and fatal if any of the following three are detected
+ my $msg = "$BFN DIRS section has one or more of:\n".
+    "a. Directory or source file specification cannot be read\n".
+    "b. No sources matched\n".
+    "c. Multiple build entries matching same source file";
+ warning("WID 15: $msg");
+
+ # routine: variable_match()
+ # warn if variables defined in the EVAL section are not used in any DIRS section specification
+ warning("WID 16: EVAL defined variable(s) not used in DIRS cmds: @evalextra");
+
+ # routine: variable_match()
+ # warn and fatal if variables used in the DIRS section specifications are not defined in the EVAL section
+ warning("WID 17: DIRS cmd variable(s) not defined in EVAL section: @dirsextra");
+
+
+ Fatals(Fatal ID(FID)):
+
+ # routine: main bld program block
+ # bad option entered - only '-h' allowed
+ fatal("FID 1: GetOptions() failed(use bld -h).");
+
+ # routine: main bld program block
+ # bld does not take any arguments
+ fatal("FID 2: Arguments specified - takes only options.") if @ARGV > 0;
+
+ # routine: Bld_section_extract()
+ # missing Bld file
+ fatal("FID 3: $BFN file missing.");
+
+ # routine: Bld_section_extract()
+ # the Bld file requires sections separated by a line with EVAL at the beginning followed by a line with DIRS at the beginning
+ fatal("FID 4: $BFN invalid format - need EVAL and DIRS sections.");
+
+ # routine: main bld program block
+ # the Bld file EVAL section requires the definition of six variables and optionally any others
+ fatal("FID 5: $BFN EVAL section is empty.");
+
+ # routine: main bld program block
+ # the EVAL section is 'eval "@eval";'ed for errors
+ fatal("FID 6: $BFN EVAL section: Fatal eval error: $EVAL_ERROR");
+
+ # routine: main bld program block
+ # $opt_s must be either "system" or "nosystem"
+ fatal("FID 7: Invalid value for \$opt_s: \'$opt_s\'") if $opt_s ne "system" and $opt_s ne "nosystem";
+
+ # routine: main bld program block
+ # $opt_r must be either "rebuild" or "norebuild"
+ fatal("FID 8: Invalid value for \$opt_r: \'$opt_r\'") if $opt_r ne "rebuild" and $opt_r ne "norebuild";
+
+ # routine: main bld program block
+ # $opt_lib must be either "nolibcheck" or "libcheck" or "warnlibcheck" or "fatallibcheck"
+ fatal("FID 9: Invalid value for \$opt_lib: \'$opt_lib\'") if
+     $opt_lib ne "nolibcheck" and
+     $opt_lib ne "libcheck" and
+     $opt_lib ne "warnlibcheck" and
+     $opt_lib ne "fatallibcheck";
+
+ # routine: main bld program block
+ # $bld, $bldcmd and $lib_dirs are mandatory defines in the EVAL section
+ fatal("FID 10: One or more of $BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
+
+ # routine: main bld program block
+ # $opt_s and $opt_r and $opt_lib are mandatory defines in the EVAL section
+ fatal("FID 11: One or more of $BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
+
+ # routine: read_Blddotsig()
+ # invalid header file or library file SHA1 signature in Bld.sig file
+ fatal("FID 12: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+
+ # routine: read_Blddotsig()
+ # invalid source file SHA1 signature in Bld.sig file
+ fatal("FID 13: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+
+ # routine: read_Blddotsig()
+ # invalid source file build cmd SHA1 signature in Bld.sig file
+ fatal("FID 14: Malformed $SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
+
+ # routine: read_Blddotsig()
+ # invalid source target file SHA1 signature in Bld.sig file
+ fatal("FID 15: Malformed $SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
+
+ # routine: read_Blddotsig()
+ # a line in the Bld.sig file did not match a recognized format
+ fatal("FID 16: Malformed $SIGFN file - invalid format line:\n$line");
+
+ # routine: main bld program block
+ # execution of the {} field cmds with system() failed
+ fatal("FID 17: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
+
+ # routine: main bld program block
+ # DIRS section lines must be formatted with cmd blocks({}) or three field specification lines(dir:regex:{})
+ fatal("FID 18: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+
+ # routine: main bld program block
+ # for regexs in DIRS section dir:regex:{} specifications the regex must match at lest one source file
+ fatal("FID 19: No source file matched in any DIRS section line regular expression.");
+
+ # routine: rebuild_target_bool()
+ # if $opt_lib is "libcheck" or "warnlibcheck" or "fatallibcheck" the target must be dynamically linkable
+ fatal("FID 20: ldd return: $bld is 'not a dynamic executable'");
+
+ # routine: rebuild_target_bool()
+ # a library has been removed from the bld and "fatallibcheck" has been specified
+ fatal("FID 21: Libraries removed: @libs_removed") if $opt_lib eq "fatallibcheck";
+
+ # routine: rebuild_target_bool()
+ # a library has been changed from the bld and "fatallibcheck" has been specified
+ fatal("FID 22: Library changed: $l") if $opt_lib eq "fatallibcheck";
+
+ # routine: rebuild_target_bool()
+ # a library has been added from the bld and "fatallibcheck" has been specified
+ fatal("FID 23: Libraries added: @libs_removed") if $opt_lib eq "fatallibcheck";
+
+ # routine: rebuild_exec()
+ # error detected in rebuilding the target form $bldcmd
+ fatal("FID 24: Error msg: $error_msg\nCmd: \"$tmp\"\nFail status: $status");
+
+ # routine: rebuild_exec()
+ # doing 'ldd' cmd on the target, $bld, indicated that the target wis not a dynamic executable
+ fatal("FID 25: ldd return: $bld is 'not a dynamic executable'");
+
+ # routine: src_pro()
+ # wrong number of arguments specified for the src_pro() routine
+ fatal("FID 26: src_pro(): wrong number of args") if @_ != 11;
+
+ # routine: src_pro()
+ # source files may only have valid file extensions
+ fatal("FID 27: Valid file extension not found in $s");
+
+ # routine: src_pro()
+ # source files may only have valid file extensions
+ fatal("FID 28: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+
+ # routine: buildopt()
+ # the source file has an extension that does not match what is expected by the build option
+ fatal("FID 29: Invalid combination of source extension: $srcext and build option: -c.");
+
+ # routine: buildopt()
+ # two objects files of the same name can't be produced in the same place
+ fatal("FID 30: Object file conflict - $s produces an object file $basenametgt that already exists.");
+
+ # routine: buildopt()
+ # the source file has an extension that does not match what is expected by the build option
+ fatal("FID 31: Invalid combination of source extension: $srcext and build option: -S.");
+
+ # routine: buildopt()
+ # the source file has an extension that does not match what is expected by the build option
+ fatal("FID 32: Invalid combination of source extension: $srcext and build option: -E.");
+
+ # routine: buildopt()
+ # the source file has an extension that does not match what is expected by the build option
+ fatal("FID 33: Invalid combination of source extension: $srcext and build option: non of -c/-S/-E exists.");
+
+ # routine: buildopt()
+ # only one of options -c/-S/-E may be specified in a cmd field for a source
+ fatal("FID 34: Multiple options -c/-S/-E specified in cmd: $cmd_var_sub.");
+
+ # routine: tgtextorfile()
+ # multiple target files in the $srcpath directory.  if more than one target file do fatal().
+ fatal("FID 35: More than one target file for $srcfile in $srcpath: @tgtfiles");
+
+ # routine: src_pro()
+ # execution of the {} field cmds with system() failed
+ fatal("FID 36: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
+
+ # routine: src_pro()
+ # execution of the {} field cmds with system() failed to produce any new target files
+ fatal("FID 37: No new target files created by command:\nCmd: \"$cmd_var_sub\"");
+
+ # routine: tgt_signature()
+ # execution of the {} field cmds with system() failed to produce any new target files
+ fatal("FID 38: No target file for $srcfile in $srcpath: @tgtfiles");
+
+ # routine: tgt_signature()
+ # check for multiple target files created by $cmd_var_sub
+ fatal("FID 39: More than one target file for $srcfile in $srcpath: @tgtfiles");
+
+ # routine: tgt_signature()
+ # two target files of the same name and location cannot be created
+ fatal("FID 40: An identical target file(name) has been created twice: ${srcpath}$tgtfiles[0]");
+
+ # routine: src_pro()
+ # moving all new files in the bld directory created by "$cmd_var_sub" execution
+ # to the directory of the $s source failed
+ fatal("FID 41: Error msg: $error_msg\n\"mv $newfile $srcpath\" fail status: $status");
+
+ # routine: dirs_pro()
+ # Bld file DIRS section cannot be empty
+ fatal("FID 42: $BFN DIRS section is empty.");
+
+ # routine: cvt_dirs_to_array()
+ # Bld file DIRS section line should be a cmd block({}) but does not match this pattern
+ fatal("FID 43: $BFN DIRS section line is not valid(doesn't match $RGX_CMD_BLOCK): $line");
+
+ # routine: cvt_dirs_to_array()
+ # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines(dir:regex:{})
+ fatal("FID 44: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $dir_regex.$line");
+
+ # routine: cvt_dirs_to_array()
+ # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines(dir:regex:{})
+ fatal("FID 45: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $line");
+
+ # routine: dirs_pro()
+ # Bld file DIRS section cannot be empty
+ fatal("FID 46: $BFN DIRS section is empty.");
+
+ # routine: dirs_pro()
+ # a formatting error was detected in a DIRS section line; must be cmd block({}) or one dir:regex:{cmds}
+ fatal("FID 47: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+
+ # routine: accum_blddotinfo_output()
+ # Bld file DIRS section directory specifications must have valid chars
+ fatal("FID 48: Bad(really weird) char(not $RGX_VALID_PATH_CHARS) in directory specification: $dir");
+
+ # routine: accum_blddotinfo_output()
+ # do eval {} on regex to determine if regex is valid
+ fatal("FID 49: Invalid regular expression - \"$regex_srcs\".");
+
+ # routine: accum_blddotinfo_output()
+ # each Bld file DIRS section cmd field must have at least on '$s' source file specification
+ fatal("FID 50: No '\$s' variable specified in DIRS line command field: $cmd_var_sub");
+
+ # routine: accum_blddotinfo_output()
+ # source files may only have valid file extensions
+ fatal("FID 51: Valid file extension not found in $s");
+
+ # routine: accum_blddotinfo_output()
+ # source files may only have valid file extensions
+ fatal("FID 52: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+
+ # routine: accum_blddotinfo_output()
+ # a formatting error was detected in a DIRS section line; must be cmd block({}) or one dir:regex:{cmds}
+ fatal("FID 53: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+
+ # routine: dirs_pro()
+ # Bld DIRS section has one or more of:
+ #     a. Directory or source file specification cannot be read
+ #     b. No sources matched
+ #     c. Multiple build entries matching same source file
+ fatal("FID 54: $msg   - see $BWFN.\n");
+
+ # routine: variable_match()
+ # the scalar variable '$s' may never be specified in the EVAL section
+ fatal("FID 55: The scalar variable \$s may not be specified in the EVAL section, as this is used in the DIRS".
+       " section command field to signify matched source files.");
+
+ # routine: variable_match()
+ # a formatting error was detected in a DIRS section line; must be cmd block({}) or one dir:regex:{cmds}
+ fatal("FID 56: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+
+ # routine: variable_match()
+ # variables used in DIRS section cmd fields but not defined in the EVAL section
+ fatal("FID 57: Extra unused variable(s) in DIRS section - see $BWFN.");
+
+ # routine: hdr_depend()
+ # doing the 'cpp' cmd on a source file failed
+ fatal("FID 58: $cpperror");
+
+ # routine: file_sig_calc()
+ # file to calculate signature of does not exist
+ fatal("FID 59: File: $filename does not exit.");
+
+ # routine: file_sig_calc()
+ # error on open attempt of Bld file
+ fatal("FID 60: File: open() error on $filename.");
+
+ # routine: file_sig_calc()
+ # can't take a signature of a zero length file
+ fatal("FID 61: File: $filename is of zero size - a useful signature cannot be taken of an empty file.");
+
+ # routine: sourcesort()
+ # the regex's for valid source, header or library files do not match
+ fatal("FID 62: Invalid source format - $a");
+
+ # routine: sourcesort()
+ # the regex's for valid source, header or library files do not match
+ fatal("FID 63: Invalid source format - $b");
+
+ # routine: sourcesort()
+ # the regex for valid file extensions did not match
+ fatal("FID 64: Valid file extension not found in $basea");
+
+ # routine: sourcesort()
+ # the regex for valid file extensions did not match
+ fatal("FID 65: Valid file extension not found in $baseb");
+
+=head1 TODO/CONTEMPLATE/INVESTIGATE/EXAMINE/CHECKOUT/THINK ABOUT/HACK ON
+
+   Software Development:
+
+ . investigate `cd Bld.systemd/systemd-208; ldd ` cd before ldd
+
+ . investigate elimination of -L(use lib_dirs?) option in Bld.<project>.<target> files
+
+ . check: is $lib_dirs working? does this require a full path? 
+
+ . Bld.example/example/Bld.example.rdx-c - mod rdx to delete() and search() on from one to n keys
+       - do not require the full set of keys - should be easy
+
+   Test:
+
+ . bld - install kernel - think about automation of 'make V=1' to Bld file
+ . test execution of arbitrary perl code in Bld.<project>.gv and EVAL sections
+ . do a 'make V-1 install' in the git project and see what it takes to install git
+ . add new version of one of git/subversion/systemd to show how multiple versions of <project> are bld't
+ . run on Mac
+ . test library changes
+ . investigate running under the debugger and profiling
+ . Unit Tests:
+      . empty Bld file
+      . Bld file with both, in order, EVAL and DIRS lines
+      . EVAL section is correct(required variables) and DIRS section is empty
+      . EVAL section is empty(required variables) and DIRS section is correct(non-empty)
+      . EVAL section is empty(required variables) and DIRS section is empty
+
+   Doc:
+
+ . add explanation of aux directory
+ . go thru code line by line and do code scrub, comment scrub and make list of features and advantages
+ . do bld perldoc
+ . doc extensions.pl and clang-gcc-headers.pl
+ . Bld file with only a {} block will execute the block but fail because of no .o files to build the target
+ . make list of install component requirements:
+       1. experimental.pm
+       2. gcc/clang
+ . add note that two project builds cannot run at the same time - Bld.sig and Bld.gv files
+ . add Note about if two targets are built from the same source files - they both use the same .o files
+       and may compile different .o files depending on the compile options - this results in the building
+       of one target interfering with the build of the other target since the signature of the .o files
+       are now different because of the other build.
+ . add doc/notes about ldd and env variable LD_LIBRARY_PATH - add code to add special paths to LD_LIBRARY_PATH??
+ . doc packages needed for execution of all Bld.example's :
+       clang(LLVM), gcc, g++, GNUstep header of the GNUstep Base library package
+ . add perldoc section on how to use bld to build a multi executable/library project e.g. subversion
+ . major routine call tree
+ . explain modules to install and all build/run requirements
+       experimental.pm
+       gcc/g++
+       clang
+       ldd
+ . required executables are available and full paths - operation: ldd, cpp, mv, which - build: gcc, g++, clang, as
+       add doc with list of all external cmds
+ . FFAQ - (Fake)FAQ
+ . add section on design notes - section on design philosophy
+ . write subroutines summary
+ . add doc about the 6 required variables and how to construct them
+
+   Outside resources:
+
+ . read Intermediate Perl 2nd Ed for ideas
+ . investigate scons on scons.tigres.org
+ . read "Managing Projects with GNU Make"
+ . Links:
+     . http://www.scons.org/wiki/FromMakeToScons
+     . http://producingoss.com/ - Carl Fogel
+     . http://coding.smashingmagazine.com/2013/01/03/starting-open-source-project/
+     . http://oss-watch.ac.uk/resources/howtobuildcommunity
+
+   Release:
+
+ . on release ask for users to compile new projects and incorporate them into a Release bld.<project>.<version>.tar.gx file
+ . slide presentation
+ . article
+ . LLVM community
+ . GNU community
+ . Apache Software Foundation
+ . send the perlbrew team a copy
+ . CPAN.org
+ . hunspell
+
+   Notes:
+
+ . to do a forced rebuild of everything delete Bld.sig or *.o
+ . note on how to build both static and dynamic libraries
+ . why no 'include' DIRS directive?
+ . exit codes 0=success, 255=error - see bld.*
+ . EVAL section %@ defines are ignored - only scalar variables - $cmd to EVAL 0
+ . if a source is moved it will rebuild since the Bld.sig signature is keyed to the source
+       file and it's path from the bld parent directory
+ . same basename with different extensions will fail and same basename with same extension
+       in different locations will fail because same named object will be created
+ . symbolic links to source files should work - a file in one place and a link to that same
+       file in another place will be detected/warned/fatal
+ . g++ is installed with the gcc-c++ package
+
+   Consult
+
+ . open source release consult??
+
+=head1 INCOMPATIBILITIES
+
+ None Known
+
+=head1 BUGS AND LIMITATIONS
+
+ None Known
+
+=head1 SEE ALSO
+
+ bld.README
+
+ Critique of 'make':
+     http://www.scons.org/wiki/FromMakeToScons -
+         a detailed critique of make and some alternatives
+     ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3 -
+         a brief critique of make and how GNU automake from the GNU Build System contributes
+
+=head1 GITHUB RELEASES
+
+ bld-1.0.0.tar.gz - initial release
+ 
+=head1 AUTHOR
+
+ Richard A Hogaboom
+ richard.hogaboom@gmail.com
+
+=head1 LICENSE and COPYRIGHT and (DISCLAIMER OF) WARRANTY
+
+Copyright (c) 1998-2014, Richard A Hogaboom
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the {organization} nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. :-)
+

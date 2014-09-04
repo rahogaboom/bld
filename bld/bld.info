@@ -1,0 +1,319 @@
+
+OS: linux
+
+bld version: 1.0.0
+
+perl full path: /usr/bin/perl
+perl version: Summary of my perl5 (revision 5 version 18 subversion 2) configuration:
+
+cpp full path: /usr/bin/cpp
+cpp version: cpp (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1)
+
+gcc full path: /usr/lib64/ccache/gcc
+gcc version: gcc (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1)
+
+g++ full path: /usr/lib64/ccache/g++
+g++ version: g++ (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1)
+
+clang full path: /usr/bin/clang
+clang version: clang version 3.4 (tags/RELEASE_34/final)
+
+
+####################################################################################################
+comments section of Bld file:
+
+Comment(s)
+
+
+####################################################################################################
+EVAL section expansion of $bld, $bldcmd and $lib_dirs mandatory variables($O is object files):
+
+$bld = exec-c
+$bldcmd = "gcc -lm -o $bld $O"
+$lib_dirs = "example/lib /usr/lib /lib /usr/local/lib"
+
+EVAL section expansion of $opt_s and $opt_r and $opt_lib mandatory option variables:
+
+$opt_s = "system"
+$opt_r = "rebuild"
+$opt_lib = "warnlibcheck"
+
+####################################################################################################
+Bld file DIRS section specification lines with irrelevant white space compressed out:
+
+bld.example/example/C:^main\.c$:{\nif [ "$COND" == 'a' ];\nthen\n$CC -S $INCLUDE $s;\nfi\nif [ "$COND" == 'b' ];\nthen\n$CC -O4 -S $INCLUDE $s;\nfi\n}
+{\nls $LSOPTIONS;\n}
+bld.example/example/C:^g\.x\.C$:{\n$CC -c $INCLUDE $s;\n}
+bld.example/example/C/a b:^m\.c$:{$CC -c $INCLUDE $s;}
+bld.example/example/C:^(h|i)\.c$:{ls -l $s;$CC -c $INCLUDE $s;}
+bld.example/example/C:^main\.s$:{as -c -o main.o $s;}
+bld.example/example/C/ww:^u\.c$:{$CC -c $INCLUDE $s;}
+R bld.example/example/C/y:^.*\.c$:{$CC -c $INCLUDE $s;}
+bld.example/example/C/x:^t\.c$:{$CC -c $INCLUDE $s;}
+bld.example/example/C/z:^(w|w1)\.c$:{$CC -c $INCLUDE $s;}
+{\nls -lfda;pwd;\nls;\n}
+
+
+####################################################################################################
+R recursively expanded and numbered DIRS section specification lines:
+
+   1  bld.example/example/C:^main\.c$:{\nif [ "$COND" == 'a' ];\nthen\n$CC -S $INCLUDE $s;\nfi\nif [ "$COND" == 'b' ];\nthen\n$CC -O4 -S $INCLUDE $s;\nfi\n}
+   2  {\nls $LSOPTIONS;\n}
+   3  bld.example/example/C:^g\.x\.C$:{\n$CC -c $INCLUDE $s;\n}
+   4  bld.example/example/C/a b:^m\.c$:{$CC -c $INCLUDE $s;}
+   5  bld.example/example/C:^(h|i)\.c$:{ls -l $s;$CC -c $INCLUDE $s;}
+   6  bld.example/example/C:^main\.s$:{as -c -o main.o $s;}
+   7  bld.example/example/C/ww:^u\.c$:{$CC -c $INCLUDE $s;}
+   8  bld.example/example/C/y:^.*\.c$:{$CC -c $INCLUDE $s;}
+   9  bld.example/example/C/y/a:^.*\.c$:{$CC -c $INCLUDE $s;}
+  10  bld.example/example/C/x:^t\.c$:{$CC -c $INCLUDE $s;}
+  11  bld.example/example/C/z:^(w|w1)\.c$:{$CC -c $INCLUDE $s;}
+  12  {\nls -lfda;pwd;\nls;\n}
+
+
+####################################################################################################
+a. DIRS section specification lines
+    b. variable interpolated(except for $s) specification line cmd field
+        c. matching compilation unit source file(s)
+            d. source file header dependencies:
+
+----------
+   1  bld.example/example/C:^main\.c$:{\nif [ "$COND" == 'a' ];\nthen\n$CC -S $INCLUDE $s;\nfi\nif [ "$COND" == 'b' ];\nthen\n$CC -O4 -S $INCLUDE $s;\nfi\n}
+      {\nif [ "$COND" == 'a' ];\nthen\ngcc -S -I bld.example/example/include $s;\nfi\nif [ "$COND" == 'b' ];\nthen\ngcc -O4 -S -I bld.example/example/include $s;\nfi\n}
+          bld.example/example/C/main.c
+              /usr/include/_G_config.h
+              /usr/include/sys/cdefs.h
+              /usr/include/bits/cmathcalls.h
+              /usr/include/complex.h
+              /usr/include/features.h
+              /usr/include/libio.h
+              /usr/include/bits/mathdef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h
+              /usr/include/stdc-predef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/include/stdio.h
+              /usr/include/bits/stdio_lim.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/sys_errlist.h
+              /usr/include/bits/types.h
+              /usr/include/bits/typesizes.h
+              /usr/include/wchar.h
+              /usr/include/bits/wordsize.h
+              bld.example/example/C/head.h
+              bld.example/example/C/l.hh
+
+----------
+   2  {\nls $LSOPTIONS;\n}
+      {\nls $LSOPTIONS;\n}
+
+----------
+   3  bld.example/example/C:^g\.x\.C$:{\n$CC -c $INCLUDE $s;\n}
+      {\ngcc -c -I bld.example/example/include $s;\n}
+          bld.example/example/C/g.x.C
+              /usr/include/sys/cdefs.h
+              /usr/include/features.h
+              /usr/include/stdc-predef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/include/string.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/wordsize.h
+              /usr/include/xlocale.h
+
+----------
+   4  bld.example/example/C/a b:^m\.c$:{$CC -c $INCLUDE $s;}
+      {gcc -c -I bld.example/example/include $s;}
+          bld.example/example/C/a b/m.c
+              /usr/include/_G_config.h
+              /usr/include/sys/cdefs.h
+              /usr/include/features.h
+              /usr/include/libio.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h
+              /usr/include/stdc-predef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/include/stdio.h
+              /usr/include/bits/stdio_lim.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/sys_errlist.h
+              /usr/include/bits/types.h
+              /usr/include/bits/typesizes.h
+              /usr/include/wchar.h
+              /usr/include/bits/wordsize.h
+
+----------
+   5  bld.example/example/C:^(h|i)\.c$:{ls -l $s;$CC -c $INCLUDE $s;}
+      {ls -l $s;gcc -c -I bld.example/example/include $s;}
+          bld.example/example/C/i.c
+              /usr/include/stdc-predef.h
+              bld.example/example/C/../include/head.h
+          bld.example/example/C/h.c
+              /usr/include/_G_config.h
+              /usr/include/sys/cdefs.h
+              /usr/include/features.h
+              /usr/include/libio.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h
+              /usr/include/stdc-predef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/include/stdio.h
+              /usr/include/bits/stdio_lim.h
+              /usr/include/string.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/sys_errlist.h
+              /usr/include/bits/types.h
+              /usr/include/bits/typesizes.h
+              /usr/include/wchar.h
+              /usr/include/bits/wordsize.h
+              /usr/include/xlocale.h
+
+----------
+   6  bld.example/example/C:^main\.s$:{as -c -o main.o $s;}
+      {as -c -o main.o $s;}
+          bld.example/example/C/main.s
+
+----------
+   7  bld.example/example/C/ww:^u\.c$:{$CC -c $INCLUDE $s;}
+      {gcc -c -I bld.example/example/include $s;}
+          bld.example/example/C/ww/u.c
+              /usr/include/sys/cdefs.h
+              /usr/include/features.h
+              /usr/include/stdc-predef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/include/string.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/wordsize.h
+              /usr/include/xlocale.h
+
+----------
+   8  bld.example/example/C/y:^.*\.c$:{$CC -c $INCLUDE $s;}
+      {gcc -c -I bld.example/example/include $s;}
+          bld.example/example/C/y/tt.c
+              /usr/include/stdc-predef.h
+              bld.example/example/include/head.h
+
+----------
+   9  bld.example/example/C/y/a:^.*\.c$:{$CC -c $INCLUDE $s;}
+      {gcc -c -I bld.example/example/include $s;}
+          bld.example/example/C/y/a/j.c
+              /usr/include/sys/cdefs.h
+              /usr/include/features.h
+              /usr/include/stdc-predef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/include/string.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/wordsize.h
+              /usr/include/xlocale.h
+
+----------
+  10  bld.example/example/C/x:^t\.c$:{$CC -c $INCLUDE $s;}
+      {gcc -c -I bld.example/example/include $s;}
+          bld.example/example/C/x/t.c
+              /usr/include/stdc-predef.h
+
+----------
+  11  bld.example/example/C/z:^(w|w1)\.c$:{$CC -c $INCLUDE $s;}
+      {gcc -c -I bld.example/example/include $s;}
+          bld.example/example/C/z/w1.c
+              /usr/include/sys/cdefs.h
+              /usr/include/bits/cmathcalls.h
+              /usr/include/complex.h
+              /usr/include/features.h
+              /usr/include/bits/mathdef.h
+              /usr/include/stdc-predef.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/wordsize.h
+          bld.example/example/C/z/w.c
+              /usr/include/sys/cdefs.h
+              /usr/include/bits/cmathcalls.h
+              /usr/include/complex.h
+              /usr/include/features.h
+              /usr/include/bits/mathdef.h
+              /usr/include/stdc-predef.h
+              /usr/include/gnu/stubs.h
+              /usr/include/gnu/stubs-64.h
+              /usr/include/bits/wordsize.h
+
+----------
+  12  {\nls -lfda;pwd;\nls;\n}
+      {\nls -lfda;pwd;\nls;\n}
+
+
+####################################################################################################
+EVAL section expansion of defined variables used in DIRS section cmd fields:
+
+$CC = gcc
+$COND = a
+$INCLUDE = -I bld.example/example/include
+$LSOPTIONS = -l
+
+
+####################################################################################################
+List of all build - System headers(full path)
+                    User headers(relative path)
+                    System libraries(full path)
+                    User libraries(relative path)
+                    Source files(relative path)
+                    Build target(bld directory):
+
+--------------------------------------------------
+System headers:
+'/usr/include/_G_config.h'
+'/usr/include/sys/cdefs.h'
+'/usr/include/bits/cmathcalls.h'
+'/usr/include/complex.h'
+'/usr/include/features.h'
+'/usr/include/libio.h'
+'/usr/include/bits/mathdef.h'
+'/usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h'
+'/usr/include/stdc-predef.h'
+'/usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h'
+'/usr/include/stdio.h'
+'/usr/include/bits/stdio_lim.h'
+'/usr/include/string.h'
+'/usr/include/gnu/stubs.h'
+'/usr/include/gnu/stubs-64.h'
+'/usr/include/bits/sys_errlist.h'
+'/usr/include/bits/types.h'
+'/usr/include/bits/typesizes.h'
+'/usr/include/wchar.h'
+'/usr/include/bits/wordsize.h'
+'/usr/include/xlocale.h'
+
+--------------------------------------------------
+User headers:
+'bld.example/example/C/../include/head.h'
+'bld.example/example/C/head.h'
+'bld.example/example/include/head.h'
+'bld.example/example/C/l.hh'
+
+--------------------------------------------------
+System libraries:
+'/lib64/libc.so.6'
+'/lib64/libm.so.6'
+
+--------------------------------------------------
+User libraries:
+
+--------------------------------------------------
+Source files:
+'bld.example/example/C/g.x.C'
+'bld.example/example/C/h.c'
+'bld.example/example/C/i.c'
+'bld.example/example/C/y/a/j.c'
+'bld.example/example/C/a b/m.c'
+'bld.example/example/C/main.c'
+'bld.example/example/C/main.s'
+'bld.example/example/C/x/t.c'
+'bld.example/example/C/y/tt.c'
+'bld.example/example/C/ww/u.c'
+'bld.example/example/C/z/w.c'
+'bld.example/example/C/z/w1.c'
+
+--------------------------------------------------
+Build target:
+'exec-c'

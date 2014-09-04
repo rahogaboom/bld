@@ -1,0 +1,287 @@
+#!/usr/bin/perl
+
+# perform cmd line arg specified library/executable builds:
+#     e.g. './bld.$project credential-store lib.a' - bld the 'credential-store' executable and the 'lib.a' library
+#     e.g. './bld.$project --all' - bld all valid targets if option is '--all'(no args allowed)
+
+# standard modules
+use strict;
+use warnings;
+use diagnostics;
+use autodie;
+use Getopt::Long;
+
+# croak() - die with better info than die()
+use Carp qw(
+               croak
+           );
+
+my
+(
+    $opt_all,
+
+    # the bld.$project.targets file
+    @TargetsFile,
+
+    # hash(set to undef) and array of all possible valid targets from bld.$project.targets file
+    %ValidTargets,
+    @ValidTargets,
+
+    # valid targets specified on the cmd line
+    @ValidTargetsCmdLine,
+
+    # any not valid targets specified on the cmd line
+    @notValidTargetsCmdLine,
+
+    # the project name
+    $project,
+
+    # regexs
+    $RGX_BLANK_LINE,
+    $RGX_COMMENT_LINE,
+    $RGX_VALID_TARGET_CHARS,
+
+    # file names
+    $TARGETSFN,
+    $BFN,
+    $SIGFN,
+    $BGVFN,
+    $BIFN,
+    $BWFN,
+    $BFFN,
+);
+
+BEGIN
+{
+    # get the project name from the end of the name of this script
+    ($project) = $0 =~ m{bld\.([^.]*?)$};
+
+    if ( not defined $project )
+    {
+        croak("$0: project name not matched at end of $0\n");
+    }
+
+    $RGX_BLANK_LINE         = qr{ ^\s*$ }x;
+    $RGX_COMMENT_LINE       = qr{ ^\s*\# }x;
+    $RGX_VALID_TARGET_CHARS = qr{ [A-Za-z0-9-_.] }x;
+
+    $TARGETSFN = "bld.$project.targets";
+    $BFN       = "Bld";
+    $SIGFN     = "Bld.sig";
+    $BGVFN     = "Bld.gv";
+    $BIFN      = "bld.info";
+    $BWFN      = "bld.warn";
+    $BFFN      = "bld.fatal";
+}
+
+GetOptions
+(    
+    "all" => \$opt_all,
+) or croak("GetOptions() failed(only --all option allowed).");
+
+if ( $opt_all )
+{
+    croak("No arguments allowed if --all option specified.") if @ARGV > 0;
+}
+else
+{
+    croak("One or more arguments required if --all option not specified.") if @ARGV <= 0;
+}
+
+# each not blank or not a comment line is a valid target argument to bld.$project e.g. './bld.$project $target'
+# and will build one(that named) library or executable
+if ( not -e $TARGETSFN )
+{
+    croak("$TARGETSFN cannot be opened.");
+}
+open my $fh, "<", $TARGETSFN;
+@TargetsFile = <$fh>;
+close $fh;
+chomp @TargetsFile;
+
+foreach my $target ( @TargetsFile )
+{
+    # ignore if comment or blank line
+    next if ( $target =~ $RGX_COMMENT_LINE or $target =~ $RGX_BLANK_LINE );
+
+    # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
+    if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
+    {
+        print "bld.$project.rm: Invalid target line: \'$target\' in $TARGETSFN file.\n";
+        exit 1;
+    }
+
+    push @ValidTargets, $target;
+    $ValidTargets{$target} = undef;
+}
+
+if ( $opt_all )
+{
+    @ValidTargetsCmdLine = @ValidTargets;
+}
+else
+{
+    # add valid cmd line targets to @ValidTargetsCmdLine and not valid cmd line targets to @notValidTargetsCmdLine
+    foreach my $arg ( @ARGV )
+    {
+        if ( exists $ValidTargets{$arg} )
+        {
+            push @ValidTargetsCmdLine, $arg;
+        }
+        else
+        {
+            push @notValidTargetsCmdLine, $arg;
+        }
+    }
+
+    # if a cmd line specified target is not valid, exit
+    if ( @notValidTargetsCmdLine )
+    {
+        print "bld.$project.rm: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
+        exit 1;
+    }
+}
+
+# copy bld global variables
+if ( -e "$BGVFN.$project" )
+{
+    `cp $BGVFN.$project ../../$BGVFN;`;
+}
+else
+{
+    `rm -f ../../$BGVFN;`;
+}
+
+# bld each of the cmd line targets
+foreach my $target ( @ValidTargetsCmdLine )
+{
+    print "#####################################\n";
+    print "'bld'ing $target\n";
+
+    if ( -e "$BFN.$project.$target" )
+    {
+        `cp $BFN.$project.$target ../../$BFN;`;
+    }
+    else
+    {
+        print "bld.$project: Missing $BFN.$project.$target file.\n";
+        exit 1;
+    }
+
+    `rm -f ../../$SIGFN;`;
+
+    if ( -e "$SIGFN.$project.$target" )
+    {
+        `cp $SIGFN.$project.$target ../../$SIGFN;`;
+    }
+
+    print `
+              cd ../..;
+              ./bld;
+              cd - >/dev/null; # the >/dev/null gets rid of a path print
+              cp ../../$SIGFN $SIGFN.$project.$target;
+              cp ../../$BIFN $BIFN.$project.$target;
+              cp ../../$BWFN $BWFN.$project.$target;
+              cp ../../$BFFN $BFFN.$project.$target;
+          `;
+
+    if ( -e "../../$target" )
+    {
+        `cp ../../$target .;`;
+    }
+}
+
+1;
+
+__END__
+
+=head1 NAME
+
+ bld.<project>
+
+=head1 VERSION
+
+ bld.<project> version 1.0.0
+
+=head1 USAGE
+
+ usage: bld.<project> <[--all] | [target] [target] ...>
+     --all    - bld all targets in the bld.<project>.targets file.
+                mutually exclusive of specifying any cmd line targets.
+     [target] - bld a target specified in the bld.<project>.targets file.
+                mutually exclusive of specifying --all.
+
+=head1 REQUIRED ARGUMENTS
+
+ None
+
+=head1 OPTIONS
+
+ --all - bld all targets in the bld.<project>.targets file.
+
+=head1 DESCRIPTION
+
+ bld.<project> is used for bld'ing the project targets; all of which are specified in the bld.<project>.targets file.
+ For each target specified three files will be built:
+     bld.warn.<project>.<target>
+     bld.info.<project>.<target>
+     bld.fatal.<project>.<target>
+
+These correspond to the standard bld.warn, bld.info and bld.fatal files - only with the .<project>.<target> appended.
+
+=head1 CONFIGURATION AND ENVIRONMENT
+
+ No configuration files or environment variables are used.
+
+=head1 FILES
+
+ bld.<project>.targets - all of the project targets are specified, one to a line.
+
+=head1 DEPENDENCIES
+
+ None
+
+=head1 SEE ALSO
+
+ Bld.gv.<project>
+ bld.<project>.README
+ bld.<project>.install
+ bld.<project>.rm
+ bld.<project>.targets
+ bld.<project>.script.*
+
+=head1 AUTHOR
+
+ Richard A Hogaboom
+ richard.hogaboom@gmail.com
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (c) 1998-2014, Richard A Hogaboom
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the {organization} nor the names of its 
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+

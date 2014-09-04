@@ -1,0 +1,506 @@
+
+----------------------------------------------------------------------------------------------------
+bld.README CONTENTS
+
+1. INITIAL STEPS
+2. PROJECT STATE
+3. DEPENDENCIES
+4. bld DIRECTORIES AND DIRECTORY FILES
+5. QUICK START
+6. BUILDING SINGLE TARGETS
+7. BUILDING MULTI-TARGET PROJECTS
+8. Bld FILE FORMAT
+9. NOTES
+10. Contact:
+
+
+----------------------------------------------------------------------------------------------------
+INITIAL STEPS
+
+ cd bld
+ Read bld.README.
+ Do './bld -h' for the usage msg.
+ Do 'perldoc bld' for the full man page.
+ Do './bld' to build the exec-c executable "Hello, world!" program.  This creates the
+     bld.info, bld.warn and Bld.sig files which along with the Bld file gives an
+     illustration of how to construct Bld files and the output that bld creates.
+
+
+----------------------------------------------------------------------------------------------------
+PROJECT STATE
+
+ State:
+ 1. The code is mostly done - unless someone finds a bug or suggests an enhancement.
+ 2. The in code documentation is done.
+ 3. The testing is 80%-90% done.
+ 4. The usage msg is done - the perldoc is 50%-60% done, needs a lot of work.
+
+ Needed:
+ 1. The code is in very good shape unless someone discovers a bug or suggests an enhancement.
+    My current focus is on the documentation and testing.
+
+ 2. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
+    no options.  How options affect the generated code and thus the Bld files is important.
+    Anyone willing to investigate configure options and how these options affect the Bld files
+    is welcome.
+
+ 3. The bld.<project>.install scripts all need to be done.  I'd prefer to partner with someone
+    knowledgeable about the installation of git, svn and systemd.
+
+ 4. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
+
+ 5. The git, svn and systemd projects will all be creating new versions eventually.  Anyone
+    that would like to add bld.<project>/<version> and Bld.<project>/<version> directories
+    with the new versions is welcome.
+
+ 6. I need someone with substantial experience building the linux kernel to advise me or partner
+    with me on the construction of 3.15 or later.
+
+ 7. If you successfully bld a new project and wish to contribute the bld, please do so.  I'm 
+    interested in how others construct/organize/document/debug projects and their Bld files.
+
+
+----------------------------------------------------------------------------------------------------
+DEPENDENCIES
+
+     Required for execution:
+        experimental.pm(3pm) - for smartmatch and switch features
+        cpp(1) - gnu cpp cmd is required for dependency determination
+        ldd(1) - used for library dependency determination
+
+     Required for test:
+        gcc(1)/g++(1) (http://gcc.gnu.org/)
+        clang(1) (http://llvm.org/)
+
+
+----------------------------------------------------------------------------------------------------
+bld DIRECTORIES AND DIRECTORY FILES
+
+~/bld directory files:
+bld        - the bld perl script
+bld.rm     - script to clean the bld directory
+bld.README - for first point of contact quick start
+Bld        - the bld file which controls bld and the construction of a target
+Bld.gv     - the file of global values imported into the Bld file(unusually used only for multi-target builds)
+Bld.sig    - the signature(SHA1) file created from the Bld file
+bld.info   - information about the bld
+bld.warn   - warnings from the bld
+bld.fatal  - the fatal msg that ended the bld
+
+~/bld directories:
+Bld.<project>/<version> - has all files controlling <project> <version>s blds
+bld.<project>/<version> - source code for <project> <version>s
+aux                     - template scripts for <project> blds
+
+~/bld/aux files:
+aux/bld.<project>       - template copied to Bld.<project>/<version> directories to bld multi-target projects
+aux/bld.<project>.rm    - template copied to Bld.<project>/<version> directories to clean multi-target projects
+
+~/bld/Bld.<project>/<version> files:
+bld.<project>                 - for initiating single target, multi-target or all target blds of a <project>
+bld.<project>.rm              - for initiating single target, multi-target or all target clean of a <project>
+bld.<project>.targets         - list of all <project> targets
+bld.<project>.README          - <project> README
+bld.<project>.install         - <project> install script
+bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
+Bld.<project>.<target>        - the Bld file for each <project> <target>
+Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
+Bld.sig.<project>.<target>    - the signature(SHA1) file for each <project> <target>
+bld.info.<project>.<target>   - the bld.info file for each <project> <target>
+bld.warn.<project>.<target>   - the bld.warn file for each <project> <target>
+bld.fatal.<project>.<target>  - the bld.fatal file for each <project> <target>
+bld.<project>.targets         - all of the <project> targets
+
+~/bld <project> directories:
+bld.example - 10 example source code directories, all independent of each other
+Bld.example - Bld.example/example has the Bld.example.<target> construction files
+bld.git     - the git source code
+Bld.git     - the git Bld files
+bld.kernel  - the kernel source code
+Bld.kernel  - the kernel Bld file
+bld.svn     - the svn source code
+Bld.svn     - the svn Bld files
+bld.systemd - the systemd source code
+Bld.systemd - the systemd Bld files
+
+
+----------------------------------------------------------------------------------------------------
+QUICK START
+    (a target is an executable or library(static or shared))
+
+1. Bld'ing the systemd project - http://www.freedesktop.org/wiki/Software/systemd/
+   a. cd Bld.systemd/systemd-208 # puts you into the systemd(systemd-208) project directory
+   b. ./bld.systemd --all        # bld's all of the systemd targets and bld target output files -
+                                       the bld.info.systemd.<target>,
+                                       the bld.warn.systemd.<target>,
+                                       the bld.fatal.systemd.<target>,
+                                       files
+   c. ./bld.systemd.rm --all     # cleans up everything
+
+2. Bld'ing the svn project - https://subversion.apache.org/
+   a. cd Bld.svn/subversion-1.8.5 # puts you into the svn(subversion-1.8.5) project directory
+   b. ./bld.svn --all             # bld's all of the svn targets and bld target output files -
+                                        the bld.info.svn.<target>,
+                                        the bld.warn.svn.<target>,
+                                        the bld.fatal.svn.<target>,
+                                        files
+   c. ./bld.svn.rm --all          # cleans up everything
+
+3. Bld'ing the git project - http://www.git-scm.com/
+   a. cd Bld.git/git-1.9.rc0 # puts you into the git(git-1.9.rc0) project directory
+   b. ./bld.git --all        # bld's all of the git targets and bld target output files -
+                                   the bld.info.git.<target>,
+                                   the bld.warn.git.<target>,
+                                   the bld.fatal.git.<target>,
+                                   files
+   c. ./bld.git.rm --all     # cleans up everything
+
+4. Bld'ing any single target
+   a. cd bld       # the main bld directory - cd here when you unpack the bld.tar.xz file
+   b. Install the source code in a sub-directory of the bld directory
+   c. Create a Bld file - the Bld file entirely controls the target bld - see example below
+   d. ./bld -h     # the bld usage msg
+   e. ./bld        # do the bld
+   f. ./bld.rm     # clean up
+   g. vi Bld.sig   # examine the bld signature file
+   h. vi bld.info  # detailed info about the stages of the bld
+   i. vi bld.warn  # warning msgs from the bld
+   j. vi bld.fatal # fatal msgs that terminated the bld - should be empty if bld is successful
+
+----------------------------------------------------------------------------------------------------
+BUILDING SINGLE TARGETS
+    (a target is an executable or library(static or shared))
+
+    1. Construct the Bld file - see below for a Bld file example and see the Bld.example
+       directory for multiple examples.  A Bld.gv file is not needed for a single target.
+       Since there are no args or options to bld and no environment variables or rc files
+       are used, nothing else needs to be done.
+
+    2. Execute './bld'.  This will rebuild the target and create/update the Bld.sig signature
+       file.  The bld.info, bld.warn and bld.fatal files will be created.
+
+    3. Use './bld.rm' to clean the bld directory.
+
+
+----------------------------------------------------------------------------------------------------
+BUILDING MULTI-TARGET PROJECTS
+    (a target is an executable or library(static or shared))
+
+    1. Pick a name for the project e.g. git, svn, systemd.
+
+    2. In the main bld directory(the location of the bld script) create a bld.<project>
+       directory.  Create another directory, bld.<project>/<version>, that describes the
+       version of the code it will hold e.g. systemd-208.  Any number of these version
+       directories may be created to maintain different versions of the code.  Unpack the
+       source code in the version directory e.g. bld.systemd/systemd-208/<systemd-208 src code>.
+
+    3. Create a Bld.<project> directory.  Create another directory, Bld.<project>/<version>,
+       that describes the version of the code it will maintain e.g. systemd-208.  There
+       should be one version directory for each version of the code being maintained.
+       These directories will hold:
+           a. all of the Bld.<project>.<target> and Bld.gv.<project> files that control the
+              construction of each project target
+           b. all of the target bld output files:
+                  bld.info.<project>.<target>(information describing the bld)
+                  bld.warn.<project>.<target>(bld warning msgs)
+                  bld.fatal.<project>.<target>(bld fatal msgs)
+           c. the bld scripts and script control files
+           d. all of the targets
+
+    4. Create a Bld.<project>.<target> file for each project target.  These control the bld
+       for each and only that target.  If there are variables that may be defined globally
+       over the entire project then set them in the Bld.gv.<project>(one per project) file.  
+       The Bld.gv.<project> file will be included in each Bld.<project>.<target> file before
+       it is evaluated.  All Bld.<project>.<target> files require six variables to be defined.
+       These are:
+
+       e.g.
+       # mandatory defined variables
+
+           # space separated list of directories to search for libraries
+           $lib_dirs = ""; 
+
+           # use system header files in dependency checking("system" or "nosystem")
+           $opt_s = "nosystem";
+
+           # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+           $opt_r = "rebuild";
+
+           # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+           $opt_lib = "nolibcheck";
+
+           # the target to built e.g. executable, libx.a, libx.so
+           $bld="accelerometer";
+
+           # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+           $bldcmd = "$CC $LIBSLINKOPTS -o \$bld \$O -LBld.systemd/systemd-208 -ludev -lsystemd-shared -ludev-core -lm -lrt -ldl";
+
+       The definition of these variables may be spread between the Bld.<project>.<target> and the imported Bld.gv.<project> files.
+       See the Bld FILE FORMAT section below for detailed instructions on Bld file construction.
+
+
+    5. Create a bld.<project>.targets file with all of the project target names, one to a line.
+       e.g.
+
+           # each line is a valid target argument to bld.<project> e.g. './bld.<project> target'
+           # and will build one(that named) library or executable.  the order of target bld's
+           # is important.  if 'bld.<project> --all' is used to bld all targets then dependencies
+           # must be built first, that is, libraries that executables depend on must be built at
+           # the start.
+
+           # 
+           libsystemd-shared.a
+
+           # 
+           libsystemd-login.so
+
+           # 
+           systemd-cgls
+
+           ...
+
+       The order is important; if an executable depends on a library then build the library first.
+
+    6. Copy the 'bld.<project>' and 'bld.<project>.rm' files from the aux directory to the source code
+       directory and rename them for that particular project.  These scripts use the <project> part
+       of the script name for building output files.
+
+    7. Run the ./bld.<project> script with the --all option or one or more target names from the bld.<project>.targets file.
+       This will bld all targets or the selected targets.  The:
+
+       bld.info.<project>.<target>(information describing the bld)
+       bld.warn.<project>.<target>(bld warning msgs)
+       bld.fatal.<project>.<target>(bld fatal msgs)
+
+       files will be created.  Examine these for the results of each target bld.  All of the  bld.fatal.<project>.<target>
+       files should be empty if everything bld's OK.
+
+    9. Run './bld.<project> --all' again to rebuild.  If everything built successfully the first time then this run
+       will indicate that everything is up to date.
+
+    8. Use './bld.<project>.rm [--all] [target, target, ...]' to clean up.
+
+    9. Use './bld.<project>.install' as root to install the project.
+
+    10. Examine the ./bld.<project>.README for project specific information.
+
+
+----------------------------------------------------------------------------------------------------
+Bld FILE FORMAT
+
+ The Bld file(and Bld.gv) controls the entire target bld.  It is divided into three sections -
+ Comments, EVAL and DIRS:
+
+ Comments
+ EVAL
+
+ # mandatory defined variables
+     $bld="";
+     $bldcmd = "";
+     $lib_dirs = "";
+     $opt_s = "";
+     $opt_r = "";
+     $opt_lib = "";
+
+ DIRS
+ # {cmds} cmd blocks or dir:regex:{cmds} specifications
+
+ {cmds}
+ dir:regex:{cmds}
+ dir:regex:{cmds}
+ ...
+
+ 1. a comment section
+
+ 2. An EVAL(starts a line) section - this is perl code that is eval'ed in bld.  Six variables are required.  These are:
+    e.g.
+
+        EVAL
+        # mandatory defined variables
+
+            # the target to built e.g. executable, libx.a, libx.so
+            $bld="exec-c";
+
+            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            $bldcmd = "$CC -lm -o \$bld \$O";
+
+            # space separated list of directories to search for libraries
+            $lib_dirs = "example/lib /usr/lib /lib /usr/local/lib";
+
+            # use system header files in dependency checking("system" or "nosystem")
+            $opt_s = "system";
+
+            # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+            $opt_r = "rebuild";
+
+            # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+            $opt_lib = "fatallibcheck";
+
+        Any other simple perl variables can be defined in the EVAL section and used in the DIRS section.  Environment
+        variables may be set.
+
+ 3. A DIRS(starts a line) section - this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications.
+    The {cmds} blocks are just a group of shell cmds, always executed.  A dir specification is a source directory relative
+    to the bld directory.  The regex specification is a perl regular expression that will pick up one or more of the
+    source files in dir.  The {cmds} specification describes how to build the selected source files.  Any number of
+    cmds, ';' separated, may be specified within the {} brackets.
+
+ Example Bld Files:
+
+    Simplest(Bld.example/example/Bld.example.helloworld-c):
+
+        The 'Hello World!' program with only the minimal required definitions.
+
+        Comment(s)
+
+        EVAL
+
+        $CC = "gcc";
+
+        # mandatory defined variables
+
+            # the target to built e.g. executable, libx.a, libx.so
+            $bld="helloworld-c";
+
+            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            $bldcmd = "$CC -o \$bld \$O";
+
+            # space separated list of directories to search for libraries
+            $lib_dirs = "/usr/lib /lib /usr/local/lib";
+
+            # use system header files in dependency checking("system" or "nosystem")
+            $opt_s = "system";
+
+            # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+            $opt_r = "rebuild";
+
+            # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+            $opt_lib = "warnlibcheck";
+
+        DIRS
+
+        bld.example/example : ^helloworld\.c$ : { $CC -c $s; }
+
+
+    Complex(Bld.example/example/Bld.example.exec-c):
+
+        A well commented example of all of the features of a Bld file.  The code routines are all just stubs
+        designed to illustrate a Bld file.
+
+        Comment(s)
+
+        EVAL
+        # this section will define perl variables to be interpolated into DIRS section cmd fields
+
+        # the compiler
+        $CC = "clang";
+
+        # mandatory defined variables
+
+            # the target to built e.g. executable, libx.a, libx.so
+            $bld="exec-c";
+
+            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            $bldcmd = "$CC -lm -o \$bld \$O";
+
+            # space separated list of directories to search for libraries
+            $lib_dirs = "example/lib /usr/lib /lib /usr/local/lib";
+
+            # use system header files in dependency checking("system" or "nosystem")
+            $opt_s = "system";
+
+            # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+            $opt_r = "rebuild";
+
+            # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+            $opt_lib = "fatallibcheck";
+
+        # some examples of variables that will be interpolated into DIRS section cmd fields
+        $INCLUDE = "-I bld.example/example/include";
+        $LSOPTIONS = "-l";
+
+        # "a" or "b" to conditionally compile main.c
+        $COND = "a";
+
+        DIRS
+        # this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications
+
+        # example of use of conditional compilation
+        bld.example/example/C : ^main\.c$ : {
+                                  # can have comments here too
+                                  if [ "$COND" == 'a' ];
+                                  then
+                                      $CC -S $INCLUDE $s;
+                                  fi
+                                  if [ "$COND" == 'b' ];
+                                  then
+                                      $CC -O4 -S $INCLUDE $s;
+                                  fi
+                              }
+
+        # example of execution of a bare block of cmds - '{' and '}' may be on separate lines
+        {
+            ls $LSOPTIONS;
+        }
+
+        # the cmd field may be put on another line(s) and indented
+        bld.example/example/C : ^g\.x\.C$ :
+            {
+                $CC -c $INCLUDE $s;
+            }
+
+        # all three fields - dir, regex and cmd - may be put on separate lines(even with extra blank lines).
+        # directories may have embedded blanks('a b').
+        bld.example/example/C/a b :
+        ^m\.c$      :
+
+        {$CC -c $INCLUDE $s;}
+
+        # example of regex field that captures multiple source files(h.c and i.c) and example of a
+        # cmd field with multiple cmds - white space is irrelevant(a change should not cause a rebuild)
+        # example of cmd fields with multiple cmds(ls and $CC)
+        bld.example/example/C     : ^(h|i)\.c$    : {  ls -l $s;  $CC -c $INCLUDE $s;  }
+
+        # example of assembler source
+        # Note: the $CC compile produces .o output by changing the c to an o.
+        #       the as output needs to be specified by the -o option.
+        bld.example/example/C     : ^main\.s$ : {as -c -o main.o $s;}
+
+        bld.example/example/C/ww  : ^u\.c$    : {$CC -c $INCLUDE $s;}
+
+        # example of use of recursive directory search - the same regex and cmd fields
+        # are applied to all subdirectories of the specified dir field(right after the 'R')
+        R bld.example/example/C/y : ^.*\.c$   : {$CC -c $INCLUDE $s;}
+
+        bld.example/example/C/x   : ^t\.c$    : {$CC -c $INCLUDE $s;}
+
+        bld.example/example/C/z   : ^(w|w1)\.c$    : {$CC -c $INCLUDE $s;}
+
+        # cmd blocks may execute multiple cmds(ls and pwd)
+        {
+            ls -lfda; pwd;
+            ls;
+        }
+
+
+----------------------------------------------------------------------------------------------------
+NOTES
+
+    1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
+       have the same root name as the source.
+
+    2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
+       into the same project directory.
+
+    3. Some projects violate either or both of these target naming or object file naming/location
+       requirements, but reconstructing these projects with bld should be relatively easy
+       e.g. systemd.
+
+    4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
+       source directory.
+
+
+----------------------------------------------------------------------------------------------------
+Contact:
+    richard.hogaboom@gmail.com
+

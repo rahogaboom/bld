@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+# remove all files(not directories) that are not required for 'bld's
+
+# standard modules
+use strict;
+use warnings;
+use diagnostics;
+use autodie;
+use Getopt::Long;
+
+# croak() - die with better info than die()
+use Carp qw(
+               croak
+           );
+
+GetOptions
+(
+) or croak("GetOptions() failed(no options allowed).");
+
+croak("No arguments allowed.") if @ARGV;
+
+my
+(
+    # the output of 'ls -aF'
+    @ls,
+);
+
+BEGIN
+{
+}
+
+@ls = `ls -aF`;
+foreach my $file ( @ls )
+{
+    chomp($file);
+    if (
+           not -d $file and                  # not directories
+           not $file =~ m{^bld\.README$} and # not the bld file
+           not $file =~ m{^bld\*$} and       # not the bld file
+           not $file =~ m{^bld.rm\*$} and    # not the bld.rm file
+           not $file =~ m{^Bld.gv$} and      # not the Bld.gv file
+           not $file =~ m{^Bld$}             # not the Bld file
+       )
+    {
+        `rm -f $file;`;
+    }
+}
+
