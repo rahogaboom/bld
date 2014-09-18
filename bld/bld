@@ -161,7 +161,7 @@ BEGIN
              "     Bld.example - several examples intended to show how to create Bld and Bld.gv files\n\n".
              "     The following are examples of bld'ing complex multi-target projects.  They are\n".
              "     provided with releases. Unpack them in the main bld directory in the same place as\n".
-             "     the bld.examples and Bld.examples directories:\n".
+             "     the bld.example and Bld.example directories:\n".
              "         bld.git.git-1.9.rc0.tar.gz -\n".
              "             the git project http://git-scm.com/\n".
              "         bld.svn.subversion-1.8.5.tar.gz -\n".

@@ -24,7 +24,7 @@ Current example projects:
     Bld.example - several examples intended to show how to create Bld and Bld.gv files
     The following are examples of bld'ing complex multi-target projects.  They are
     provided with releases. Unpack them in the main bld directory in the same place as
-    the bld.examples and Bld.examples directories:
+    the bld.example and Bld.example directories:
         bld.git.git-1.9.rc0.tar.gz -
             the git project http://git-scm.com/
         bld.svn.subversion-1.8.5.tar.gz -
