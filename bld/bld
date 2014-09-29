@@ -146,8 +146,8 @@ BEGIN
              " Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,\n".
              " unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for\n".
              " automatic header file dependency checking.  The operation of bld depends entirely on the\n".
-             " construction of the Bld(bld specification) and Bld.gv(bld global values) files.  See\n".
-             " the bld.README file.  There are no cmd line options(except for -h(this msg)) or\n".
+             " construction of the Bld(bld specification) and Bld.gv(bld global values) files.  See the\n".
+             " bld.README file.  There are no cmd line arguments or options(except for -h(this msg)) or\n".
              " \$HOME/.bldrc or ./.bldrc files and no environment variables are used.  Complex\n".
              " multi-target projects are built with the use of:\n\n".
              "     Bld.<project>         - Bld files and target bld output files directory\n".
