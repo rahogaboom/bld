@@ -168,6 +168,14 @@ BEGIN
              "             the subversion project http://subversion.apache.org/\n".
              "         bld.systemd.systemd-208.tar.gz -\n".
              "             the systemd project http://www.freedesktop.org/wiki/Software/systemd/\n\n".
+             " Dependencies:\n".
+             "     Required for execution:\n".
+             "         experimental.pm(3pm) - for smartmatch and switch features\n".
+             "         cpp(1) - gnu cpp cmd is required for dependency determination\n".
+             "         ldd(1) - used for library dependency determination\n".
+             "     Required for test:\n".
+             "         gcc(1)/g++(1) (http://gcc.gnu.org/)\n".
+             "         clang(1) (http://llvm.org/)\n\n".
              " cd bld\n".
              " Read bld.README.\n".
              " Do './bld -h' for the usage msg.\n".

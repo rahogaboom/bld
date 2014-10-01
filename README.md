@@ -33,6 +33,15 @@ Current example projects:
         bld.systemd.systemd-208.tar.gz -
             the systemd project http://www.freedesktop.org/wiki/Software/systemd/
 
+ Dependencies:
+     Required for execution:
+         experimental.pm(3pm) - for smartmatch and switch features
+         cpp(1) - gnu cpp cmd is required for dependency determination
+         ldd(1) - used for library dependency determination
+     Required for test:
+         gcc(1)/g++(1) (http://gcc.gnu.org/)
+         clang(1) (http://llvm.org/)
+
 cd bld
 Read bld.README.
 Do './bld -h' for the usage msg.
