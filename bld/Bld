@@ -1,6 +1,9 @@
 
 Comment(s)
 
+This "Hello, world!" program has several stub do nothing routines that are just there to
+help illustrate various features of how to construct a Bld file.
+
 EVAL
 # this section will define perl variables to be interpolated into DIRS section cmd fields
 

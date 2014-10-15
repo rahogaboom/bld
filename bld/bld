@@ -182,7 +182,10 @@ BEGIN
              " Do 'perldoc bld' for the full man page.\n".
              " Do './bld' to build the exec-c executable \"Hello, world!\" program.  This creates the\n".
              "     bld.info, bld.warn and Bld.sig files which along with the Bld file gives an\n".
-             "     illustration of how to construct Bld files and the output that bld creates.\n\n";
+             "     illustration of how to construct Bld files and the output that bld creates.\n".
+             "     This \"Hello, world!\" program has several stub do nothing routines that are just\n".
+             "     there to help illustrate various features of how to construct a Bld file.\n\n";
+
 
     $SIG_SRC = 0;
     $SIG_CMD = 1;
