@@ -3715,7 +3715,8 @@ bld [-h]
     clocks, networked host clocks or files touched by command activities are eliminated.  Modern signature
     algorithms are strongly randomized even for small file changes - for the 160 bit SHA1 hash collisions are
     unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
-    is small relative to the expense of programmer time.
+    is small relative to the expense of programmer time.  An investigation of some other make alternatives
+    e.g. scons, cook - will disclose that they too are using signatures - maybe for exactly for the same reasons.
  2. bld is REALLY simple to use.  There are no arguments, no options(except -h), no environment variables and
     no rc files.  The entire bld is controlled from the Bld(and Bld.gv file) file.  Only a minimal knowledge
     of perl is needed - variable definitions and simple regular expressions.
@@ -3723,17 +3724,22 @@ bld [-h]
     file checking may be done for user header files only or for simultaneously both system header and user
     header files.  All header file dependency information associated with each source is saved to the
     bld.info file.
- 4. bld is not hierarchical.  A single Bld file controls the construction of a single target(a target is an
+ 4. There are no built in dependency rules.  The Bld file DIRS section specifications give what is to be
+    built from what and the Bld file EVAL section gives how to assemble all the components for the target.
+ 5. bld is not hierarchical.  A single Bld file controls the construction of a single target(a target is an
     executable or library(static or shared)).  Complex multi-target projects use one Bld.gv(global values)
-    file and many Bld files - one to a target.
- 5. Each source file will have three signatures associated with it - one for the source file, one for the
+    file and many Bld files - one to a target.  The source directory structure goes under bld.<project>/<version>
+    and each target Bld file(Bld.<project>.<target>) encapsulates all the build information for all the
+    source directories under bld.<project>/<version>.  All the built targets and build information files go
+    into the Bld.<project>/<version> directory.  See 13 below for reasons why recursive make causes problems.
+ 6. Each source file will have three signatures associated with it - one for the source file, one for the
     corresponding object file and one for the cmds use to rebuild the source.  A change in any of these will
     result in a rebuild.  A change in the target signature will result in a rebuild.  Optionally, the
     signatures of dynamic libraries may be tracked.  If a library signature changes the bld may warn or stop
     the rebuild.  If dynamic libraries are added or deleted from the bld this can ignore/warn/fatal.
- 6. If any files in the bld have the same signature this is warned about e.g. two header or source files of
+ 7. If any files in the bld have the same signature this is warned about e.g. two header or source files of
     the same or different names.
- 7. Complex multi-target projects are built with a standard directory setup and a standard set of scripts -
+ 8. Complex multi-target projects are built with a standard directory setup and a standard set of scripts -
     Directories:
         Bld.<project>/<version>       - has all files controlling <project> <version>s blds and bld target output files
         bld.<project>/<version>       - source code for <project> <version>s
@@ -3747,23 +3753,29 @@ bld [-h]
         bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
         Bld.<project>.<target>        - the Bld file for each <project> <target>
         Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
- 8. Security - since the signatures of everything(source, objects, libraries, executable) are checked it is
-    more difficult to insinuate an exploit into an object or library during the build process.
- 9. The capture of the full build process in the bld.info, bld.warn and bld.fatal files allows easy access to
-    and saving of this information.  For multi-target projects with the target names appended to these files
-    it allows quick investigation of the build process of many interrelated targets at the same time.
- 10. Perl - since bld is all perl and since all warnings and fatals have the source line number associated with
+ 9. Security - since the signatures of everything(source, objects, libraries, executable) are checked it is
+    more difficult to insinuate an exploit into a source, object, library or executable during the build process.
+ 10. The capture of the full build process in the bld.info, bld.warn and bld.fatal files allows easy access to
+     and saving of this information.  For multi-target projects with the target names appended to these files
+     it allows quick investigation of the build process of many interrelated targets at the same time.
+ 11. Perl - since bld is all perl and since all warnings and fatals have the source line number associated with
      them, it is very easy to locate in the souce code the exact location of an error and examine the context
      about which the error occurred and routine that the error was produced in.
- 11. Time - programmer time; learning about, maintaining/debugging Makefiles and Makefile hierarchies, dependency
+ 12. Time - programmer time; learning about, maintaining/debugging Makefiles and Makefile hierarchies, dependency
      checking integration and formulation of Makefile strategies, automatic Makefile generation with Autotools -
      these all dominate the programmer time and expense of 'make'.  bld only requires basic perl variables(in
      the Bld file EVAL section) and dir:regex:{} line specifications(in the Bld file DIRS section).
- 12. 'make' and it's difficulties:
+ 13. 'make' and it's difficulties:
          http://www.scons.org/wiki/FromMakeToScons -
              a detailed critique of make and some alternatives
+         http://www.scons.org/architecture/
+             a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
          ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3 -
              a brief critique of make and how GNU automake from the GNU Build System contributes
+         http://aegis.sourceforge.net/auug97.pdf -
+             an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
+         http://www.conifersystems.com/whitepapers/gnu-make/
+             an in depth critique of make
 
 =head1 PROJECT STATE
 
@@ -4571,6 +4583,10 @@ bld [-h]
 
    Software Development:
 
+ . write executable to compare Bld.sig signatures with Bld.<project>/<version> source for security
+   purposes.  with Bld.sig protected then sofware build is protected.  write executable to do
+   Bld.sig signature compare against source for all the targets in a project build.
+
  . investigate `cd Bld.systemd/systemd-208; ldd ` cd before ldd
 
  . investigate elimination of -L(use lib_dirs?) option in Bld.<project>.<target> files
@@ -4580,8 +4596,13 @@ bld [-h]
  . Bld.example/example/Bld.example.rdx-c - mod rdx to delete() and search() on from one to n keys
        - do not require the full set of keys - should be easy
 
+ . Use Modern::Perl with bld
+
+ . Use Find::File::Rule and File::Slurp in bld
+
    Test:
 
+ . bld - allow compile of a group od 1 or more *.c files without building an exec or library
  . bld - install kernel - think about automation of 'make V=1' to Bld file
  . test execution of arbitrary perl code in Bld.<project>.gv and EVAL sections
  . do a 'make V-1 install' in the git project and see what it takes to install git
@@ -4598,6 +4619,8 @@ bld [-h]
 
    Doc:
 
+ . Doc that bld has no inherent built in rules
+ . add security info
  . add explanation of aux directory
  . go thru code line by line and do code scrub, comment scrub and make list of features and advantages
  . do bld perldoc
@@ -4646,6 +4669,8 @@ bld [-h]
  . article
  . LLVM community
  . GNU community
+ . Contribute to Free Software Foundation
+ . 37signals.com
  . Apache Software Foundation
  . send the perlbrew team a copy
  . CPAN.org
@@ -4687,6 +4712,8 @@ bld [-h]
          a detailed critique of make and some alternatives
      ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3 -
          a brief critique of make and how GNU automake from the GNU Build System contributes
+     http://aegis.sourceforge.net/auug97.pdf -
+         an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
 
 =head1 GITHUB RELEASES
 

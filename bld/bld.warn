@@ -2,7 +2,7 @@ line: 2930 - WID 11: Multiple(2) '$s' variables specified in DIRS line command f
 
 line: 2930 - WID 11: Multiple(2) '$s' variables specified in DIRS line command field: {ls -l $s;gcc -c -I bld.example/example/include $s;}
 
-line: 3149 - WID 16: EVAL defined variable(s) not used in DIRS cmds: $COND $LSOPTIONS
+line: 3149 - WID 16: EVAL defined variable(s) not used in DIRS cmds: $LSOPTIONS $COND
 
 line: 2169 - WID 9: Multiple instances of '-S' detected in compile options(might just be conditional compilation).
 --->\nif [ "a" == 'a' ];\nthen\ngcc -S -I bld.example/example/include "bld.example/example/C/main.c";\nfi\nif [ "a" == 'b' ];\nthen\ngcc -O4 -S -I bld.example/example/include "bld.example/example/C/main.c";\nfi\n

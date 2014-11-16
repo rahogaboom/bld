@@ -4,7 +4,7 @@ OS: linux
 bld version: 1.0.0
 
 perl full path: /usr/bin/perl
-perl version: Summary of my perl5 (revision 5 version 18 subversion 2) configuration:
+perl version: Summary of my perl5 (revision 5 version 18 subversion 4) configuration:
 
 cpp full path: /usr/bin/cpp
 cpp version: cpp (GCC) 4.8.3 20140911 (Red Hat 4.8.3-7)
