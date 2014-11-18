@@ -750,7 +750,7 @@ BEGIN
             }
             when ( m{$RGX_VALID_DIRS_LINE} )
             {
-                # DIRS section three field specification line - dir:regex:{cmd}
+                # DIRS section three field specification line - '[R] dir:regex:{cmds}'
 
                 # split dir lines on ":" and remove $regex_srcs enclosing '{' and '}', and $cmd enclosing '{' and '}'
                 my ($dir, $regex_srcs, $cmd) = split $COLON, $line;
@@ -2486,7 +2486,7 @@ sub dirs_pro
     }
 
     #  convert $dirs scalar to @dirs array.  $dirs holds the entire contents of the Bld
-    # file DIRS section.  @dirs will have one cmd block({}) or one dir:regex:{cmds}
+    # file DIRS section.  @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}'
     # specification per array element
     @dirs = cvt_dirs_to_array( $dirs );
 
@@ -2632,7 +2632,7 @@ sub dirs_pro
 # Usage      : @dirs = cvt_dirs_to_array( $dirs );
 #
 # Purpose    : convert $dirs scalar to @dirs array.  $dirs holds the entire contents of the Bld
-#            : file DIRS section.  @dirs will have one cmd block({}) or one dir:regex:{cmds}
+#            : file DIRS section.  @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}'
 #            : specification per array element.
 #            :     1. compress out irrelevant whitespace.  some spaces are important to preserve e.g. "-I.  -c"
 #            :     2. to "-I. -c", keeps a single space between command line options.  this also makes rebuilding
@@ -2641,7 +2641,7 @@ sub dirs_pro
 #
 # Parameters : $dirs - all the DIRS section lines of $BFN in a single scalar variable
 #
-# Returns    : @dirs - @dirs will have one cmd block({}) or one dir:regex:{cmds} specification per array element
+# Returns    : @dirs - @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}' specification per array element
 #
 # Globals    : None
 #
@@ -2745,7 +2745,7 @@ sub cvt_dirs_to_array
 #
 # Purpose    : expand DIRS section @dirs lines that start with 'R '(recursive) in the directory first field
 #
-# Parameters : @dirs - @dirs will have one cmd block({}) or one dir:regex:{cmds} specification per array element
+# Parameters : @dirs - @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}' specification per array element
 #
 # Returns    : @tmp - R(recursive) line specification expanded @dirs
 #
@@ -2819,7 +2819,7 @@ sub expand_R_specification
 #            :        7. Source file specified in more than one DIRS line specification
 #
 # Parameters : $opt_s - to use system header files in dependency checking("system" or "nosystem")
-#            : @dirs  - @dirs will have one cmd block({}) or one dir:regex:{cmds} specification per array element
+#            : @dirs  - @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}' specification per array element
 #
 # Returns    : $fatal_not_readable     - either a directory or a source file is not readable
 #            : $fatal_multiple_sources - multiple build entries in $BFN file DIRS section lines matching same source file
@@ -3764,15 +3764,15 @@ bld [-h]
  12. Time - programmer time; learning about, maintaining/debugging Makefiles and Makefile hierarchies, dependency
      checking integration and formulation of Makefile strategies, automatic Makefile generation with Autotools -
      these all dominate the programmer time and expense of 'make'.  bld only requires basic perl variables(in
-     the Bld file EVAL section) and dir:regex:{} line specifications(in the Bld file DIRS section).
+     the Bld file EVAL section) and '[R] dir:regex:{cmds}' line specifications(in the Bld file DIRS section).
  13. 'make' and it's difficulties:
-         http://www.scons.org/wiki/FromMakeToScons -
+         http://www.scons.org/wiki/FromMakeToScons
              a detailed critique of make and some alternatives
          http://www.scons.org/architecture/
              a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
-         ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3 -
+         ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
              a brief critique of make and how GNU automake from the GNU Build System contributes
-         http://aegis.sourceforge.net/auug97.pdf -
+         http://aegis.sourceforge.net/auug97.pdf
              an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
          http://www.conifersystems.com/whitepapers/gnu-make/
              an in depth critique of make
@@ -4042,11 +4042,11 @@ bld [-h]
      $opt_lib = "";
 
  DIRS
- # {cmds} cmd blocks or dir:regex:{cmds} specifications
+ # {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications
 
  {cmds}
- dir:regex:{cmds}
- dir:regex:{cmds}
+ '[R] dir:regex:{cmds}'
+ '[R] dir:regex:{cmds}'
  ...
 
  1. a comment section
@@ -4078,7 +4078,7 @@ bld [-h]
         Any other simple perl variables can be defined in the EVAL section and used in the DIRS section.  Environment
         variables may be set.
 
- 3. A DIRS(starts a line) section - this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications.
+ 3. A DIRS(starts a line) section - this section will have either {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications.
     The {cmds} blocks are just a group of shell cmds, always executed.  A dir specification is a source directory relative
     to the bld directory.  The regex specification is a perl regular expression that will pick up one or more of the
     source files in dir.  The {cmds} specification describes how to build the selected source files.  Any number of
@@ -4162,7 +4162,7 @@ bld [-h]
         $COND = "a";
 
         DIRS
-        # this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications
+        # this section will have either {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications
 
         # example of use of conditional compilation
         bld.example/example/C : ^main\.c$ : {
@@ -4383,11 +4383,11 @@ bld [-h]
  fatal("FID 17: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
 
  # routine: main bld program block
- # DIRS section lines must be formatted with cmd blocks({}) or three field specification lines(dir:regex:{})
+ # DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
  fatal("FID 18: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: main bld program block
- # for regexs in DIRS section dir:regex:{} specifications the regex must match at lest one source file
+ # for regexs in DIRS section '[R] dir:regex:{cmds}' specifications the regex must match at lest one source file
  fatal("FID 19: No source file matched in any DIRS section line regular expression.");
 
  # routine: rebuild_target_bool()
@@ -4488,11 +4488,11 @@ bld [-h]
  fatal("FID 43: $BFN DIRS section line is not valid(doesn't match $RGX_CMD_BLOCK): $line");
 
  # routine: cvt_dirs_to_array()
- # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines(dir:regex:{})
+ # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
  fatal("FID 44: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $dir_regex.$line");
 
  # routine: cvt_dirs_to_array()
- # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines(dir:regex:{})
+ # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
  fatal("FID 45: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $line");
 
  # routine: dirs_pro()
@@ -4500,7 +4500,7 @@ bld [-h]
  fatal("FID 46: $BFN DIRS section is empty.");
 
  # routine: dirs_pro()
- # a formatting error was detected in a DIRS section line; must be cmd block({}) or one dir:regex:{cmds}
+ # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
  fatal("FID 47: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: accum_blddotinfo_output()
@@ -4524,7 +4524,7 @@ bld [-h]
  fatal("FID 52: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
 
  # routine: accum_blddotinfo_output()
- # a formatting error was detected in a DIRS section line; must be cmd block({}) or one dir:regex:{cmds}
+ # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
  fatal("FID 53: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: dirs_pro()
@@ -4540,7 +4540,7 @@ bld [-h]
        " section command field to signify matched source files.");
 
  # routine: variable_match()
- # a formatting error was detected in a DIRS section line; must be cmd block({}) or one dir:regex:{cmds}
+ # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
  fatal("FID 56: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: variable_match()
@@ -4691,7 +4691,7 @@ bld [-h]
        file in another place will be detected/warned/fatal
  . g++ is installed with the gcc-c++ package
 
-   Consult
+   Consult:
 
  . open source release consult??
 
@@ -4708,17 +4708,24 @@ bld [-h]
  bld.README
 
  Critique of 'make':
-     http://www.scons.org/wiki/FromMakeToScons -
+     http://www.scons.org/wiki/FromMakeToScons
          a detailed critique of make and some alternatives
-     ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3 -
+     http://www.scons.org/architecture/
+         a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
+     ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
          a brief critique of make and how GNU automake from the GNU Build System contributes
-     http://aegis.sourceforge.net/auug97.pdf -
+     http://aegis.sourceforge.net/auug97.pdf
          an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
+     http://www.conifersystems.com/whitepapers/gnu-make/
+         an in depth critique of make
 
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
      bld-1.0.0.tar.gz - initial release
+         bld.git.git-1.9.rc0.tar.gz
+         bld.svn.subversion-1.8.5.tar.gz
+         bld.systemd.systemd-208.tar.gz
  
 =head1 AUTHOR
 

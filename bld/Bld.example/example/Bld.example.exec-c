@@ -38,7 +38,7 @@ $LSOPTIONS = "-l";
 $COND = "a";
 
 DIRS
-# this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications
+# this section will have either {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications
 
 # example of use of conditional compilation
 bld.example/example/C : ^main\.c$ : {

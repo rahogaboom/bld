@@ -303,11 +303,11 @@ Bld FILE FORMAT
      $opt_lib = "";
 
  DIRS
- # {cmds} cmd blocks or dir:regex:{cmds} specifications
+ # {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications
 
  {cmds}
- dir:regex:{cmds}
- dir:regex:{cmds}
+ '[R] dir:regex:{cmds}'
+ '[R] dir:regex:{cmds}'
  ...
 
  1. a comment section
@@ -339,7 +339,7 @@ Bld FILE FORMAT
         Any other simple perl variables can be defined in the EVAL section and used in the DIRS section.  Environment
         variables may be set.
 
- 3. A DIRS(starts a line) section - this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications.
+ 3. A DIRS(starts a line) section - this section will have either {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications.
     The {cmds} blocks are just a group of shell cmds, always executed.  A dir specification is a source directory relative
     to the bld directory.  The regex specification is a perl regular expression that will pick up one or more of the
     source files in dir.  The {cmds} specification describes how to build the selected source files.  Any number of
@@ -423,7 +423,7 @@ Bld FILE FORMAT
         $COND = "a";
 
         DIRS
-        # this section will have either {cmds} cmd blocks or dir:regex:{cmds} specifications
+        # this section will have either {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications
 
         # example of use of conditional compilation
         bld.example/example/C : ^main\.c$ : {
