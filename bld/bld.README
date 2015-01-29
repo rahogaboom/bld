@@ -30,47 +30,79 @@ INITIAL STEPS
 PROJECT STATE
 
  State:
- 1. The code is mostly done - unless someone finds a bug or suggests an enhancement.
- 2. The in code documentation is done.
- 3. The testing is 80%-90% done.
- 4. The usage msg is done - the perldoc is 50%-60% done, needs a lot of work.
+ 1. The testing is 80%-90% done.
+ 2. The usage msg is done - the perldoc is 50%-60% done, needs a lot of work.
 
  Needed:
- 1. The code is in very good shape unless someone discovers a bug or suggests an enhancement.
-    My current focus is on the documentation and testing.
-
- 2. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
+ 1. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
     no options.  How options affect the generated code and thus the Bld files is important.
     Anyone willing to investigate configure options and how these options affect the Bld files
     is welcome.
 
- 3. The bld.<project>.install scripts all need to be done.  I'd prefer to partner with someone
+ 2. The bld.<project>.install scripts all need to be done.  I'd prefer to partner with someone
     knowledgeable about the installation of git, svn and systemd.
 
- 4. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
+ 3. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
 
- 5. The git, svn and systemd projects will all be creating new versions eventually.  Anyone
+ 4. The git, svn and systemd projects will all be creating new versions eventually.  Anyone
     that would like to add bld.<project>/<version> and Bld.<project>/<version> directories
     with the new versions is welcome.
 
- 6. I need someone with substantial experience building the linux kernel to advise me or partner
-    with me on the construction of 3.15 or later.
+ 5. I need someone with substantial experience building the linux kernel to advise me or partner
+    with me on the construction of 3.19 or later.
 
- 7. If you successfully bld a new project and wish to contribute the bld, please do so.  I'm 
+ 6. If you successfully bld a new project and wish to contribute the bld, please do so.  I'm 
     interested in how others construct/organize/document/debug projects and their Bld files.
 
 
 ----------------------------------------------------------------------------------------------------
 DEPENDENCIES
 
-     Required for execution:
+    I use Fedora for development on an x86_64 architecture.  Yum is the package installation tool.
+
+    Required for execution:
         experimental.pm(3pm) - for smartmatch and switch features
         cpp(1) - gnu cpp cmd is required for dependency determination
         ldd(1) - used for library dependency determination
 
-     Required for test:
+    Required for test:
         gcc(1)/g++(1) (http://gcc.gnu.org/)
         clang(1) (http://llvm.org/)
+        yacc(1)/flex(1)
+
+    Some variation might be required on:
+        cpanm experimental.pm
+        yum install gcc.x86_64
+        yum install gcc-c++.x86_64
+        yum install gcc-objc.x86_64
+        yum install gcc-objc++.x86_64
+        yum install libobjc.x86_64
+        yum install gnustep-base.x86_64
+        yum install gnustep-base-devel.x86_64
+        yum install clang
+        yum install byacc
+        yum install flex
+        yum install zlib-devel.x86_64
+        yum install libxdiff.x86_64
+        yum install apr.x86_64
+        yum install apr-util.x86_64
+        yum install apr-util-devel.x86_64
+        yum install sqlite-devel.x86_64
+        yum install intltool
+        yum install libcap-devel
+
+    Always remember for missing requirements that generate the following ./configure msg:
+
+        "configure: error: Package requirements (foo) were not met:
+
+        No package 'foo' found
+
+        Consider adjusting the PKG_CONFIG_PATH environment variable if you
+        installed software in a non-standard prefix."
+
+        Use: yum install "pkgconfig(foo)"
+
+        Also check: http://who-t.blogspot.com/2014/05/configure-fails-with-no-package-foo.html
 
 
 ----------------------------------------------------------------------------------------------------
@@ -116,8 +148,6 @@ bld.example - 10 example source code directories, all independent of each other
 Bld.example - Bld.example/example has the Bld.example.<target> construction files
 bld.git     - the git source code
 Bld.git     - the git Bld files
-bld.kernel  - the kernel source code
-Bld.kernel  - the kernel Bld file
 bld.svn     - the svn source code
 Bld.svn     - the svn Bld files
 bld.systemd - the systemd source code

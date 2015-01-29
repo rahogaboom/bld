@@ -1,0 +1,16 @@
+
+1. There is no bld.example/example/configure script.  All of the targets for the example project are independent.
+
+2. To rebuild the entire project do './bld.example --all'  Do 'perldoc bld.example' and 'perldoc bld.example.rm'
+   for details.
+
+3. Examine the bld.info.example.<target>, bld.warn.example.<target> and bld.fatal.example.<target> files for all
+   the details on the construction of individual targets.
+
+4. Examine the Bld.sig.example.<target> file for all the saved signatures from the building of the target.
+
+5. Examine the Bld.gv.example file for global defines, included in the Bld.example.<target> files, over the
+   entire project.
+
+6. Examine the bld.example.targets files for the complete list of project targets.
+

@@ -418,9 +418,7 @@ rdx_pat_verify()
 =head1 AUTHOR
 
  Richard Hogaboom
- Group 65 - Advanced Networks and Applications
- MIT Lincoln Laboratory
- hogaboom@ll.mit.edu
+ richard.hogaboom@gmail.com
 
 =head1 LICENCE AND COPYRIGHT
 

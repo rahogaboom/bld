@@ -1,28 +1,31 @@
 
 OS: linux
 
-bld version: 1.0.2
+bld version: 1.0.1
 
 perl full path: /usr/bin/perl
-perl version: Summary of my perl5 (revision 5 version 18 subversion 2) configuration:
+perl version: Summary of my perl5 (revision 5 version 18 subversion 4) configuration:
 
 cpp full path: /usr/bin/cpp
-cpp version: cpp (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1)
+cpp version: cpp (GCC) 4.9.2 20141101 (Red Hat 4.9.2-1)
 
-gcc full path: /usr/lib64/ccache/gcc
-gcc version: gcc (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1)
+gcc full path: /usr/bin/gcc
+gcc version: gcc (GCC) 4.9.2 20141101 (Red Hat 4.9.2-1)
 
-g++ full path: /usr/lib64/ccache/g++
-g++ version: g++ (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1)
+g++ full path: /usr/bin/g++
+g++ version: g++ (GCC) 4.9.2 20141101 (Red Hat 4.9.2-1)
 
 clang full path: /usr/bin/clang
-clang version: clang version 3.4 (tags/RELEASE_34/final)
+clang version: clang version 3.5.0 (tags/RELEASE_350/final)
 
 
 ####################################################################################################
 comments section of Bld file:
 
 Comment(s)
+
+This "Hello, world!" program has several stub do nothing routines that are just there to
+help illustrate various features of how to construct a Bld file.
 
 
 ####################################################################################################
@@ -36,7 +39,7 @@ EVAL section expansion of $opt_s and $opt_r and $opt_lib mandatory option variab
 
 $opt_s = "system"
 $opt_r = "rebuild"
-$opt_lib = "fatallibcheck"
+$opt_lib = "warnlibcheck"
 
 ####################################################################################################
 Bld file DIRS section specification lines with irrelevant white space compressed out:
@@ -88,9 +91,9 @@ a. DIRS section specification lines
               /usr/include/features.h
               /usr/include/libio.h
               /usr/include/bits/mathdef.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stdarg.h
               /usr/include/stdc-predef.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stddef.h
               /usr/include/stdio.h
               /usr/include/bits/stdio_lim.h
               /usr/include/gnu/stubs.h
@@ -114,7 +117,7 @@ a. DIRS section specification lines
               /usr/include/sys/cdefs.h
               /usr/include/features.h
               /usr/include/stdc-predef.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stddef.h
               /usr/include/string.h
               /usr/include/gnu/stubs.h
               /usr/include/gnu/stubs-64.h
@@ -129,9 +132,9 @@ a. DIRS section specification lines
               /usr/include/sys/cdefs.h
               /usr/include/features.h
               /usr/include/libio.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stdarg.h
               /usr/include/stdc-predef.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stddef.h
               /usr/include/stdio.h
               /usr/include/bits/stdio_lim.h
               /usr/include/gnu/stubs.h
@@ -153,9 +156,9 @@ a. DIRS section specification lines
               /usr/include/sys/cdefs.h
               /usr/include/features.h
               /usr/include/libio.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stdarg.h
               /usr/include/stdc-predef.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stddef.h
               /usr/include/stdio.h
               /usr/include/bits/stdio_lim.h
               /usr/include/string.h
@@ -180,7 +183,7 @@ a. DIRS section specification lines
               /usr/include/sys/cdefs.h
               /usr/include/features.h
               /usr/include/stdc-predef.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stddef.h
               /usr/include/string.h
               /usr/include/gnu/stubs.h
               /usr/include/gnu/stubs-64.h
@@ -201,7 +204,7 @@ a. DIRS section specification lines
               /usr/include/sys/cdefs.h
               /usr/include/features.h
               /usr/include/stdc-predef.h
-              /usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h
+              /usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stddef.h
               /usr/include/string.h
               /usr/include/gnu/stubs.h
               /usr/include/gnu/stubs-64.h
@@ -269,9 +272,9 @@ System headers:
 '/usr/include/features.h'
 '/usr/include/libio.h'
 '/usr/include/bits/mathdef.h'
-'/usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stdarg.h'
+'/usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stdarg.h'
 '/usr/include/stdc-predef.h'
-'/usr/lib/gcc/x86_64-redhat-linux/4.8.3/include/stddef.h'
+'/usr/lib/gcc/x86_64-redhat-linux/4.9.2/include/stddef.h'
 '/usr/include/stdio.h'
 '/usr/include/bits/stdio_lim.h'
 '/usr/include/string.h'
