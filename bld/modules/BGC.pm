@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 #
-# BGC.pm - bld global constants
+# BGC.pm - bld global initialized constants
 #
 
 package BGC

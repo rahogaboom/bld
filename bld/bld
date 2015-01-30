@@ -1444,7 +1444,7 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.0
+ bld version 1.0.1
 
 =head1 USAGE
 
@@ -2490,6 +2490,10 @@ bld [-h]
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
+     bld-1.0.1.tar.gz - added BGC.pm for global initialized constants and BldRoutines.pm for most subroutines.
+                        Rebuilt for Fedora21.  Rebuilt bld.git.git-1.9.rc0.tar.gz and bld.svn.subversion-1.8.5.tar.gz
+                        for Fedora21.  Dropped bld.systemd.systemd-208.tar.gz; will add systemd-218 or above in
+                        the 1.0.2 release.  Many doc changes.
      bld-1.0.0.tar.gz - initial release
          bld.git.git-1.9.rc0.tar.gz
          bld.svn.subversion-1.8.5.tar.gz
