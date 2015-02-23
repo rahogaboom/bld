@@ -4,36 +4,37 @@
 # BldRoutines.pm
 #
 
-# import bld global constants
-use lib ".";
-use BGC;
-
 package BldRoutines
 {
+    # import bld global constants
+    use lib ".";
+    use BGC;
+
     use vars qw(@ISA @EXPORT);
     require Exporter;
     @ISA = qw(Exporter);
     @EXPORT = qw
     (
-        &init_blddotinfo
-        &read_Blddotsig
-        &rebuild_target_bool
-        &rebuild_exec
-        &multiple_sigs
-        &buildopt
-        &tgtextorfile
-        &tgt_signature
-        &dirs_pro
-        &cvt_dirs_to_array
-        &expand_R_specification
-        &Bld_section_extract
-        &sig_file_update
-        &hdr_depend
-        &rebuild_src_bool
-        &file_sig_calc
-        &system_error_msg
-        &warning
-        &opt_help
+        init_blddotinfo
+        read_Blddotsig
+        rebuild_target_bool
+        rebuild_exec
+        multiple_sigs
+        buildopt
+        tgtextorfile
+        tgt_signature
+        dirs_pro
+        cvt_dirs_to_array
+        expand_R_specification
+        Bld_section_extract
+        sig_file_update
+        hdr_depend
+        rebuild_src_bool
+        file_sig_calc
+        system_error_msg
+        warning
+        fatal
+        opt_help
     );
 
     use warnings;
@@ -49,13 +50,14 @@ package BldRoutines
                              extract_bracketed
                          );
 
-    # croak() - used in &main::fatal() to die with better info than die()
+    # croak() - used in fatal() to die with better info than die()
     # cluck() - used for full stack trace debugging, outputs to stdout
     # shortmess() - used for full stack trace debugging, returns stack trace
     use Carp qw(
                    croak
                    cluck
                    shortmess
+                   longmess
                );
 
     # sha1_hex - the bld program SHA1 generator
@@ -72,7 +74,6 @@ package BldRoutines
     # this module allows the use of experimental perl language features(given, when, ~~) without generating warnings.
     # to see exactly where smartmatch features are being used just comment out this line.  bld will run, but with warnings
     # everyplace an experimental smartmatch feature is used.
-    #use experimental 'smartmatch';
     use experimental 'switch';
 
 
@@ -97,7 +98,7 @@ package BldRoutines
     #            : $opt_s           - to use system header files in dependency checking("system" or "nosystem")
     #            : $opt_r           - to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
     #            : $opt_lib         - to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
-    #            : $comment_section - holds comment section in Bld file for printing in $BGC::BIFN file
+    #            : $comment_section - holds comment section in Bld file for printing in $BIFN file
     #
     # Returns    : None
     #
@@ -122,11 +123,11 @@ package BldRoutines
 	   ) = @_;
 
 
-	open my $bifnfh, ">>", $BGC::BIFN;
+	open my $bifnfh, ">>", $BIFN;
 
 	print {$bifnfh} "\nOS: $OSNAME\n";
 
-	print {$bifnfh} "\nbld version: $BGC::VERSION\n\n";
+	print {$bifnfh} "\nbld version: $VERSION\n\n";
 
 	my $perl = `which perl 2>&1`;
 	chomp $perl;
@@ -208,10 +209,10 @@ package BldRoutines
     # 
     # Usage      : read_Blddotsig( $bld, \%Sigdata );
     #
-    # Purpose    : read $BGC::SIGFN file data into %Sigdata
+    # Purpose    : read $SIGFN file data into %Sigdata
     #
     # Parameters : $bld      - the target to built e.g. executable or libx.a or libx.so
-    #            : \%Sigdata - hash holding $BGC::SIGFN file signature data
+    #            : \%Sigdata - hash holding $SIGFN file signature data
     #
     # Returns    : None
     #
@@ -231,20 +232,20 @@ package BldRoutines
 	   ) = @_;
 
 
-	if ( not -e "$BGC::SIGFN" )
+	if ( not -e "$SIGFN" )
 	{
 	    return;
 	}
 
 	my $RGX_SHA1 = "[0-9a-f]\{40\}";  # regex to validate SHA1 signatures - 40 chars and all 0-9a-f
 
-	# open $BGC::SIGFN signature file
-	open my $sigfn, "<", $BGC::SIGFN;
+	# open $SIGFN signature file
+	open my $sigfn, "<", $SIGFN;
 
-	# build hash of $BGC::SIGFN file signatures with source file names as keys
+	# build hash of $SIGFN file signatures with source file names as keys
 	while ( my $line = <$sigfn> )
 	{
-	    next if $line =~ $BGC::RGX_BLANK_LINE;
+	    next if $line =~ $RGX_BLANK_LINE;
 
 	    given ( $line )
 	    {
@@ -255,14 +256,14 @@ package BldRoutines
 
 		    if ( $sigsource !~ m{^$RGX_SHA1$} )
 		    {
-			&main::fatal("FID 12: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+			fatal("FID 12: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
 		    }
 
-		    $Sigdata_ref->{$file}[$BGC::SIG_SRC] = $sigsource;
+		    $Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
 
-		    if ( $file =~ m{$BGC::RGX_LIBS} )
+		    if ( $file =~ m{$RGX_LIBS} )
 		    {
-			$Sigdata_ref->{$bld}[$BGC::LIB_DEP]{$file} = undef;
+			$Sigdata_ref->{$bld}[$LIB_DEP]{$file} = undef;
 		    }
 		}
 		when ( m{^'(.*?)'\s($RGX_SHA1)\s($RGX_SHA1)\s($RGX_SHA1)$} )
@@ -274,26 +275,26 @@ package BldRoutines
 
 		    if ( $sigsource !~ m{^$RGX_SHA1$} )
 		    {
-			&main::fatal("FID 13: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+			fatal("FID 13: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
 		    }
 
 		    if ( $sigcmd !~ m{^$RGX_SHA1$} )
 		    {
-			&main::fatal("FID 14: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
+			fatal("FID 14: Malformed $SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
 		    }
 
 		    if ( $sigtarget !~ m{^$RGX_SHA1$} )
 		    {
-			&main::fatal("FID 15: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
+			fatal("FID 15: Malformed $SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
 		    }
 
-		    $Sigdata_ref->{$file}[$BGC::SIG_SRC] = $sigsource;
-		    $Sigdata_ref->{$file}[$BGC::SIG_CMD] = $sigcmd;
-		    $Sigdata_ref->{$file}[$BGC::SIG_TGT] = $sigtarget;
+		    $Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
+		    $Sigdata_ref->{$file}[$SIG_CMD] = $sigcmd;
+		    $Sigdata_ref->{$file}[$SIG_TGT] = $sigtarget;
 		}
 		default
 		{
-		    &main::fatal("FID 16: Malformed $BGC::SIGFN file - invalid format line:\n$line");
+		    fatal("FID 16: Malformed $SIGFN file - invalid format line:\n$line");
 		}
 	    }
 	}
@@ -306,14 +307,14 @@ package BldRoutines
     #
     # Purpose    : boolean indicating to rebuild target if any of three conditions is true:
     #            :     1. target is missing
-    #            :     2. signature of target does not exit in $BGC::SIGFN signature file
+    #            :     2. signature of target does not exit in $SIGFN signature file
     #            :     3. signature of target exists in signature file but is changed from actual existing target
     #
     # Parameters : $bld         - the target to built e.g. executable or libx.a or libx.so
     #            : $bldcmd      - cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
     #            : $lib_dirs    - space separated list of directories to search for libraries
     #            : $opt_lib     - to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
-    #            : \%Sigdata    - hash holding $BGC::SIGFN file signature data
+    #            : \%Sigdata    - hash holding $SIGFN file signature data
     #            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
     #
     # Returns    : $rebuild - bool to rebuild target
@@ -340,8 +341,8 @@ package BldRoutines
 	my ( $rebuild ) = "false";
 
 
-	# if $bld does not exists return "true"
-	if ( not -f $bld )
+	# if $bld does not exists or is zero length return "true"
+	if ( not -f $bld or -z $bld )
 	{
 	    $rebuild = "true";
 	    return $rebuild;
@@ -353,7 +354,7 @@ package BldRoutines
 	# this ensures that any change to the file or these mandatory defines forces a rebuild.
 	if (
 	       (not $bld ~~ %{$Sigdata_ref}) or
-	       ($Sigdata_ref->{$bld}[$BGC::SIG_SRC] ne $sig)
+	       ($Sigdata_ref->{$bld}[$SIG_SRC] ne $sig)
 	   )
 	{
 	    # rebuild exec if $bld signature does not exist or signature is different
@@ -371,7 +372,7 @@ package BldRoutines
 	    # to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
 	    if ( $ldd =~ m{not a dynamic executable} )
 	    {
-		&main::fatal("FID 20: ldd return: $bld is 'not a dynamic executable'");
+		fatal("FID 20: ldd return: $bld is 'not a dynamic executable'");
 	    }
 
 	    # scan ldd return for full path library strings
@@ -387,15 +388,15 @@ package BldRoutines
 		}
 		else
 		{
-		    $SigdataNew_ref->{$bld}[$BGC::LIB_DEP]{$lib} = undef;
-		    $SigdataNew_ref->{$lib}[$BGC::SIG_SRC] = file_sig_calc( $lib );
+		    $SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
+		    $SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
 		}
 	    }
 
-	    # compare %Sigdata(populated from $BGC::BFN) and %SigdataNew(populated from ldd) for removed libraries
-	    foreach my $l ( sort keys %{$Sigdata_ref->{$bld}[$BGC::LIB_DEP]} )
+	    # compare %Sigdata(populated from $BFN) and %SigdataNew(populated from ldd) for removed libraries
+	    foreach my $l ( sort keys %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
 	    {
-		if ( not $l ~~ %{$Sigdata_ref->{$bld}[$BGC::LIB_DEP]} )
+		if ( not $l ~~ %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
 		{
 		    push @libs_removed, $l;
 		}
@@ -406,20 +407,20 @@ package BldRoutines
 	    {
 		$rebuild = "true";
 		warning("WID 2: Libraries removed: @libs_removed") if $opt_lib eq "warnlibcheck";
-		&main::fatal("FID 21: Libraries removed: @libs_removed") if $opt_lib eq "fatallibcheck";
+		fatal("FID 21: Libraries removed: @libs_removed") if $opt_lib eq "fatallibcheck";
 	    }
 
 	    # check each library file for this target and set $rebuild to true if library is new or library has changed
-	    foreach my $l ( keys %{$SigdataNew_ref->{$bld}[$BGC::LIB_DEP]} )
+	    foreach my $l ( keys %{$SigdataNew_ref->{$bld}[$LIB_DEP]} )
 	    {
 		if ( $l ~~ %{$Sigdata_ref} )
 		{
 		    # rebuild if library has changed
-		    if ( $Sigdata_ref->{$l}[$BGC::SIG_SRC] ne $SigdataNew_ref->{$l}[$BGC::SIG_SRC] )
+		    if ( $Sigdata_ref->{$l}[$SIG_SRC] ne $SigdataNew_ref->{$l}[$SIG_SRC] )
 		    {
 			$rebuild = "true";
 			warning("WID 3: Library changed: $l") if $opt_lib eq "warnlibcheck";
-			&main::fatal("FID 22: Library changed: $l") if $opt_lib eq "fatallibcheck";
+			fatal("FID 22: Library changed: $l") if $opt_lib eq "fatallibcheck";
 		    }
 		    next;
 		}
@@ -428,7 +429,7 @@ package BldRoutines
 		    # rebuild if library is new
 		    $rebuild = "true";
 		    warning("WID 4: Libraries added: @libs_removed") if $opt_lib eq "warnlibcheck";
-		    &main::fatal("FID 23: Libraries added: @libs_removed") if $opt_lib eq "fatallibcheck";
+		    fatal("FID 23: Libraries added: @libs_removed") if $opt_lib eq "fatallibcheck";
 		    next;
 		}
 	    }
@@ -436,8 +437,8 @@ package BldRoutines
 
 	if ( $rebuild eq "false" )
 	{
-	    # add old signature to %SigdataNew to output to $BGC::SIGFN file
-	    $SigdataNew_ref->{$bld}[$BGC::SIG_SRC] = $Sigdata_ref->{$bld}[$BGC::SIG_SRC];
+	    # add old signature to %SigdataNew to output to $SIGFN file
+	    $SigdataNew_ref->{$bld}[$SIG_SRC] = $Sigdata_ref->{$bld}[$SIG_SRC];
 	}
 
 	return $rebuild;
@@ -498,10 +499,10 @@ package BldRoutines
 	{
 	    $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-	    &main::fatal("FID 24: Error msg: $error_msg\nCmd: \"$tmp\"\nFail status: $status");
+	    fatal("FID 24: Error msg: $error_msg\nCmd: \"$tmp\"\nFail status: $status");
 	}
 
-	$SigdataNew_ref->{$bld}[$BGC::SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
+	$SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
 
 	if ( $opt_lib ne "nolibcheck" )
 	{
@@ -510,7 +511,7 @@ package BldRoutines
 
 	    if ( $ldd =~ m{not a dynamic executable} )
 	    {
-		&main::fatal("FID 25: ldd return: $bld is 'not a dynamic executable'");
+		fatal("FID 25: ldd return: $bld is 'not a dynamic executable'");
 	    }
 
 	    while ( $ldd =~ m{ ^\s+(\S+)\s=>\s(\S+)\s.*$ }gxm )
@@ -525,8 +526,8 @@ package BldRoutines
 		}
 		else
 		{
-		    $SigdataNew_ref->{$bld}[$BGC::LIB_DEP]{$lib} = undef;
-		    $SigdataNew_ref->{$lib}[$BGC::SIG_SRC] = file_sig_calc( $lib );
+		    $SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
+		    $SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
 		}
 	    }
 	}
@@ -656,7 +657,7 @@ package BldRoutines
 
                 if ( not exists ${$Depend_ref}{$hdr}{'c'}{$srcext}{'ext'} )
                 {
-                    &main::fatal("FID 29: Invalid combination of source extension: $srcext and build option: -c.");
+                    fatal("FID 29: Invalid combination of source extension: $srcext and build option: -c.");
                 }
 
                 # check if '-c' specified multiple times
@@ -672,7 +673,7 @@ package BldRoutines
 
                 # change any suffix to .o suffix and push on %Objects for use in rebuild
                 my $basenametgt = $s;
-                $basenametgt =~ s{$BGC::RGX_FILE_EXT}{o}; # replace from last period to end of string with .o
+                $basenametgt =~ s{$RGX_FILE_EXT}{o}; # replace from last period to end of string with .o
 
                 # if $basenametgt is already in %Objects fail - two different sources are producing the same object file in
                 # the same place e.g. source files a.c and a.m in the same directory will both produce a.o
@@ -680,7 +681,7 @@ package BldRoutines
                 {
                     if ( $o eq $basenametgt )
                     {
-                        &main::fatal("FID 30: Object file conflict - $s produces an object file $basenametgt that already exists.");
+                        fatal("FID 30: Object file conflict - $s produces an object file $basenametgt that already exists.");
                     }
                 }
 
@@ -694,7 +695,7 @@ package BldRoutines
 
                 if ( not exists ${$Depend_ref}{'hdr'}{'S'}{$srcext}{'ext'} )
                 {
-                    &main::fatal("FID 31: Invalid combination of source extension: $srcext and build option: -S.");
+                    fatal("FID 31: Invalid combination of source extension: $srcext and build option: -S.");
                 }
 
                 # check if '-S' specified multiple times
@@ -716,7 +717,7 @@ package BldRoutines
 
                 if ( not exists ${$Depend_ref}{'hdr'}{'E'}{$srcext}{'ext'} )
                 {
-                    &main::fatal("FID 32: Invalid combination of source extension: $srcext and build option: -E.");
+                    fatal("FID 32: Invalid combination of source extension: $srcext and build option: -E.");
                 }
 
                 # check if '-E' specified multiple times
@@ -736,14 +737,14 @@ package BldRoutines
             {
                 if ( not exists ${$Depend_ref}{'hdr'}{'n'}{$srcext}{'ext'} )
                 {
-                    &main::fatal("FID 33: Invalid combination of source extension: $srcext and build option: non of -c/-S/-E exists.");
+                    fatal("FID 33: Invalid combination of source extension: $srcext and build option: non of -c/-S/-E exists.");
                 }
 
                 $buildopt = 'n';
             }
             default
             {
-                &main::fatal("FID 34: Multiple options -c/-S/-E specified in cmd: $cmd_var_sub.");
+                fatal("FID 34: Multiple options -c/-S/-E specified in cmd: $cmd_var_sub.");
             }
         }
 
@@ -756,7 +757,7 @@ package BldRoutines
     #
     # Purpose    : return the $s target extension or file name
     #            : Also:
-    #            :     a. if multiple target files in the $srcpath directory &main::fatal()
+    #            :     a. if multiple target files in the $srcpath directory fatal()
     #            :     b. if already existing target file calculate then save the signature
     #
     # Parameters : $s               - code source file
@@ -822,7 +823,7 @@ package BldRoutines
 	        my ( $tmp );
 
 	        $tmp = $srcfile;
-	        $tmp =~ s{$BGC::RGX_FILE_EXT}{$tgtext};
+	        $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
 	        if ( $tmp ~~ @Sources )
 	        {
 		    push @tgtfiles, $tmp;
@@ -831,10 +832,10 @@ package BldRoutines
 	    }
         }
 
-        # check for multiple target files in the $srcpath directory.  if more than one target file do &main::fatal().
+        # check for multiple target files in the $srcpath directory.  if more than one target file do fatal().
         if ( @tgtfiles > 1 )
         {
-	    &main::fatal("FID 35: More than one target file for $srcfile in $srcpath: @tgtfiles");
+	    fatal("FID 35: More than one target file for $srcfile in $srcpath: @tgtfiles");
         }
 
         if ( @tgtfiles == 1 )
@@ -847,7 +848,7 @@ package BldRoutines
 	    else
 	    {
 	        # save file name extension
-	        if ( $tgtfiles[0] =~ m{.*[.]$BGC::RGX_FILE_EXT} )
+	        if ( $tgtfiles[0] =~ m{.*[.]$RGX_FILE_EXT} )
 	        {
 		    $tgtextorfile = $1;
 	        }
@@ -855,16 +856,16 @@ package BldRoutines
 
 	    # calculate signature of previously already existing target file - if no target file ignore.
 	    # why?  if the old target file has been corrupted or compromised then it's signature will not match
-	    # the signature in $BGC::BFN even if the source and the cmd to build the source have not changed.  this
+	    # the signature in $BFN even if the source and the cmd to build the source have not changed.  this
 	    # should cause a rebuild.  if a re-compile is triggered by either a source change, a build cmd change
 	    # or a change in the target file signature then the signature calculated here will be overwritten
 	    # by the after compile new signature.
-	    ${$SigdataNew_tmp_ref}{$s}[$BGC::SIG_TGT] = file_sig_calc( "$srcpath/$tgtfiles[0]" );
+	    ${$SigdataNew_tmp_ref}{$s}[$SIG_TGT] = file_sig_calc( "$srcpath/$tgtfiles[0]" );
         }
         else
         {
 	    # no previous target file in $srcpath directory
-	    $tgtextorfile = $BGC::EMPTY;
+	    $tgtextorfile = $EMPTY;
         }
 
         return $tgtextorfile;
@@ -875,8 +876,8 @@ package BldRoutines
     # Usage      : tgt_signature( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, $SigdataNew_tmp_ref, $Depend_ref, \@difference, $Targets_ref);
     #
     # Purpose    : calculate the new target file signature and return it in the @SigdataNew_tmp array
-    #            :     a. if more than one target file created by $cmd_var_sub do &main::fatal()
-    #            :     b. if an identical target file was created earlier do &main::fatal()
+    #            :     a. if more than one target file created by $cmd_var_sub do fatal()
+    #            :     b. if an identical target file was created earlier do fatal()
     #
     # Parameters : $s               - code source file
     #            : $hdr             - set to 'hdr' or 'nothdr' depending on if $s is header processible
@@ -937,7 +938,7 @@ package BldRoutines
 	        my ( $tmp );
 
 	        $tmp = $srcfile;
-	        $tmp =~ s{$BGC::RGX_FILE_EXT}{$tgtext};
+	        $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
 	        if ( $tmp ~~ @{$difference_ref} )
 	        {
 		    push @tgtfiles, $tmp;
@@ -947,21 +948,21 @@ package BldRoutines
 
         if ( @tgtfiles == 0 )
         {
-	    &main::fatal("FID 38: No target file for $srcfile in $srcpath: @tgtfiles");
+	    fatal("FID 38: No target file for $srcfile in $srcpath: @tgtfiles");
         }
 
-        # check for multiple target files created by $cmd_var_sub.  if more than one target file created do &main::fatal().
+        # check for multiple target files created by $cmd_var_sub.  if more than one target file created do fatal().
         if ( @tgtfiles > 1 )
         {
-	    &main::fatal("FID 39: More than one target file for $srcfile in $srcpath: @tgtfiles");
+	    fatal("FID 39: More than one target file for $srcfile in $srcpath: @tgtfiles");
         }
 
         # calculate signature of target
-        ${$SigdataNew_tmp_ref}{$s}[$BGC::SIG_TGT] = file_sig_calc( $tgtfiles[0] );
+        ${$SigdataNew_tmp_ref}{$s}[$SIG_TGT] = file_sig_calc( $tgtfiles[0] );
 
         if ( exists $Targets_ref->{"${srcpath}$tgtfiles[0]"} )
         {
-	    &main::fatal("FID 40: An identical target file(name) has been created twice: ${srcpath}$tgtfiles[0]");
+	    fatal("FID 40: An identical target file(name) has been created twice: ${srcpath}$tgtfiles[0]");
         }
         else
         {
@@ -973,33 +974,33 @@ package BldRoutines
     # 
     # Usage      : @dirs = dirs_pro( $dirs, $opt_s );
     #
-    # Purpose    : Process $BGC::BFN file DIRS section
+    # Purpose    : Process $BFN file DIRS section
     #            :     Sequentially, the following tasks are performed:
     #            :     1. compress the DIRS section by eliminating unnecessary white space and unnecessary newlines
     #            :        and converting the input $dirs scalar to the @dirs array with lines of format '$dir:$regex_srcs:$cmd'
-    #            :     2. print @dirs lines to $BGC::BIFN - before 'R ' lines recursive expansion
+    #            :     2. print @dirs lines to $BIFN - before 'R ' lines recursive expansion
     #            :     3. expand @dirs lines that start with 'R '(recursive).  this will replace the 'R ' line with one or more
     #            :        lines that have recursively the directories below the 'R ' line $dir and the same $regex_srcs and $cmd expressions
     #            :     4. check DIRS section compressed lines for valid format i.e. "^.*:.*:.*$"(DIRS section three field specification)
     #            :        or "^{.*}$"(DIRS section cmd block)
-    #            :     5. accumulate lines to be printed to the $BGC::BIFN file:
+    #            :     5. accumulate lines to be printed to the $BIFN file:
     #            :        a. DIRS section specification lines with a line count number
     #            :        b. variable interpolated(except for \$s) specification line cmd field
     #            :        c. matching compilation unit source file(s)
     #            :        d. source file header dependencies
     #            :        e. check for the following error conditions:
     #            :           1. either a directory or a source file is not readable
-    #            :           2. multiple build entries in $BGC::BFN file DIRS section lines matching same source file
+    #            :           2. multiple build entries in $BFN file DIRS section lines matching same source file
     #            :           3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
     #            :           4. Invalid regular expression - "$regex_srcs"
     #            :           5. No '$s' variable specified in DIRS line command field
-    #            :           6. No sources matched in $BGC::BFN DIRS section line $line
+    #            :           6. No sources matched in $BFN DIRS section line $line
     #            :           7. Source file specified in more than one DIRS line specification
     #
-    # Parameters : $dirs  - all the DIRS section lines of $BGC::BFN in a single scalar variable
+    # Parameters : $dirs  - all the DIRS section lines of $BFN in a single scalar variable
     #            : $opt_s - to use system header files in dependency checking("system" or "nosystem")
     #
-    # Returns    : @dirs - the fully processed DIRS section lines of $BGC::BFN in an array
+    # Returns    : @dirs - the fully processed DIRS section lines of $BFN in an array
     #
     # Globals    : None
     #
@@ -1021,7 +1022,7 @@ package BldRoutines
 
         if ( not defined $dirs )
         {
-            &main::fatal("FID 42: $BGC::BFN DIRS section is empty.");
+            fatal("FID 42: $BFN DIRS section is empty.");
         }
 
         #  convert $dirs scalar to @dirs array.  $dirs holds the entire contents of the Bld
@@ -1031,16 +1032,16 @@ package BldRoutines
 
         if ( @dirs == 0 )
         {
-            &main::fatal("FID 46: $BGC::BFN DIRS section is empty.");
+            fatal("FID 46: $BFN DIRS section is empty.");
         }
 
         {
-            # print @dirs lines to $BGC::BIFN - before 'R ' lines recursive expansion
+            # print @dirs lines to $BIFN - before 'R ' lines recursive expansion
 
-            open my $bifnfh, ">>", $BGC::BIFN;
+            open my $bifnfh, ">>", $BIFN;
 
             print {$bifnfh} "\n####################################################################################################\n";
-            print {$bifnfh} "$BGC::BFN file DIRS section specification lines with irrelevant white space compressed out:\n\n";
+            print {$bifnfh} "$BFN file DIRS section specification lines with irrelevant white space compressed out:\n\n";
 
             foreach my $line ( @dirs )
             {
@@ -1058,14 +1059,14 @@ package BldRoutines
         @dirs = expand_R_specification( @dirs );
 
         {
-            # print @dirs lines to $BGC::BIFN - after 'R ' lines recursive expansion
+            # print @dirs lines to $BIFN - after 'R ' lines recursive expansion
 
-            open my $bifnfh, ">>", $BGC::BIFN;
+            open my $bifnfh, ">>", $BIFN;
 
             print {$bifnfh} "\n####################################################################################################\n";
             print {$bifnfh} "R recursively expanded and numbered DIRS section specification lines:\n\n";
 
-            # log @dirs to $BGC::BIFN
+            # log @dirs to $BIFN
             {
                 my $count = 0;
                 foreach my $line ( @dirs )
@@ -1084,28 +1085,28 @@ package BldRoutines
         }
 
         # check DIRS section compressed lines for valid format i.e. "^.*:.*:.*$"(DIRS section three field specification)
-        # or "$BGC::RGX_CMD_BLOCK"(DIRS section cmd block)
+        # or "$RGX_CMD_BLOCK"(DIRS section cmd block)
         foreach my $line ( @dirs )
         {
-            if ( not $line =~ m{^.*:.*:.*$} and not $line =~ m{$BGC::RGX_CMD_BLOCK} )
+            if ( not $line =~ m{^.*:.*:.*$} and not $line =~ m{$RGX_CMD_BLOCK} )
             {
-                &main::fatal("FID 47: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+                fatal("FID 47: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
             }
         }
 
         {
-	    # accumulate lines to be printed to the $BGC::BIFN file:
+	    # accumulate lines to be printed to the $BIFN file:
 	    #     a. DIRS section specification lines with a line count number
 	    #     b. variable interpolated(except for \$s) specification line cmd field
 	    #     c. matching compilation unit source file(s)
 	    #     d. source file header dependencies
 	    #     e. check for the following error conditions:
 	    #        1. either a directory or a source file is not readable
-	    #        2. multiple build entries in $BGC::BFN file DIRS section lines matching same source file
+	    #        2. multiple build entries in $BFN file DIRS section lines matching same source file
 	    #        3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
 	    #        4. Invalid regular expression - "$regex_srcs"
 	    #        5. No '$s' variable specified in DIRS line command field
-	    #        6. No sources matched in $BGC::BFN DIRS section line $line
+	    #        6. No sources matched in $BFN DIRS section line $line
 	    #        7. Source file specified in more than one DIRS line specification
 	    my ( @tmp ) = &main::accum_blddotinfo_output( $opt_s, @dirs );
 
@@ -1113,40 +1114,40 @@ package BldRoutines
 	    my $fatal_multiple_sources = shift @tmp;
 	    my @bldcmds =  @tmp;
 
-	    # write fatal msg to $BGC::BFFN
+	    # write fatal msg to $BFFN
 	    if ( $fatal_not_readable eq "true" )
 	    {
 	        {
-		    open my $bffnfh, ">>", $BGC::BFFN;
-		    print {$bffnfh} "Directory or source file specification in $BGC::BFN file DIRS line cannot be read.\n";
+		    open my $bffnfh, ">>", $BFFN;
+		    print {$bffnfh} "Directory or source file specification in $BFN file DIRS line cannot be read.\n";
 		    close $bffnfh;
 	        }
 	    }
 
-	    # write fatal msg to $BGC::BFFN
+	    # write fatal msg to $BFFN
 	    if ( $fatal_multiple_sources eq "true" )
 	    {
 	        {
-		    open my $bffnfh, ">>", $BGC::BFFN;
-		    print {$bffnfh} "Multiple build entries in $BGC::BFN file DIRS section lines matching same source file.\n";
+		    open my $bffnfh, ">>", $BFFN;
+		    print {$bffnfh} "Multiple build entries in $BFN file DIRS section lines matching same source file.\n";
 		    close $bffnfh;
 	        }
 	    }
 
 	    if ( $fatal_not_readable eq "true" or $fatal_multiple_sources eq "true" )
 	    {
-	        my $msg = "$BGC::BFN DIRS section has one or more of:\n".
+	        my $msg = "$BFN DIRS section has one or more of:\n".
 		          "a. Directory or source file specification cannot be read\n".
 		          "b. No sources matched\n".
 		          "c. Multiple build entries matching same source file";
 
 	        warning("WID 15: $msg");
 
-	        &main::fatal("FID 54: $msg   - see $BGC::BWFN.\n");
+	        fatal("FID 54: $msg   - see $BWFN.\n");
 	    }
 
 	    {
-	        open my $bifnfh, ">>", $BGC::BIFN;
+	        open my $bifnfh, ">>", $BIFN;
 
 	        print {$bifnfh} "\n####################################################################################################\n";
 	        print {$bifnfh} "a. DIRS section specification lines\n".
@@ -1178,7 +1179,7 @@ package BldRoutines
     #            :     3. insensitive to the number of spaces between command line options.  other spaces are
     #            :     4. irrelevant, such as the spaces before and after the chars "{};:\n" and are eliminated.
     #
-    # Parameters : $dirs - all the DIRS section lines of $BGC::BFN in a single scalar variable
+    # Parameters : $dirs - all the DIRS section lines of $BFN in a single scalar variable
     #
     # Returns    : @dirs - @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}' specification per array element
     #
@@ -1236,15 +1237,15 @@ package BldRoutines
         my $dir_regex;
         foreach my $line ( @fields )
         {
-	    next if $line =~ $BGC::RGX_BLANK_LINE;
+	    next if $line =~ $RGX_BLANK_LINE;
 
 	    if ( $line =~ m{^[{].*[}]$} ) # matches a line of '{stuff}' exactly - a $cmd
 	    {
 	        if ( $prevline eq "cmd" )
 	        {
-		    if ( not $line =~ m{$BGC::RGX_CMD_BLOCK} )
+		    if ( not $line =~ m{$RGX_CMD_BLOCK} )
 		    {
-		        &main::fatal("FID 43: $BGC::BFN DIRS section line is not valid(doesn't match $BGC::RGX_CMD_BLOCK): $line");
+		        fatal("FID 43: $BFN DIRS section line is not valid(doesn't match $RGX_CMD_BLOCK): $line");
 		    }
 
 		    # lone cmd block string
@@ -1252,9 +1253,9 @@ package BldRoutines
 	        }
 	        else
 	        {
-		    if ( not $dir_regex.$line =~ m{$BGC::RGX_VALID_DIRS_LINE} )
+		    if ( not $dir_regex.$line =~ m{$RGX_VALID_DIRS_LINE} )
 		    {
-		        &main::fatal("FID 44: $BGC::BFN DIRS section line is not valid(doesn't match $BGC::RGX_VALID_DIRS_LINE): $dir_regex.$line");
+		        fatal("FID 44: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $dir_regex.$line");
 		    }
 
 		    # concatenate '$dir:$regex:' and '$cmd' strings
@@ -1264,9 +1265,9 @@ package BldRoutines
 	    }
 	    else
 	    {
-	        if ( not $line =~ m{$BGC::RGX_VALID_DIRS_LINE} )
+	        if ( not $line =~ m{$RGX_VALID_DIRS_LINE} )
 	        {
-		    &main::fatal("FID 45: $BGC::BFN DIRS section line is not valid(doesn't match $BGC::RGX_VALID_DIRS_LINE): $line");
+		    fatal("FID 45: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $line");
 	        }
 
 	        # save '$dir:$regex:' line for next loop iteration
@@ -1320,7 +1321,7 @@ package BldRoutines
 	        %dirs = ();
 	        # recursively find all subdirs from $dir as the start point
 	        # Note: if a directory is empty find() will not find it.  this is not a problem since a DIRS section
-	        #       line with no source files to match cause a &main::fatal() error.
+	        #       line with no source files to match cause a fatal() error.
 	        find(sub {no warnings 'File::Find'; $dirs{"$File::Find::dir"} = 1;}, $dir);
 
 	        # push recursively expanded dirs onto @tmp
@@ -1343,7 +1344,7 @@ package BldRoutines
     # 
     # Usage      : my ( @tmp ) = Bld_section_extract();
     #
-    # Purpose    : scan $BGC::BFN file accumulating EVAL lines(in @eval) and DIRS lines(in $dirs) for later processing.
+    # Purpose    : scan $BFN file accumulating EVAL lines(in @eval) and DIRS lines(in $dirs) for later processing.
     #
     # Parameters : None
     #
@@ -1369,16 +1370,16 @@ package BldRoutines
         my ( $dirs, $comment_section, $eval_section, $dirs_section );
 
         # slurp in whole file to scalar
-        if ( not -e "$BGC::BFN" )
+        if ( not -e "$BFN" )
         {
-	    &main::fatal("FID 3: $BGC::BFN file missing.");
+	    fatal("FID 3: $BFN file missing.");
         }
         open my $bfnfh, "<", "Bld";
         my @bfnfile = <$bfnfh>;
         foreach my $e ( @bfnfile ){ $bfnfile .= $e }
         close $bfnfh;
 
-        # match $BGC::BFN for EVAL and DIRS sections and extract them
+        # match $BFN for EVAL and DIRS sections and extract them
         if (
 	       $bfnfile =~ m{
 			        (.*?)  # matches comment section - minimal match guarantees that only first EVAL will match
@@ -1395,7 +1396,7 @@ package BldRoutines
         }
         else
         {
-	    &main::fatal("FID 4: $BGC::BFN invalid format - need EVAL and DIRS sections.");
+	    fatal("FID 4: $BFN invalid format - need EVAL and DIRS sections.");
         }
 
         # accumulate EVAL section lines in @eval
@@ -1404,7 +1405,7 @@ package BldRoutines
 	    my $eval_line = $1;
 
 	    # ignore if comment or blank line(s)
-	    next if ( $eval_line =~ $BGC::RGX_COMMENT_LINE or $eval_line =~ $BGC::RGX_BLANK_LINE );
+	    next if ( $eval_line =~ $RGX_COMMENT_LINE or $eval_line =~ $RGX_BLANK_LINE );
 
 	    push @eval, $eval_line;
         }
@@ -1415,7 +1416,7 @@ package BldRoutines
 	    my $dirs_line = $1;
 
 	    # ignore if comment or blank line(s)
-	    next if ( $dirs_line =~ $BGC::RGX_COMMENT_LINE or $dirs_line =~ $BGC::RGX_BLANK_LINE );
+	    next if ( $dirs_line =~ $RGX_COMMENT_LINE or $dirs_line =~ $RGX_BLANK_LINE );
 
 	    $dirs .= "$dirs_line\n";
         }
@@ -1427,7 +1428,7 @@ package BldRoutines
     # 
     # Usage      : sig_file_update( $bld, \%SigdataNew );
     #
-    # Purpose    : replace $BGC::SIGFN file with new %SigdataNew entries and write $BGC::BIFN file source files section
+    # Purpose    : replace $SIGFN file with new %SigdataNew entries and write $BIFN file source files section
     #
     # Parameters : $bld         - the target to built e.g. executable or libx.a or libx.so
     #            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
@@ -1461,12 +1462,12 @@ package BldRoutines
 
             given ( $s )
             {
-                when ( m{ ^\/.*[.]$BGC::RGX_HDR_EXT$ }x )
+                when ( m{ ^\/.*[.]$RGX_HDR_EXT$ }x )
                 {
                     # collect system header files
                     push @system_hdrs, sprintf "%s", $s;
                 }
-                when ( m{ ^[^\/].*[.]$BGC::RGX_HDR_EXT$ }x )
+                when ( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x )
                 {
                     # collect not full path header files
                     push @user_hdrs, sprintf "%s", $s;
@@ -1474,13 +1475,13 @@ package BldRoutines
                 when (
                          (
                              $path =~ m{^\/.*} and
-                             $file =~ m{$BGC::RGX_LIBS}
+                             $file =~ m{$RGX_LIBS}
                          )
                          and not
                          (
                              # don't pick up the build target
                              $file =~ m{$bld} and
-                             $path eq $BGC::EMPTY
+                             $path eq $EMPTY
                          )
                      )
                 {
@@ -1490,20 +1491,20 @@ package BldRoutines
                 when (
                          (
                              $path =~ m{^[^\/].*} and
-                             $file =~ m{$BGC::RGX_LIBS}
+                             $file =~ m{$RGX_LIBS}
                          )
                          and not
                          (
                              # don't pick up the build target
                              $file =~ m{$bld} and
-                             $path eq $BGC::EMPTY
+                             $path eq $EMPTY
                          )
                      )
                 {
                     # collect library files
                     push @user_libraries, sprintf "%s", $s;
                 }
-                when ( defined $SigdataNew_ref->{$s}[$BGC::SIG_CMD] and defined $SigdataNew_ref->{$s}[$BGC::SIG_TGT] )
+                when ( defined $SigdataNew_ref->{$s}[$SIG_CMD] and defined $SigdataNew_ref->{$s}[$SIG_TGT] )
                 {
                     # collect code files
                     push @code, sprintf "%s", $s;
@@ -1527,7 +1528,7 @@ package BldRoutines
         foreach my $s ( @system_hdrs )
         {
             push @bifn, "'$s'\n";
-            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$BGC::SIG_SRC];
+            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
         }
         push @bifn, "\n";
         push @sigfn, "\n";
@@ -1537,7 +1538,7 @@ package BldRoutines
         foreach my $s ( @user_hdrs )
         {
             push @bifn, "'$s'\n";
-            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$BGC::SIG_SRC];
+            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
         }
         push @bifn, "\n";
         push @sigfn, "\n";
@@ -1547,7 +1548,7 @@ package BldRoutines
         foreach my $s ( @system_libraries )
         {
             push @bifn, "'$s'\n";
-            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$BGC::SIG_SRC];
+            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
         }
         push @bifn, "\n";
         push @sigfn, "\n";
@@ -1557,7 +1558,7 @@ package BldRoutines
         foreach my $s ( @user_libraries )
         {
             push @bifn, "'$s'\n";
-            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$BGC::SIG_SRC];
+            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
         }
         push @bifn, "\n";
         push @sigfn, "\n";
@@ -1567,7 +1568,7 @@ package BldRoutines
         foreach my $s ( @code )
         {
             push @bifn, "'$s'\n";
-            push @sigfn, sprintf "'%s' %s %s %s\n", $s, $SigdataNew_ref->{$s}[$BGC::SIG_SRC], $SigdataNew_ref->{$s}[$BGC::SIG_CMD], $SigdataNew_ref->{$s}[$BGC::SIG_TGT];
+            push @sigfn, sprintf "'%s' %s %s %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC], $SigdataNew_ref->{$s}[$SIG_CMD], $SigdataNew_ref->{$s}[$SIG_TGT];
         }
         push @bifn, "\n";
         push @sigfn, "\n";
@@ -1577,10 +1578,10 @@ package BldRoutines
         foreach my $s ( @exec )
         {
             push @bifn, "'$s'\n";
-            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$BGC::SIG_SRC];
+            push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
         }
 
-        open my $bifnfh, ">>", $BGC::BIFN;
+        open my $bifnfh, ">>", $BIFN;
         print {$bifnfh} "\n####################################################################################################\n";
         print {$bifnfh} "List of all build - System headers(full path)\n".
                         "                    User headers(relative path)\n".
@@ -1595,7 +1596,7 @@ package BldRoutines
         }
         close $bifnfh;
 
-        open my $sigfn, ">", $BGC::SIGFN;
+        open my $sigfn, ">", $SIGFN;
         foreach my $line ( @sigfn )
         {
             print $sigfn "$line";
@@ -1643,10 +1644,10 @@ package BldRoutines
 
 
         # copy -I(include directories), -D(define), and -U(undefine) directives from $cmd_var_sub to $IDU
-        $IDU = $BGC::EMPTY;
+        $IDU = $EMPTY;
         while ( $cmd_var_sub =~ m{ (-I\s*\S+|-D\s*\S+|-U\s*\S+) }gx )
         {
-            $IDU .= $1.$BGC::SPACE;
+            $IDU .= $1.$SPACE;
         }
 
         my ( %hdr_dep, @hdr_dep );
@@ -1663,7 +1664,7 @@ package BldRoutines
         #
         my $cppret = `cpp -H -M $addoption $IDU "$s" 2>/dev/null`;
 
-        # if the word ' error '(spaces required) appears in the cpp output &main::fatal()
+        # if the word ' error '(spaces required) appears in the cpp output fatal()
         if ( $cppret =~ m{\serror\s}m )
         {
             my ( $cpperror );
@@ -1679,11 +1680,11 @@ package BldRoutines
 
             print "$cpperror\n";
 
-            &main::fatal("FID 58: $cpperror");
+            fatal("FID 58: $cpperror");
         }
 
         # populate %hdr_dep with all unique header files returned by cpp
-        while ( $cppret =~ m{ (\S+[.]$BGC::RGX_HDR_EXT)\b }gx )
+        while ( $cppret =~ m{ (\S+[.]$RGX_HDR_EXT)\b }gx )
         {
             $hdr_dep{$1} = undef;
         }
@@ -1704,7 +1705,7 @@ package BldRoutines
     # Parameters : $s               - relative path source file name starting from the bld home directory,
     #            :                    should only be compilation units(not header files)
     #            : $tgtextorfile    - the file name extension of the target file to be built from $s
-    #            : \%Sigdata        - reference to hash holding $BGC::SIGFN file data
+    #            : \%Sigdata        - reference to hash holding $SIGFN file data
     #            : \%SigdataNew_tmp - hash holding bld calculated command, source, header, library and target file signature data
     #
     # Returns    : "true"(rebuild $s) or "false"(do not rebuild $s)
@@ -1746,13 +1747,13 @@ package BldRoutines
         return "true" if not $s ~~ %{$Sigdata_ref};
 
         # rebuild if source signature has changed
-        return "true" if $Sigdata_ref->{$s}[$BGC::SIG_SRC] ne $SigdataNew_ref->{$s}[$BGC::SIG_SRC];
+        return "true" if $Sigdata_ref->{$s}[$SIG_SRC] ne $SigdataNew_ref->{$s}[$SIG_SRC];
 
         # rebuild if build command has changed
-        return "true" if $Sigdata_ref->{$s}[$BGC::SIG_CMD] ne $SigdataNew_ref->{$s}[$BGC::SIG_CMD];
+        return "true" if $Sigdata_ref->{$s}[$SIG_CMD] ne $SigdataNew_ref->{$s}[$SIG_CMD];
 
         # rebuild if no target file extension found
-        return "true" if $tgtextorfile eq $BGC::EMPTY;
+        return "true" if $tgtextorfile eq $EMPTY;
 
         # if $tgtextorfile has an embedded period, then it is a full file name
         if ( $tgtextorfile =~ m{ [.] }x )
@@ -1763,26 +1764,26 @@ package BldRoutines
         else
         {
             $tgtfile = $s;
-            $tgtfile =~ s{$BGC::RGX_FILE_EXT}{$tgtextorfile}; # replace from last period to end of string with .$tgtextorfile
+            $tgtfile =~ s{$RGX_FILE_EXT}{$tgtextorfile}; # replace from last period to end of string with .$tgtextorfile
         }
 
         # rebuild if target file does not exist
         return "true" if not -e "$tgtfile";
 
         # rebuild if target signature does not currently exist
-        return "true" if not defined $Sigdata_ref->{$s}[$BGC::SIG_TGT] or not defined $SigdataNew_ref->{$s}[$BGC::SIG_TGT];
+        return "true" if not defined $Sigdata_ref->{$s}[$SIG_TGT] or not defined $SigdataNew_ref->{$s}[$SIG_TGT];
 
         # rebuild if target has changed
-        return "true" if $Sigdata_ref->{$s}[$BGC::SIG_TGT] ne $SigdataNew_ref->{$s}[$BGC::SIG_TGT];
+        return "true" if $Sigdata_ref->{$s}[$SIG_TGT] ne $SigdataNew_ref->{$s}[$SIG_TGT];
 
         # check each header file for this source
-        foreach my $h ( keys %{$SigdataNew_ref->{$s}[$BGC::HDR_DEP]} )
+        foreach my $h ( keys %{$SigdataNew_ref->{$s}[$HDR_DEP]} )
         {
             # rebuild if header is new
             return "true" if not $h ~~ %{$Sigdata_ref};
 
             # rebuild if header has changed
-            return "true" if $Sigdata_ref->{$h}[$BGC::SIG_SRC] ne $SigdataNew_ref->{$h}[$BGC::SIG_SRC];
+            return "true" if $Sigdata_ref->{$h}[$SIG_SRC] ne $SigdataNew_ref->{$h}[$SIG_SRC];
         }
 
         return "false";
@@ -1802,7 +1803,7 @@ package BldRoutines
     # Returns    : if $filename exists
     #            :     return SHA1 signature of "$filename . @otherstrings"
     #            : else
-    #            :     &main::fatal()
+    #            :     fatal()
     #
     # Globals    : None
     #
@@ -1826,12 +1827,12 @@ package BldRoutines
 
         if ( not -e $filename )
         {
-            &main::fatal("FID 59: File: $filename does not exit.");
+            fatal("FID 59: File: $filename does not exit.");
         }
 
-        if ( not -e $BGC::BFN )
+        if ( not -e $BFN )
         {
-            &main::fatal("FID 60: File: open() error on $filename.");
+            fatal("FID 60: File: open() error on $filename.");
         }
         open my $fh, "<", $filename;
 
@@ -1839,13 +1840,13 @@ package BldRoutines
 
         if ( $inputfilesize == 0 )
         {
-            &main::fatal("FID 61: File: $filename is of zero size - a useful signature cannot be taken of an empty file.");
+            fatal("FID 61: File: $filename is of zero size - a useful signature cannot be taken of an empty file.");
         }
 
         read $fh, $inputfile, $inputfilesize;
         close $fh;
 
-        my $otherstrings = $BGC::EMPTY;
+        my $otherstrings = $EMPTY;
         foreach my $string ( @otherstrings )
         {
             $otherstrings .= $string;
@@ -1912,7 +1913,7 @@ package BldRoutines
     # 
     # Usage      : warning("warning msg");
     #
-    # Purpose    : accept msg as arg and append it to $BGC::BWFN file, then return.
+    # Purpose    : accept msg as arg and append it to $BWFN file, then return.
     #
     # Parameters : $msg - a single scalar msg
     #
@@ -1924,7 +1925,7 @@ package BldRoutines
     #
     # Notes      : None
     #
-    # See Also   : &main::fatal()
+    # See Also   : fatal()
     #
     sub warning
     {
@@ -1934,11 +1935,53 @@ package BldRoutines
 
         my ( $package, $filename, $line ) = caller;
 
-        open my $bwfnfh, ">>", $BGC::BWFN;
+        open my $bwfnfh, ">>", $BWFN;
         printf {$bwfnfh} "line: %4d - %s\n\n", $line, $msg;
         close $bwfnfh;
 
         return;
+    }
+
+
+    # 
+    # Usage      : fatal("fatal msg");
+    #
+    # Purpose    : accept msg as arg and append it to $BFFN file, then self 'kill INT' to
+    #            : call the anonymous interrupt($SIG{INT}) handler routine to croak().
+    #
+    # Parameters : $msg - a single scalar msg
+    #
+    # Returns    : Does not return
+    #
+    # Globals    : None
+    #
+    # Throws     : None
+    #
+    # Notes      : None
+    #
+    # See Also   : warning()
+    #
+    sub fatal
+    {
+	my (
+	       $msg,
+	   ) = @_;
+
+	my ( $package, $filename, $line );
+
+
+	( $package, $filename, $line ) = caller;
+
+	open my $bffnfh, ">>", $BFFN;
+	printf {$bffnfh} "package: %s\n", $package;
+	printf {$bffnfh} "filename: %s  line: %4d\n", $filename, $line;
+	printf {$bffnfh} "stack trace: %s\n", longmess("");
+	printf {$bffnfh} "fatal(\$msg) msg: %s\n\n", $msg;
+	close $bffnfh;
+
+	croak("\n$msg");
+
+	return;
     }
 
 
@@ -1964,7 +2007,7 @@ package BldRoutines
         print "usage: bld [-h]\n";
         print "    -h          - this message.(exit)\n";
 
-        print "$BGC::USAGE";
+        print "$USAGE";
 
         exit;
     }
@@ -2005,44 +2048,44 @@ package BldRoutines
 
         given( $a )
         {
-            when( m{ ^\/.*[.]$BGC::RGX_HDR_EXT$ }x )    { $na = 1; }
-            when( m{ ^\/.*$BGC::RGX_LIBS$ }x )          { $na = 2; }
-            when( m{ ^[^\/].*$BGC::RGX_LIBS$ }x )       { $na = 3; }
-            when( m{ ^[^\/].*[.]$BGC::RGX_HDR_EXT$ }x ) { $na = 4; }
-            when( m{ .*[.]$BGC::RGX_SRC_EXT$ }x )       { $na = 5; }
-            default { &main::fatal("FID 62: Invalid source format - $a"); }
+            when( m{ ^\/.*[.]$RGX_HDR_EXT$ }x )    { $na = 1; }
+            when( m{ ^\/.*$RGX_LIBS$ }x )          { $na = 2; }
+            when( m{ ^[^\/].*$RGX_LIBS$ }x )       { $na = 3; }
+            when( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x ) { $na = 4; }
+            when( m{ .*[.]$RGX_SRC_EXT$ }x )       { $na = 5; }
+            default { fatal("FID 62: Invalid source format - $a"); }
         }
 
         given( $b )
         {
-            when( m{ ^\/.*[.]$BGC::RGX_HDR_EXT$ }x )    { $nb = 1; }
-            when( m{ ^\/.*$BGC::RGX_LIBS$ }x )          { $nb = 2; }
-            when( m{ ^[^\/].*$BGC::RGX_LIBS$ }x )       { $nb = 3; }
-            when( m{ ^[^\/].*[.]$BGC::RGX_HDR_EXT$ }x ) { $nb = 4; }
-            when( m{ .*[.]$BGC::RGX_SRC_EXT$ }x )       { $nb = 5; }
-            default { &main::fatal("FID 63: Invalid source format - $b"); }
+            when( m{ ^\/.*[.]$RGX_HDR_EXT$ }x )    { $nb = 1; }
+            when( m{ ^\/.*$RGX_LIBS$ }x )          { $nb = 2; }
+            when( m{ ^[^\/].*$RGX_LIBS$ }x )       { $nb = 3; }
+            when( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x ) { $nb = 4; }
+            when( m{ .*[.]$RGX_SRC_EXT$ }x )       { $nb = 5; }
+            default { fatal("FID 63: Invalid source format - $b"); }
         }
 
         ( $vol, $path, $basea ) = File::Spec->splitpath( $a );
-        if ( $basea =~ m{(.*)[.]$BGC::RGX_FILE_EXT} )
+        if ( $basea =~ m{(.*)[.]$RGX_FILE_EXT} )
         {
             $afile = $1;
             $aext = $2;
         }
         else
         {
-            &main::fatal("FID 64: Valid file extension not found in $basea");
+            fatal("FID 64: Valid file extension not found in $basea");
         }
 
         ( $vol, $path, $baseb ) = File::Spec->splitpath( $b );
-        if ( $baseb =~ m{(.*)[.]$BGC::RGX_FILE_EXT} )
+        if ( $baseb =~ m{(.*)[.]$RGX_FILE_EXT} )
         {
             $bfile = $1;
             $bext = $2;
         }
         else
         {
-            &main::fatal("FID 65: Valid file extension not found in $baseb");
+            fatal("FID 65: Valid file extension not found in $baseb");
         }
 
         # DEBUG

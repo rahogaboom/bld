@@ -23,7 +23,7 @@ use Getopt::Long;
 use File::Find;
 use Data::Dumper;
 
-# extract_multiple - for parsing the $BGC::BFN DIRS section
+# extract_multiple - for parsing the $BFN DIRS section
 # extract_bracketed - used by extract_multiple for finding '{}''s
 use Text::Balanced qw(
                          extract_multiple
@@ -37,6 +37,7 @@ use Carp qw(
                croak
                cluck
                shortmess
+               longmess
            );
 
 # sha1_hex - the bld program SHA1 generator
@@ -57,47 +58,27 @@ use experimental 'switch';
 
 use lib "./modules";
 use BGC;
-use BldRoutines qw(
-                      init_blddotinfo
-                      read_Blddotsig
-                      rebuild_target_bool
-                      rebuild_exec
-                      multiple_sigs
-                      buildopt
-                      tgtextorfile
-                      tgt_signature
-                      dirs_pro
-                      cvt_dirs_to_array
-                      expand_R_specification
-                      Bld_section_extract
-                      sig_file_update
-                      hdr_depend
-                      rebuild_src_bool
-                      file_sig_calc
-                      system_error_msg
-                      warning
-                      opt_help
-                  );
+use BldRoutines;
 
 # START: main bld program block
 {
     my
     (
         # file related
-        @eval,    # contents of the $BGC::BFN file EVAL section
-        $dirs,    # contents of the $BGC::BFN file DIRS section before \s+ compression
-        @dirs,    # contents of the $BGC::BFN file DIRS section after \s+ compression
+        @eval,    # contents of the $BFN file EVAL section
+        $dirs,    # contents of the $BFN file DIRS section before \s+ compression
+        @dirs,    # contents of the $BFN file DIRS section after \s+ compression
 
         $opt_h,   # -h cmd line help option, do ./bld -h
 
-        $comment_section, # holds comment section in Bld file for printing in $BGC::BIFN file
+        $comment_section, # holds comment section in Bld file for printing in $BIFN file
 
-        # mandatory variable definitions in the EVAL section of $BGC::BFN
+        # mandatory variable definitions in the EVAL section of $BFN
             $bld,        # the target to built e.g. executable, libx.a, libx.so
             $bldcmd,     # cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
             $lib_dirs,   # space separated list of directories to search for libraries
 
-            # mandatory option related in the EVAL section of $BGC::BFN
+            # mandatory option related in the EVAL section of $BFN
                 $opt_s,     # to use system header files in dependency checking("system" or "nosystem")
                 $opt_r,     # to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
                 $opt_lib,   # to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
@@ -107,7 +88,7 @@ use BldRoutines qw(
         $rebuild_nosrc,  # boolean to indicate a(any) source file has been deleted
         $rebuild_target, # boolean to indicate the target has:
                          #     1. target is missing
-                         #     2. signature of target does not exist in $BGC::SIGFN signature file
+                         #     2. signature of target does not exist in $SIGFN signature file
                          #     3. signature of target exists in signature file but is changed from actual existing target
 
         # primary program data structures
@@ -115,105 +96,105 @@ use BldRoutines qw(
                 # signature data and build target library dependency data
                 #
                 # the hash will be two levels(for source file signature, build cmd signature and build target signature data):
-                # $Sigdata{<full path or relative path file source>}[<$BGC::SIG_SRC or $BGC::SIG_CMD or $BGC::SIG_TGT>] = '<signature>'
+                # $Sigdata{<full path or relative path file source>}[<$SIG_SRC or $SIG_CMD or $SIG_TGT>] = '<signature>'
                 #     a. the first level hash has a key of the source file full path or relative path name e.g. 'src/source.c' or '/usr/include/fcntl.h'
                 #     b. the second level array has one of three index values:
-                #         1. $BGC::SIG_SRC - source signature e.g. signature of 'source.c' or 'header.h' or 'libx.so'
-                #         2. $BGC::SIG_CMD - build cmd signature e.g. signature of 'clang -c source.c -lm'
-                #         3. $BGC::SIG_TGT - target signature e.g. signature of 'source.o'
+                #         1. $SIG_SRC - source signature e.g. signature of 'source.c' or 'header.h' or 'libx.so'
+                #         2. $SIG_CMD - build cmd signature e.g. signature of 'clang -c source.c -lm'
+                #         3. $SIG_TGT - target signature e.g. signature of 'source.o'
                 #     c. the values are signatures
                 #
                 # Example: # signature of source file
-                #          $Sigdata{'src/C/main.c'}[$BGC::SIG_SRC] = 'e8bc19c1ccd64bbbe71e6a73a3a017bbaafd33e5';
+                #          $Sigdata{'src/C/main.c'}[$SIG_SRC] = 'e8bc19c1ccd64bbbe71e6a73a3a017bbaafd33e5';
                 #
                 #          # signature of source file build cmd
-                #          $Sigdata{'src/C/main.c'}[$BGC::SIG_CMD] = 'f951dd4b3366670d9fc8d71da1b74b3b5d5fade8';
+                #          $Sigdata{'src/C/main.c'}[$SIG_CMD] = 'f951dd4b3366670d9fc8d71da1b74b3b5d5fade8';
                 #
                 #          # signature of source file target file e.g. main.o
-                #          $Sigdata{'src/C/main.c'}[$BGC::SIG_TGT] = '4a62b30b41272438b3575822223877457366c8db';
+                #          $Sigdata{'src/C/main.c'}[$SIG_TGT] = '4a62b30b41272438b3575822223877457366c8db';
                 #
                 #          # signature of full path header file
-                #          $Sigdata{'/usr/include/wchar.h'}[$BGC::SIG_SRC] = '587c23d7ebd0856b9a9a59c8b0c6469bf0c75963';
+                #          $Sigdata{'/usr/include/wchar.h'}[$SIG_SRC] = '587c23d7ebd0856b9a9a59c8b0c6469bf0c75963';
                 #
                 #          # signature of relative path header file
-                #          $Sigdata{'src/C/head.h'}[$BGC::SIG_SRC] = '7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
+                #          $Sigdata{'src/C/head.h'}[$SIG_SRC] = '7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
                 #
                 #          # signature of build target
-                #          $Sigdata{'exec-c'}[$BGC::SIG_SRC] = '7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
+                #          $Sigdata{'exec-c'}[$SIG_SRC] = '7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
                 #
                 # the hash will have three levels(for build target library file dependency data):
-                # $Sigdata{<build target>}[<$BGC::LIB_DEP>]{<library file name>} = undef
+                # $Sigdata{<build target>}[<$LIB_DEP>]{<library file name>} = undef
                 #     a. the first level hash has a key of the build target file name e.g. exec-c
-                #     b. the second level array has an index values of $BGC::LIB_DEP - a library dependency e.g. libm.so
+                #     b. the second level array has an index values of $LIB_DEP - a library dependency e.g. libm.so
                 #     c. the third level hash has a key of the library file name
                 #     d. the values are undef
                 #
                 # Example: # library dependency of build target
-                #          $Sigdata{'exec-c'}[$BGC::LIB_DEP]{'/lib64/libc.so.6'} = undef;
+                #          $Sigdata{'exec-c'}[$LIB_DEP]{'/lib64/libc.so.6'} = undef;
                 #
                 #          # library dependency of build target
-                #          $Sigdata{'exec-c'}[$BGC::LIB_DEP]{'/lib64/libm.so.6'} = undef;
+                #          $Sigdata{'exec-c'}[$LIB_DEP]{'/lib64/libm.so.6'} = undef;
                 #
-                # Purpose: holds $BGC::SIGFN file signature data read in at program start for comparison to %SigdataNew program calculated data to
+                # Purpose: holds $SIGFN file signature data read in at program start for comparison to %SigdataNew program calculated data to
                 #          determine what, if anything, to rebuild
 
             %SigdataNew,
                 # signature and dependency information
                 #
                 # the hash will have two levels(for signature data):
-                # $SigdataNew{<full path or relative path file source>}[<$BGC::SIG_SRC or $BGC::SIG_CMD or $BGC::SIG_TGT>] = '<signature>'
+                # $SigdataNew{<full path or relative path file source>}[<$SIG_SRC or $SIG_CMD or $SIG_TGT>] = '<signature>'
                 #     a. the first level hash has a key of the source file full path or relative path name e.g. 'src/source.c' or '/usr/include/fcntl.h'
                 #     b. the second level array has one of three index values:
-                #         1. $BGC::SIG_SRC - source signature e.g. signature of source.c or header.h or libx.so
-                #         2. $BGC::SIG_CMD - build cmd signature e.g. signature of "clang -c source.c -lm"
-                #         3. $BGC::SIG_TGT - target signature e.g. signature of source.o
+                #         1. $SIG_SRC - source signature e.g. signature of source.c or header.h or libx.so
+                #         2. $SIG_CMD - build cmd signature e.g. signature of "clang -c source.c -lm"
+                #         3. $SIG_TGT - target signature e.g. signature of source.o
                 #     c. the values are signatures
                 #
                 # Example: # library signature
-                #          $SigdataNew{'/lib64/libc.so.6'}[$BGC::SIG_SRC] = '7c135fc5b3aca5ef9064bdbd51608cf1aad6feee';
+                #          $SigdataNew{'/lib64/libc.so.6'}[$SIG_SRC] = '7c135fc5b3aca5ef9064bdbd51608cf1aad6feee';
                 #
                 #          # build target signature
-                #          $SigdataNew{'exec-c'}[$BGC::SIG_SRC] = '95b0de6b76a336aed5bfb1a5fa1d757ccf1eabfc';
+                #          $SigdataNew{'exec-c'}[$SIG_SRC] = '95b0de6b76a336aed5bfb1a5fa1d757ccf1eabfc';
                 #
                 #          # signature of source file
-                #          $SigdataNew{'src/C/main.c'}[$BGC::SIG_SRC] = 'e8bc19c1ccd64bbbe71e6a73a3a017bbaafd33e5';
+                #          $SigdataNew{'src/C/main.c'}[$SIG_SRC] = 'e8bc19c1ccd64bbbe71e6a73a3a017bbaafd33e5';
                 #
                 #          # signature of source file build cmd
-                #          $SigdataNew{'src/C/main.c'}[$BGC::SIG_CMD] = 'f951dd4b3366670d9fc8d71da1b74b3b5d5fade8';
+                #          $SigdataNew{'src/C/main.c'}[$SIG_CMD] = 'f951dd4b3366670d9fc8d71da1b74b3b5d5fade8';
                 #
                 #          # signature of source file target file e.g. main.o
-                #          $SigdataNew{'src/C/main.c'}[$BGC::SIG_TGT] = '4a62b30b41272438b3575822223877457366c8db';
+                #          $SigdataNew{'src/C/main.c'}[$SIG_TGT] = '4a62b30b41272438b3575822223877457366c8db';
                 #
                 #          # signature of full path header file
-                #          $SigdataNew{'/usr/include/stdc-predef.h'}[$BGC::SIG_SRC] = '51eecd0afe5466d0ea173369fbe0c91657f92d53';
+                #          $SigdataNew{'/usr/include/stdc-predef.h'}[$SIG_SRC] = '51eecd0afe5466d0ea173369fbe0c91657f92d53';
                 #
                 #          # signature of relative path header file
-                #          $SigdataNew{'src/include/head.h'}[$BGC::SIG_SRC] = 'i7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
+                #          $SigdataNew{'src/include/head.h'}[$SIG_SRC] = 'i7354a1b2a464cb3a0f6444d4363c4aae7e40b362';
                 #
                 # the hash will have three levels(for header file or library file dependency data):
-                # $SigdataNew{<full path or relative path file source>}[<$BGC::HDR_DEP or $BGC::LIB_DEP>]{<file name>} = undef
+                # $SigdataNew{<full path or relative path file source>}[<$HDR_DEP or $LIB_DEP>]{<file name>} = undef
                 #     a. the first level hash has a key of the source file full path or relative path name e.g. 'src/source.c' or '/usr/include/fcntl.h'
                 #     b. the second level array has one of two index values:
-                #         1. $BGC::HDR_DEP - a header dependency - the source depends on a header e.g. header.h
-                #         2. $BGC::LIB_DEP - a library dependency - the $bldcmd for the $bld target depends on a library e.g. libm.so
+                #         1. $HDR_DEP - a header dependency - the source depends on a header e.g. header.h
+                #         2. $LIB_DEP - a library dependency - the $bldcmd for the $bld target depends on a library e.g. libm.so
                 #     c. the third level hash has a key of the header or library file name
                 #     d. the values are undef
                 #
                 # Example: # library dependency of build target
-                #          $SigdataNew{'exec-c'}[$BGC::LIB_DEP]{'/lib64/libm.so.6'} = undef;
+                #          $SigdataNew{'exec-c'}[$LIB_DEP]{'/lib64/libm.so.6'} = undef;
                 #
                 #          # library dependency of build target
-                #          $SigdataNew{'exec-c'}[$BGC::LIB_DEP]{'/lib64/libc.so.6'} = undef;
+                #          $SigdataNew{'exec-c'}[$LIB_DEP]{'/lib64/libc.so.6'} = undef;
                 #
                 #          # source file full path header dependency
-                #          $SigdataNew{'src/C/main.c'}[$BGC::HDR_DEP]{'/usr/include/_G_config.h'} = undef;
+                #          $SigdataNew{'src/C/main.c'}[$HDR_DEP]{'/usr/include/_G_config.h'} = undef;
                 #
                 #          # source file relative path header dependency
-                #          $SigdataNew{'src/C/main.c'}[$BGC::HDR_DEP]{'src/C/l.hh'} = undef;
+                #          $SigdataNew{'src/C/main.c'}[$HDR_DEP]{'src/C/l.hh'} = undef;
                 #
                 # Purpose: holds program calculated data - command, source, header, library and target file signature data as well as source file header dependencies and build
                 #          cmd library dependencies.  data in this structure is compared with data in the %Sigdata structure to determine what, if anything, to rebuild.  just
-                #          before program exit the $BGC::SIG_SRC, $BGC::SIG_CMD and $BGC::SIG_TGT signatures of %SigdataNew are written to $BGC::SIGFN and becomes the %Sigdata for the next run.
+                #          before program exit the $SIG_SRC, $SIG_CMD and $SIG_TGT signatures of %SigdataNew are written to $SIGFN and becomes the %Sigdata for the next run.
 
             %Objects,
                 # object files
@@ -286,8 +267,8 @@ use BldRoutines qw(
                 #          already exists will fatal().  if a source is not rebuilt then it will not be added to %Targets.  only rebuilt targets are added.
     );
 
-    # initially interrupts just croak(); after the $BGC::BFN file has been processed and the $BGC::SIGFN has been read in, int_sig_handler()
-    # will handle them and first write out any partially accumulated new signatures to $BGC::SIGFN and then croak().
+    # initially interrupts just croak(); after the $BFN file has been processed and the $SIGFN has been read in, int_sig_handler()
+    # will handle them and first write out any partially accumulated new signatures to $SIGFN and then croak().
     local $SIG{INT} = sub {
                               my (
                                      $signame,
@@ -307,17 +288,17 @@ use BldRoutines qw(
     opt_help() if $opt_h;
 
     {
-        # clear $BGC::BIFN, $BGC::BWFN and $BGC::BFFN files
+        # clear $BIFN, $BWFN and $BFFN files
 
-        open my $bifnfh, ">", $BGC::BIFN;
+        open my $bifnfh, ">", $BIFN;
         close $bifnfh;
-        open my $bwfnfh, ">", $BGC::BWFN;
+        open my $bwfnfh, ">", $BWFN;
         close $bwfnfh;
-        open my $bffnfh, ">", $BGC::BFFN;
+        open my $bffnfh, ">", $BFFN;
         close $bffnfh;
     }
 
-    # scan $BGC::BFN file accumulating EVAL lines(in @eval) and DIRS lines(in $dirs) for later processing.
+    # scan $BFN file accumulating EVAL lines(in @eval) and DIRS lines(in $dirs) for later processing.
     my ( @tmp ) = Bld_section_extract();
     $comment_section = shift @tmp;
     $dirs = pop @tmp;
@@ -325,19 +306,19 @@ use BldRoutines qw(
 
     if ( @eval == 0 )
     {
-        fatal("FID 5: $BGC::BFN EVAL section is empty.");
+        fatal("FID 5: $BFN EVAL section is empty.");
     }
 
     {
-        # if a $BGC::BGVFN file exists read in as an array and prepend to the @eval array.
-        # this allows the $BGC::BGVFN file to serve as a source of global variable defines.
+        # if a $BGVFN file exists read in as an array and prepend to the @eval array.
+        # this allows the $BGVFN file to serve as a source of global variable defines.
 
         my @bldrc;
 
-        # slurp in $BGC::BGVFN file to array
-        if ( -f "$BGC::BGVFN" and -r "$BGC::BGVFN" )
+        # slurp in $BGVFN file to array
+        if ( -f "$BGVFN" and -r "$BGVFN" )
         {
-            open my $bldrcfh, "<", "$BGC::BGVFN";
+            open my $bldrcfh, "<", "$BGVFN";
             @bldrc = <$bldrcfh>;
             close $bldrcfh;
         }
@@ -346,7 +327,7 @@ use BldRoutines qw(
     }
 
     {
-        # eval() the EVAL section code of the $BGC::BFN file.  this must be 'no strict' or
+        # eval() the EVAL section code of the $BFN file.  this must be 'no strict' or
         # interpolation will complain about undefined variables.
 
         no strict;
@@ -356,7 +337,7 @@ use BldRoutines qw(
         # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
         if ( $EVAL_ERROR )
         {
-            fatal("FID 6: $BGC::BFN EVAL section: Fatal eval error: $EVAL_ERROR");
+            fatal("FID 6: $BFN EVAL section: Fatal eval error: $EVAL_ERROR");
         }
 
         fatal("FID 7: Invalid value for \$opt_s: \'$opt_s\'") if $opt_s ne "system" and $opt_s ne "nosystem";
@@ -370,12 +351,12 @@ use BldRoutines qw(
 
     if ( not defined $bld or not defined $bldcmd or not defined $lib_dirs )
     {
-        fatal("FID 10: One or more of $BGC::BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
+        fatal("FID 10: One or more of $BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
     }
 
     if ( not defined $opt_s or not defined $opt_r or not defined $opt_lib )
     {
-        fatal("FID 11: One or more of $BGC::BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
+        fatal("FID 11: One or more of $BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
     }
 
     $bld =~ s{^\s*|\s*$}{}g; # strip pre/post white space
@@ -388,20 +369,20 @@ use BldRoutines qw(
     if ( $opt_s eq "nosystem" )
     {
         my @tmp = grep { /^[^\/]/ } split /\s+/, $lib_dirs;
-        $lib_dirs = join $BGC::SPACE, @tmp;
+        $lib_dirs = join $SPACE, @tmp;
     }
 
     # write initial info to the bld.info file
     init_blddotinfo( $bld, $bldcmd, $lib_dirs, $opt_s, $opt_r, $opt_lib, $comment_section );
 
-    # process $BGC::BFN file DIRS section
+    # process $BFN file DIRS section
     @dirs = dirs_pro( $dirs, $opt_s );
 
     # scan EVAL and DIRS sections for variables.  if variables in EVAL but not in DIRS do warning().
     # if variables in DIRS but not in EVAL, do warning() and fatal().
     variable_match( \@eval, \@dirs );
 
-    # read $BGC::SIGFN file data into %Sigdata
+    # read $SIGFN file data into %Sigdata
     read_Blddotsig( $bld, \%Sigdata );
 
     # enable ^C interruption
@@ -413,7 +394,7 @@ use BldRoutines qw(
     #
     # Purpose    : interrupt handler, not called directly, but by the program receiving at INT signal.
     #            : this may happen in two ways - a. a ^C is typed at the keyboard during program execution and
-    #            : b. during a call to the fatal() routine.  fatal() prints it's calling msg to the $BGC::BFFN file
+    #            : b. during a call to the fatal() routine.  fatal() prints it's calling msg to the $BFFN file
     #            : and then signals an INT to the program.
     #
     # Parameters : called with the SIG name of the interrupt
@@ -451,8 +432,8 @@ use BldRoutines qw(
     # boolean to indicate that any source file was rebuilt and thus $bld will need rebuilding
     $rebuild_chgsrc = "false";
 
-    # for each directory line in $BGC::BFN, check sources and if needed rebuild with $cmd
-    # for that directory.  a source file will be rebuilt if a $BGC::SIGFN file signature entry
+    # for each directory line in $BFN, check sources and if needed rebuild with $cmd
+    # for that directory.  a source file will be rebuilt if a $SIGFN file signature entry
     # does not exist for this source file, indicating a new source file, or the source
     # file signature has changed.
 
@@ -460,16 +441,18 @@ use BldRoutines qw(
     {
         given ( $line )
         {
-            when ( m{$BGC::RGX_CMD_BLOCK} )
+            when ( m{$RGX_CMD_BLOCK} )
             {
+                my ( $cmd, $cmd_var_sub );
+
                 # DIRS section cmd block
-                my $cmd = $line;
+                $cmd = $line;
 
                 $cmd =~ s{^\{|\}$}{}g; # remove $cmd delimiters
 
-                my $cmd_var_sub = var_sub( $cmd );
+                $cmd_var_sub = var_sub( $cmd );
 
-                if ( $cmd_var_sub ne $BGC::EMPTY )
+                if ( $cmd_var_sub ne $EMPTY )
                 {
                     my ( $status, $error_msg );
 
@@ -489,18 +472,20 @@ use BldRoutines qw(
                 print "{$cmd_var_sub}\n";
                 next;
             }
-            when ( m{$BGC::RGX_VALID_DIRS_LINE} )
+            when ( m{$RGX_VALID_DIRS_LINE} )
             {
                 # DIRS section three field specification line - '[R] dir:regex:{cmds}'
 
                 # split dir lines on ":" and remove $regex_srcs enclosing '{' and '}', and $cmd enclosing '{' and '}'
-                my ($dir, $regex_srcs, $cmd) = split $BGC::COLON, $line;
+                my ($dir, $regex_srcs, $cmd) = split $COLON, $line;
 
                 # add double quotes around the source file $s in order to handle spaces in the file name
                 $cmd =~ s{\$s}{"\$s"}g;
 
                 $regex_srcs =~ s{^\{|\}$}{}g; # remove $regex_srcs regex delimiters
                 $cmd =~ s{^\{|\}$}{}g; # remove $cmd delimiters
+
+                $dir = var_sub( $dir );
 
                 opendir my ( $dirfh ), $dir;
 
@@ -512,7 +497,7 @@ use BldRoutines qw(
                 {
                     my ( $truefalse );
 
-                    $truefalse = src_pro( $s, $cmd, $bld, $opt_s, $opt_r, \%Sigdata, \%BGC::Depend, \%SigdataNew, \%SourceSig, \%Objects, \%Targets );
+                    $truefalse = src_pro( $s, $cmd, $bld, $opt_s, $opt_r, \%Sigdata, \%Depend, \%SigdataNew, \%SourceSig, \%Objects, \%Targets );
 
                     # if any $s needs rebuilding set $rebuild_chgsrc to "true"
                     if ( $truefalse eq "true" )
@@ -523,7 +508,7 @@ use BldRoutines qw(
             }
             default
             {
-                fatal("FID 18: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+                fatal("FID 18: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
             }
         }
     } # END: foreach my $line ( @dirs ){}
@@ -540,7 +525,7 @@ use BldRoutines qw(
 
     # boolean indicating to rebuild target if any of three conditions is true:
     #     1. target is missing
-    #     2. signature of target does not exist in $BGC::SIGFN signature file
+    #     2. signature of target does not exist in $SIGFN signature file
     #     3. signature of target exists in signature file but is changed from actual existing target
     $rebuild_target = rebuild_target_bool( $bld, $bldcmd, $lib_dirs, $opt_lib, \%Sigdata, \%SigdataNew );
 
@@ -600,13 +585,13 @@ use BldRoutines qw(
     # then there is a source or library of the same signature in two different places
     multiple_sigs( \%SourceSig );
 
-    # if $opt_r option is "norebuild" do not rebuild - do not touch $BGC::SIGFN file
+    # if $opt_r option is "norebuild" do not rebuild - do not touch $SIGFN file
     if ( $opt_r eq "norebuild" ) { exit 0; }
 
-    # ignore interrupts while $BGC::SIGFN is being written
+    # ignore interrupts while $SIGFN is being written
     local $SIG{INT} = 'IGNORE';
 
-    # writes %SigdataNew signature data to $BGC::SIGFN and header/code file inventory to $BGC::BIFN
+    # writes %SigdataNew signature data to $SIGFN and header/code file inventory to $BIFN
     sig_file_update( $bld, \%SigdataNew );
 
     exit 0;
@@ -615,9 +600,9 @@ use BldRoutines qw(
 
 
 #
-# SUBROUTINES SECTION - Global data dependent(only var_sub())
+# SUBROUTINES SECTION - Global data dependent(var_sub(), variable_match(), accum_blddotinfo_output(), src_pro())
 #
-#     Note: The global data is all of the variables imported from the EVAL section of the $BGC::BFN file by the eval "" of that section
+#     Note: The global data is all of the variables imported from the EVAL section of the $BFN file by the eval "" of that section
 #
 
 
@@ -638,7 +623,7 @@ use BldRoutines qw(
 #            : the return depends on calling context(see wantarray()).
 #
 # Parameters : $cmd     - command string
-#            :            Note: $cmd may have embedded newlines.  this is OK as m{\$(\w+)}g should match newlines.
+#            :            Note: $cmd may have embedded newlines.  this is OK as m{\$($RGX_PERL_VARIABLE)}g should match newlines.
 #            :
 #            : @exclude - list of variables to exclude from substitution - applies to both $cmd and %h returns.
 #            :            these variables may be specified either with or without the leading '$' sign. e.g. '$bld' or 'bld'
@@ -686,7 +671,7 @@ sub var_sub
     # find all(except from @exclude) simple perl variables($name) and, depending on the calling context,
     # either substitute their values or build a hash with variable/variable value entries.  ignore
     # entirely any %hash variables($hash{a}) or @array variables($array[0])
-    while ( $cmd =~ m{ \$(\w+)(?:\s|=) }gx )
+    while ( $cmd =~ m{ \$($RGX_PERL_VARIABLE) }gx )
     {
         my $varmatch = $1;
 
@@ -707,16 +692,6 @@ sub var_sub
 
     return $wantarray ? %h : $cmd;
 }
-
-
-#
-# SUBROUTINES SECTION - Global data independent
-#
-#     Note: All subroutine data comes from their arguments(except globally defined constants).
-#           They return all data thru their return lists.  No global data is used.  Some routines
-#           write to files e.g. bld.warn, bld.info.  Some subroutines read files in order to
-#           calculate signatures.
-#
 
 
 # 
@@ -761,7 +736,7 @@ sub variable_match
         if ( "\$s" ~~ %eval_vars )
         {
             fatal("FID 55: The scalar variable \$s may not be specified in the EVAL section, as this is used in the DIRS".
-                  " section command field to signify matched source files.");
+                                " section command field to signify matched source files.");
         }
     }
 
@@ -772,7 +747,7 @@ sub variable_match
 
         given ( $line )
         {
-            when ( m{$BGC::RGX_CMD_BLOCK} )
+            when ( m{$RGX_CMD_BLOCK} )
             {
                 # DIRS section cmd block
                 my $cmd = $line;
@@ -780,19 +755,19 @@ sub variable_match
                 my %dirs_vars_tmp = var_sub( $cmd );
                 %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
             }
-            when ( m{$BGC::RGX_VALID_DIRS_LINE} )
+            when ( m{$RGX_VALID_DIRS_LINE} )
             {
                 # DIRS section three field specification line
                 my ($dir, $regex_srcs, $cmd);
 
-                ($dir, $regex_srcs, $cmd) = split $BGC::COLON, $line;
+                ($dir, $regex_srcs, $cmd) = split $COLON, $line;
 
                 my %dirs_vars_tmp = var_sub( $cmd, '$s' );
                 %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
             }
             default
             {
-                fatal("FID 56: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+                fatal("FID 56: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
             }
         }
     }
@@ -829,12 +804,12 @@ sub variable_match
         if ( not @dirsextra == 0 )
         {
             warning("WID 17: DIRS cmd variable(s) not defined in EVAL section: @dirsextra");
-            fatal("FID 57: Extra unused variable(s) in DIRS section - see $BGC::BWFN.");
+            fatal("FID 57: Extra unused variable(s) in DIRS section - see $BWFN.");
         }
     }
 
     {
-        open my $bifnfh, ">>", $BGC::BIFN;
+        open my $bifnfh, ">>", $BIFN;
 
         # print expansion of eval{} section defined variables that appear in $cmd's
         print {$bifnfh} "\n####################################################################################################\n";
@@ -854,25 +829,25 @@ sub variable_match
 # 
 # Usage      : my ( @tmp ) = accum_blddotinfo_output( $opt_s, @dirs );
 #
-# Purpose    : accumulate lines to be printed to the $BGC::BIFN file:
+# Purpose    : accumulate lines to be printed to the $BIFN file:
 #            :     a. DIRS section specification lines with a line count number
 #            :     b. variable interpolated(except for \$s) specification line cmd field
 #            :     c. matching compilation unit source file(s)
 #            :     d. source file header dependencies
 #            :     e. check for the following error conditions:
 #            :        1. either a directory or a source file is not readable
-#            :        2. multiple build entries in $BGC::BFN file DIRS section lines matching same source file
+#            :        2. multiple build entries in $BFN file DIRS section lines matching same source file
 #            :        3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
 #            :        4. Invalid regular expression - "$regex_srcs"
 #            :        5. No '$s' variable specified in DIRS line command field
-#            :        6. No sources matched in $BGC::BFN DIRS section line $line
+#            :        6. No sources matched in $BFN DIRS section line $line
 #            :        7. Source file specified in more than one DIRS line specification
 #
 # Parameters : $opt_s - to use system header files in dependency checking("system" or "nosystem")
 #            : @dirs  - @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}' specification per array element
 #
 # Returns    : $fatal_not_readable     - either a directory or a source file is not readable
-#            : $fatal_multiple_sources - multiple build entries in $BGC::BFN file DIRS section lines matching same source file
+#            : $fatal_multiple_sources - multiple build entries in $BFN file DIRS section lines matching same source file
 #            : @bldcmds                - output for Bld.info
 #
 # Globals    : None
@@ -896,7 +871,7 @@ sub accum_blddotinfo_output
     # either a directory or a source file is not readable
     my ( $fatal_not_readable ) = "false";
 
-    # multiple build entries in $BGC::BFN file DIRS section lines matching same source file
+    # multiple build entries in $BFN file DIRS section lines matching same source file
     my ( $fatal_multiple_sources ) = "false";
 
     # hash with keys of the source file names(basename only) for detection of multiple source
@@ -915,7 +890,7 @@ sub accum_blddotinfo_output
 
 	given ( $line )
 	{
-	    when ( m{$BGC::RGX_CMD_BLOCK} )
+	    when ( m{$RGX_CMD_BLOCK} )
 	    {
 		# DIRS section cmd block
 		my $cmd = $line;
@@ -926,20 +901,23 @@ sub accum_blddotinfo_output
 		push @bldcmds, "      $cmd_var_sub\n";
 		push @bldcmds, "\n";
 	    }
-	    when ( m{$BGC::RGX_VALID_DIRS_LINE} )
+	    when ( m{$RGX_VALID_DIRS_LINE} )
 	    {
 		# DIRS section three field specification line
 		my ($dir, $regex_srcs, $cmd);
 
 		chomp $line;
-		($dir, $regex_srcs, $cmd) = split $BGC::COLON, $line;
+		($dir, $regex_srcs, $cmd) = split $COLON, $line;
+
+		# variable interpolate $dir variable
+		$dir = var_sub( $dir );
 
 		# check $dir for existence and readability
 		if ( not -e "$dir" or not -r "$dir" )
 		{
 		    {
-			open my $bffnfh, ">>", $BGC::BFFN;
-			print {$bffnfh} "Directory \"$dir\" specification in $BGC::BFN file DIRS line $count cannot be read.\n";
+			open my $bffnfh, ">>", $BFFN;
+			print {$bffnfh} "Directory \"$dir\" specification in $BFN file DIRS line $count cannot be read.\n";
 			close $bffnfh;
 		    }
 
@@ -948,13 +926,13 @@ sub accum_blddotinfo_output
 		}
 
 		# check $dir for invalid chars
-		if ( $dir !~ m{^$BGC::RGX_VALID_PATH_CHARS+$} )
+		if ( $dir !~ m{^$RGX_VALID_PATH_CHARS+$} )
 		{
-		    fatal("FID 48: Bad(really weird) char(not $BGC::RGX_VALID_PATH_CHARS) in directory specification: $dir");
+		    fatal("FID 48: Bad(really weird) char(not $RGX_VALID_PATH_CHARS) in directory specification: $dir");
 		}
 
 		# check $regex_srcs for valid regular expression
-		eval { $BGC::EMPTY =~ m{$regex_srcs} };
+		eval { $EMPTY =~ m{$regex_srcs} };
 		if ( $EVAL_ERROR )
 		{
 		    fatal("FID 49: Invalid regular expression - \"$regex_srcs\".");
@@ -992,7 +970,7 @@ sub accum_blddotinfo_output
 
 		if ( @Sources == 0 )
 		{
-		    warning("WID 12: No sources matched in $BGC::BFN DIRS section line $line");
+		    warning("WID 12: No sources matched in $BFN DIRS section line $line");
 		}
 
 		{
@@ -1039,7 +1017,7 @@ sub accum_blddotinfo_output
 			my ( @hdeps, $srcext );
 
 			# capture file name extension
-			if ( $s =~ m{.*[.]$BGC::RGX_FILE_EXT} )
+			if ( $s =~ m{.*[.]$RGX_FILE_EXT} )
 			{
 			    $srcext = $1;
 			}
@@ -1051,23 +1029,23 @@ sub accum_blddotinfo_output
 			given ( $srcext )
 			{
 			    when (
-				     $srcext ~~ $BGC::Depend{'hdr'}{'c'} or
-				     $srcext ~~ $BGC::Depend{'hdr'}{'S'} or
-				     $srcext ~~ $BGC::Depend{'hdr'}{'E'} or
-				     $srcext ~~ $BGC::Depend{'hdr'}{'n'}
+				     $srcext ~~ $Depend{'hdr'}{'c'} or
+				     $srcext ~~ $Depend{'hdr'}{'S'} or
+				     $srcext ~~ $Depend{'hdr'}{'E'} or
+				     $srcext ~~ $Depend{'hdr'}{'n'}
 				 )
 			    {
 				# $s is a hdr processible file
 				# find all header file dependencies of source file
 				@hdeps = hdr_depend( $cmd_var_sub, $s, "" );
 			    }
-			    when ( $srcext ~~ $BGC::Depend{'nothdr'}{'c'} )
+			    when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
 			    {
 				; # noop for recognizable not header file processible $srcext
 			    }
 			    default
 			    {
-				fatal("FID 52: $BGC::BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+				fatal("FID 52: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
 			    }
 			}
 
@@ -1075,7 +1053,7 @@ sub accum_blddotinfo_output
 			foreach my $h ( @hdeps )
 			{
 			    # 
-			    if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$BGC::RGX_HDR_EXT$ }x ) {next;}
+			    if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
 
 			    push @bldcmds, "              $h\n";
 			} # END: foreach my $line ( @hdeps ){}
@@ -1085,7 +1063,7 @@ sub accum_blddotinfo_output
 	    }
 	    default
 	    {
-		fatal("FID 53: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+		fatal("FID 53: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 	    }
 	} # END: given ( $line ){}
     } # END: foreach my $line ( @dirs ){}
@@ -1104,7 +1082,7 @@ sub accum_blddotinfo_output
 #            : $bld         - the target to built e.g. executable or libx.a or libx.so
 #            : $opt_s       - to use system header files in dependency checking("system" or "nosystem")
 #            : $opt_r       - to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
-#            : \%Sigdata    - hash holding $BGC::SIGFN file signature data
+#            : \%Sigdata    - hash holding $SIGFN file signature data
 #            : \%Depend     - source file extension dependencies e.g. c -> o and m -> o
 #            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
 #            : \%SourceSig  - source signatures - see above
@@ -1149,7 +1127,7 @@ sub src_pro
     ( $srcvol, $srcpath, $srcfile ) = File::Spec->splitpath( $s );
 
     # set $srcext for later use
-    if ( $srcfile =~ m{.*[.]$BGC::RGX_FILE_EXT} )
+    if ( $srcfile =~ m{.*[.]$RGX_FILE_EXT} )
     {
         $srcext = $1;
     }
@@ -1162,37 +1140,44 @@ sub src_pro
     given ( $srcext )
     {
         when (
-                 $srcext ~~ $BGC::Depend{'hdr'}{'c'} or
-                 $srcext ~~ $BGC::Depend{'hdr'}{'S'} or
-                 $srcext ~~ $BGC::Depend{'hdr'}{'E'} or
-                 $srcext ~~ $BGC::Depend{'hdr'}{'n'}
+                 $srcext ~~ $Depend{'hdr'}{'c'} or
+                 $srcext ~~ $Depend{'hdr'}{'S'} or
+                 $srcext ~~ $Depend{'hdr'}{'E'} or
+                 $srcext ~~ $Depend{'hdr'}{'n'}
              )
         {
             # $s is a hdr processible file
             $hdr = "hdr";
         }
-        when ( $srcext ~~ $BGC::Depend{'nothdr'}{'c'} )
+        when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
         {
             # $s is a not hdr processible file
             $hdr = "nothdr";
         }
         default
         {
-            fatal("FID 28: $BGC::BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+            fatal("FID 28: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
         }
     }
 
     # calculate signature of source file and save in %SigdataNew
-    $SigdataNew_tmp{$s}[$BGC::SIG_SRC] = file_sig_calc( $s );
+    $SigdataNew_tmp{$s}[$SIG_SRC] = file_sig_calc( $s );
 
     # find $VARIABLEs in $cmd and substitute EVAL section values for these variables.
     # NOTE: do 'perldoc -q "How can I expand variables in text strings"' to see a discussion
     #       of how this(s{}{}gee) works and possible alternatives.
 
     $cmd_var_sub = $cmd;
+#print "XXX1 $cmd_var_sub\n";
+#print "XXX3 $RGX_PERL_VARIABLE\n";
     no strict;
-    $cmd_var_sub =~ s{(\$\w+)}{$1}gee;
+    $cmd_var_sub =~ s{(\$$RGX_PERL_VARIABLE)}{$1}gee;
     use strict;
+#print "XXX2 $cmd_var_sub\n";
+
+
+
+
 
     # for the signature calculation only compress out '!!!'s - this makes the signature insensitive to
     # bracketing changes or added/deleted newlines.  when the cmd is executed and printed, however, the
@@ -1201,10 +1186,10 @@ sub src_pro
     $cmd_sig =~ s{!!!}{}g;
 
     # calculate signature of variable substituted source $cmd_sig
-    $SigdataNew_tmp{$s}[$BGC::SIG_CMD] = sha1_hex( $cmd_sig );
+    $SigdataNew_tmp{$s}[$SIG_CMD] = sha1_hex( $cmd_sig );
 
     # populate source signature hash %SourceSig - see definition above
-    ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$BGC::SIG_SRC]"}{$s} = undef;
+    ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
 
     # return which cmd line option(-c or -S or -E or (none of these)) is in effect
     $buildopt = buildopt( $s, $cmd_var_sub, $hdr, $srcext, $Depend_ref, $Objects_ref );
@@ -1225,16 +1210,16 @@ sub src_pro
 
         foreach my $h ( @hdeps )
         {
-            if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$BGC::RGX_HDR_EXT$ }x ) {next;}
+            if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
 
             # calculate signature of header file
             if ( not $h ~~ %SigdataNew_tmp )
             {
-                $SigdataNew_tmp{$h}[$BGC::SIG_SRC] = file_sig_calc( $h );
+                $SigdataNew_tmp{$h}[$SIG_SRC] = file_sig_calc( $h );
             }
 
             # add header files to %SigdataNew header dependencies
-            $SigdataNew_tmp{$s}[$BGC::HDR_DEP]{$h} = undef;
+            $SigdataNew_tmp{$s}[$HDR_DEP]{$h} = undef;
         } # END: foreach my $line ( @hdeps ){}
     }
 
@@ -1333,12 +1318,12 @@ sub src_pro
 
         # since the $cmd_var_sub has built successfully add the tmp data stored in the local
         # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
-        $SigdataNew_ref->{$s}[$BGC::SIG_SRC] = $SigdataNew_tmp{$s}[$BGC::SIG_SRC];
-        $SigdataNew_ref->{$s}[$BGC::SIG_CMD] = $SigdataNew_tmp{$s}[$BGC::SIG_CMD];
-        $SigdataNew_ref->{$s}[$BGC::SIG_TGT] = $SigdataNew_tmp{$s}[$BGC::SIG_TGT];
+        $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
+        $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
+        $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
 
         # populate source signature hash %SourceSig - see definition above
-        ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$BGC::SIG_SRC]"}{$s} = undef;
+        ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
 
         if ( $hdr eq "hdr" )
         {
@@ -1346,11 +1331,11 @@ sub src_pro
             {
                 if ( $h ne $s )
                 {
-                    $SigdataNew_ref->{$h}[$BGC::SIG_SRC] = $SigdataNew_tmp{$h}[$BGC::SIG_SRC];
-                    $SigdataNew_ref->{$s}[$BGC::HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$BGC::HDR_DEP]{$h};
+                    $SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
+                    $SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
 
                     # populate source signature hash %SourceSig - see definition above
-                    ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$BGC::SIG_SRC]"}{$h} = undef;
+                    ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
                 }
             }
         }
@@ -1371,12 +1356,12 @@ sub src_pro
 
         # since the $cmd_var_sub has built successfully add the tmp data stored in the local
         # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
-        $SigdataNew_ref->{$s}[$BGC::SIG_SRC] = $SigdataNew_tmp{$s}[$BGC::SIG_SRC];
-        $SigdataNew_ref->{$s}[$BGC::SIG_CMD] = $SigdataNew_tmp{$s}[$BGC::SIG_CMD];
-        $SigdataNew_ref->{$s}[$BGC::SIG_TGT] = $SigdataNew_tmp{$s}[$BGC::SIG_TGT];
+        $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
+        $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
+        $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
 
         # populate source signature hash %SourceSig - see definition above
-        ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$BGC::SIG_SRC]"}{$s} = undef;
+        ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
 
         if ( $hdr eq "hdr" )
         {
@@ -1385,53 +1370,17 @@ sub src_pro
                 if ( $h ne $s )
                 {
                     # move header file signatures and source header file dependencies to \%SigdataNew
-                    $SigdataNew_ref->{$h}[$BGC::SIG_SRC] = $SigdataNew_tmp{$h}[$BGC::SIG_SRC];
-                    $SigdataNew_ref->{$s}[$BGC::HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$BGC::HDR_DEP]{$h};
+                    $SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
+                    $SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
 
                     # populate source signature hash %SourceSig - see definition above
-                    ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$BGC::SIG_SRC]"}{$h} = undef;
+                    ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
                 }
             }
         }
 
         return "false";
     }
-}
-
-
-# 
-# Usage      : fatal("fatal msg");
-#
-# Purpose    : accept msg as arg and append it to $BFFN file, then self 'kill INT' to
-#            : call the anonymous interrupt($SIG{INT}) handler routine to croak().
-#
-# Parameters : $msg - a single scalar msg
-#
-# Returns    : Does not return
-#
-# Globals    : None
-#
-# Throws     : None
-#
-# Notes      : None
-#
-# See Also   : warning()
-#
-sub fatal
-{
-    my (
-           $msg,
-       ) = @_;
-
-    my ( $package, $filename, $line ) = caller;
-
-    open my $bffnfh, ">>", $BGC::BFFN;
-    printf {$bffnfh} "line: %4d - %s\n\n", $line, $msg;
-    close $bffnfh;
-
-    kill INT => $PID;
-
-    return;
 }
 
 1;
@@ -1444,7 +1393,7 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.1
+ bld version 1.0.2
 
 =head1 USAGE
 
@@ -1552,10 +1501,6 @@ bld [-h]
 
 =head1 PROJECT STATE
 
- State:
- 1. The testing is 80%-90% done.
- 2. The usage msg is done - the perldoc is 50%-60% done, needs a lot of work.
-
  Needed:
  1. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
     no options.  How options affect the generated code and thus the Bld files is important.
@@ -1579,7 +1524,7 @@ bld [-h]
 
 =head1 DESCRIPTION
 
- bld(1.0.1) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.2) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses SHA1
  signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
@@ -2047,7 +1992,7 @@ bld [-h]
 
  # routine: accum_blddotinfo_output()
  # the regex field of the cmd line specification did not match any source files
- warning("WID 12: No sources matched in $BGC::BFN DIRS section line $line");
+ warning("WID 12: No sources matched in $BFN DIRS section line $line");
 
  # routine: accum_blddotinfo_output()
  # warn if a source file does not exist or is not readable
@@ -2061,7 +2006,7 @@ bld [-h]
 
  # routine: dirs_pro()
  # warn and fatal if any of the following three are detected
- my $msg = "$BGC::BFN DIRS section has one or more of:\n".
+ my $msg = "$BFN DIRS section has one or more of:\n".
     "a. Directory or source file specification cannot be read\n".
     "b. No sources matched\n".
     "c. Multiple build entries matching same source file";
@@ -2088,19 +2033,19 @@ bld [-h]
 
  # routine: Bld_section_extract()
  # missing Bld file
- fatal("FID 3: $BGC::BFN file missing.");
+ fatal("FID 3: $BFN file missing.");
 
  # routine: Bld_section_extract()
  # the Bld file requires sections separated by a line with EVAL at the beginning followed by a line with DIRS at the beginning
- fatal("FID 4: $BGC::BFN invalid format - need EVAL and DIRS sections.");
+ fatal("FID 4: $BFN invalid format - need EVAL and DIRS sections.");
 
  # routine: main bld program block
  # the Bld file EVAL section requires the definition of six variables and optionally any others
- fatal("FID 5: $BGC::BFN EVAL section is empty.");
+ fatal("FID 5: $BFN EVAL section is empty.");
 
  # routine: main bld program block
  # the EVAL section is 'eval "@eval";'ed for errors
- fatal("FID 6: $BGC::BFN EVAL section: Fatal eval error: $EVAL_ERROR");
+ fatal("FID 6: $BFN EVAL section: Fatal eval error: $EVAL_ERROR");
 
  # routine: main bld program block
  # $opt_s must be either "system" or "nosystem"
@@ -2120,31 +2065,31 @@ bld [-h]
 
  # routine: main bld program block
  # $bld, $bldcmd and $lib_dirs are mandatory defines in the EVAL section
- fatal("FID 10: One or more of $BGC::BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
+ fatal("FID 10: One or more of $BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
 
  # routine: main bld program block
  # $opt_s and $opt_r and $opt_lib are mandatory defines in the EVAL section
- fatal("FID 11: One or more of $BGC::BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
+ fatal("FID 11: One or more of $BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
 
  # routine: read_Blddotsig()
  # invalid header file or library file SHA1 signature in Bld.sig file
- fatal("FID 12: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+ fatal("FID 12: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
 
  # routine: read_Blddotsig()
  # invalid source file SHA1 signature in Bld.sig file
- fatal("FID 13: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
+ fatal("FID 13: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
 
  # routine: read_Blddotsig()
  # invalid source file build cmd SHA1 signature in Bld.sig file
- fatal("FID 14: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
+ fatal("FID 14: Malformed $SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
 
  # routine: read_Blddotsig()
  # invalid source target file SHA1 signature in Bld.sig file
- fatal("FID 15: Malformed $BGC::SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
+ fatal("FID 15: Malformed $SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
 
  # routine: read_Blddotsig()
  # a line in the Bld.sig file did not match a recognized format
- fatal("FID 16: Malformed $BGC::SIGFN file - invalid format line:\n$line");
+ fatal("FID 16: Malformed $SIGFN file - invalid format line:\n$line");
 
  # routine: main bld program block
  # execution of the {} field cmds with system() failed
@@ -2152,7 +2097,7 @@ bld [-h]
 
  # routine: main bld program block
  # DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
- fatal("FID 18: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+ fatal("FID 18: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: main bld program block
  # for regexs in DIRS section '[R] dir:regex:{cmds}' specifications the regex must match at lest one source file
@@ -2192,7 +2137,7 @@ bld [-h]
 
  # routine: src_pro()
  # source files may only have valid file extensions
- fatal("FID 28: $BGC::BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+ fatal("FID 28: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
 
  # routine: buildopt()
  # the source file has an extension that does not match what is expected by the build option
@@ -2249,31 +2194,31 @@ bld [-h]
 
  # routine: dirs_pro()
  # Bld file DIRS section cannot be empty
- fatal("FID 42: $BGC::BFN DIRS section is empty.");
+ fatal("FID 42: $BFN DIRS section is empty.");
 
  # routine: cvt_dirs_to_array()
  # Bld file DIRS section line should be a cmd block({}) but does not match this pattern
- fatal("FID 43: $BGC::BFN DIRS section line is not valid(doesn't match $BGC::RGX_CMD_BLOCK): $line");
+ fatal("FID 43: $BFN DIRS section line is not valid(doesn't match $RGX_CMD_BLOCK): $line");
 
  # routine: cvt_dirs_to_array()
  # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
- fatal("FID 44: $BGC::BFN DIRS section line is not valid(doesn't match $BGC::RGX_VALID_DIRS_LINE): $dir_regex.$line");
+ fatal("FID 44: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $dir_regex.$line");
 
  # routine: cvt_dirs_to_array()
  # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
- fatal("FID 45: $BGC::BFN DIRS section line is not valid(doesn't match $BGC::RGX_VALID_DIRS_LINE): $line");
+ fatal("FID 45: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $line");
 
  # routine: dirs_pro()
  # Bld file DIRS section cannot be empty
- fatal("FID 46: $BGC::BFN DIRS section is empty.");
+ fatal("FID 46: $BFN DIRS section is empty.");
 
  # routine: dirs_pro()
  # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
- fatal("FID 47: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+ fatal("FID 47: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: accum_blddotinfo_output()
  # Bld file DIRS section directory specifications must have valid chars
- fatal("FID 48: Bad(really weird) char(not $BGC::RGX_VALID_PATH_CHARS) in directory specification: $dir");
+ fatal("FID 48: Bad(really weird) char(not $RGX_VALID_PATH_CHARS) in directory specification: $dir");
 
  # routine: accum_blddotinfo_output()
  # do eval {} on regex to determine if regex is valid
@@ -2289,18 +2234,18 @@ bld [-h]
 
  # routine: accum_blddotinfo_output()
  # source files may only have valid file extensions
- fatal("FID 52: $BGC::BFN DIRS section source file $s has no recognizable extension(see %Depend)");
+ fatal("FID 52: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
 
  # routine: accum_blddotinfo_output()
  # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
- fatal("FID 53: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+ fatal("FID 53: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: dirs_pro()
  # Bld DIRS section has one or more of:
  #     a. Directory or source file specification cannot be read
  #     b. No sources matched
  #     c. Multiple build entries matching same source file
- fatal("FID 54: $msg   - see $BGC::BWFN.\n");
+ fatal("FID 54: $msg   - see $BWFN.\n");
 
  # routine: variable_match()
  # the scalar variable '$s' may never be specified in the EVAL section
@@ -2309,11 +2254,11 @@ bld [-h]
 
  # routine: variable_match()
  # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
- fatal("FID 56: $BGC::BFN DIRS section line is incorrectly formatted(see $BGC::BIFN): $line");
+ fatal("FID 56: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
 
  # routine: variable_match()
  # variables used in DIRS section cmd fields but not defined in the EVAL section
- fatal("FID 57: Extra unused variable(s) in DIRS section - see $BGC::BWFN.");
+ fatal("FID 57: Extra unused variable(s) in DIRS section - see $BWFN.");
 
  # routine: hdr_depend()
  # doing the 'cpp' cmd on a source file failed
@@ -2350,6 +2295,8 @@ bld [-h]
 =head1 TODO/CONTEMPLATE/INVESTIGATE/EXAMINE/CHECKOUT/THINK ABOUT/HACK ON
 
    Software Development:
+
+ . add ability to interpolate perl variables in the DIRS section line specifications directory field
 
  . write executable to compare Bld.sig signatures with Bld.<project>/<version> source for security
    purposes.  with Bld.sig protected then sofware build is protected.  write executable to do
@@ -2490,6 +2437,10 @@ bld [-h]
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
+     bld-1.0.2.tar.gz - added capability to set Bld file EVAL section variables for interpolation into DIRS section
+                        directory specifications.  improved fatal() output. updated git/svn/systemd builds to
+                        Fedora21.  doc improvements.  improved exports/imports of variables/functions between
+                        bld/BGC.pm/BldRoutines.pm.
      bld-1.0.1.tar.gz - added BGC.pm for global initialized constants and BldRoutines.pm for most subroutines.
                         Rebuilt for Fedora21.  Rebuilt bld.git.git-1.9.rc0.tar.gz and bld.svn.subversion-1.8.5.tar.gz
                         for Fedora21.  Dropped bld.systemd.systemd-208.tar.gz; will add systemd-218 or above in

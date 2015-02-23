@@ -1,2 +1,10 @@
 /test
 *.o
+/bld/bld.git
+/bld/Bld.git
+/bld/bld.svn
+/bld/Bld.svn
+/bld/bld.systemd
+/bld/Bld.systemd
+/bld/bld.kernel
+/bld/Bld.kernel

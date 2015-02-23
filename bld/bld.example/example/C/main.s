@@ -21,5 +21,5 @@ main:
 	.cfi_endproc
 .LFE0:
 	.size	main, .-main
-	.ident	"GCC: (GNU) 4.9.2 20141101 (Red Hat 4.9.2-1)"
+	.ident	"GCC: (GNU) 4.9.2 20150212 (Red Hat 4.9.2-6)"
 	.section	.note.GNU-stack,"",@progbits

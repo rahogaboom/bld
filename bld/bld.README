@@ -29,10 +29,6 @@ INITIAL STEPS
 ----------------------------------------------------------------------------------------------------
 PROJECT STATE
 
- State:
- 1. The testing is 80%-90% done.
- 2. The usage msg is done - the perldoc is 50%-60% done, needs a lot of work.
-
  Needed:
  1. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
     no options.  How options affect the generated code and thus the Bld files is important.
@@ -71,6 +67,7 @@ DEPENDENCIES
         yacc(1)/flex(1)
 
     Some variation might be required on:
+        cpan install cpanm
         cpanm experimental.pm
         yum install gcc.x86_64
         yum install gcc-c++.x86_64
@@ -90,6 +87,8 @@ DEPENDENCIES
         yum install sqlite-devel.x86_64
         yum install intltool
         yum install libcap-devel
+        yum install gtk-doc
+        yum install lzma.x86_64
 
     Always remember for missing requirements that generate the following ./configure msg:
 
@@ -103,6 +102,9 @@ DEPENDENCIES
         Use: yum install "pkgconfig(foo)"
 
         Also check: http://who-t.blogspot.com/2014/05/configure-fails-with-no-package-foo.html
+
+    If the downloaded project code does not have a configure script then check for a configure.ac
+    file and run 'autoconf' with no arguments or options.  This will generate a configure script.
 
 
 ----------------------------------------------------------------------------------------------------

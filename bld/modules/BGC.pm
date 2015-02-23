@@ -6,7 +6,44 @@
 
 package BGC
 {
-    $VERSION = "1.0.1";
+    use vars qw(@ISA @EXPORT);
+    require Exporter;
+    @ISA = qw(Exporter);
+    @EXPORT = qw (
+                     $VERSION
+                     $SIGFN
+                     $BFN
+                     $BGVFN
+                     $BIFN
+                     $BWFN
+                     $BFFN
+                     $USAGE
+                     $SIG_SRC
+                     $SIG_CMD
+                     $SIG_TGT
+                     $HDR_DEP
+                     $LIB_DEP
+                     $RGX_HDR_EXT
+                     $RGX_SRC_EXT
+                     $RGX_FILE_EXT
+                     $RGX_VALID_PATH_CHARS
+                     $RGX_VALID_DIRS_LINE
+                     $RGX_PERL_VARIABLE
+                     $RGX_BLANK_LINE
+                     $RGX_COMMENT_LINE
+                     $RGX_CMD_BLOCK
+                     $RGX_LIBS
+                     $COLON
+                     $EMPTY
+                     $SPACE
+                     %Depend
+                 );
+
+    use warnings;
+    use diagnostics;
+    use autodie;
+
+    $VERSION = "1.0.2";
 
     # file names
     $SIGFN = "Bld.sig";       # SIGnature File Name
@@ -129,6 +166,9 @@ package BGC
                                        .*: # regex field
                                        .*$ # cmd field
                                   }x;
+
+        # match a perl variable
+        $RGX_PERL_VARIABLE    = qr{ [A-Za-z_][A-Za-z0-9_]* }x;
 
         # match a blank line
         $RGX_BLANK_LINE       = qr{ ^\s*$ }x;

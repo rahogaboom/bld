@@ -1,19 +1,19 @@
 
 OS: linux
 
-bld version: 1.0.1
+bld version: 1.0.2
 
 perl full path: /usr/bin/perl
 perl version: Summary of my perl5 (revision 5 version 18 subversion 4) configuration:
 
 cpp full path: /usr/bin/cpp
-cpp version: cpp (GCC) 4.9.2 20141101 (Red Hat 4.9.2-1)
+cpp version: cpp (GCC) 4.9.2 20150212 (Red Hat 4.9.2-6)
 
 gcc full path: /usr/bin/gcc
-gcc version: gcc (GCC) 4.9.2 20141101 (Red Hat 4.9.2-1)
+gcc version: gcc (GCC) 4.9.2 20150212 (Red Hat 4.9.2-6)
 
 g++ full path: /usr/bin/g++
-g++ version: g++ (GCC) 4.9.2 20141101 (Red Hat 4.9.2-1)
+g++ version: g++ (GCC) 4.9.2 20150212 (Red Hat 4.9.2-6)
 
 clang full path: /usr/bin/clang
 clang version: clang version 3.5.0 (tags/RELEASE_350/final)
@@ -82,7 +82,7 @@ a. DIRS section specification lines
 
 ----------
    1  bld.example/example/C:^main\.c$:{\nif [ "$COND" == 'a' ];\nthen\n$CC -S $INCLUDE $s;\nfi\nif [ "$COND" == 'b' ];\nthen\n$CC -O4 -S $INCLUDE $s;\nfi\n}
-      {\nif [ "$COND" == 'a' ];\nthen\ngcc -S -I bld.example/example/include $s;\nfi\nif [ "$COND" == 'b' ];\nthen\ngcc -O4 -S -I bld.example/example/include $s;\nfi\n}
+      {\nif [ "a" == 'a' ];\nthen\ngcc -S -I bld.example/example/include $s;\nfi\nif [ "$COND" == 'b' ];\nthen\n$CC -O4 -S $INCLUDE $s;\nfi\n}
           bld.example/example/C/main.c
               /usr/include/_G_config.h
               /usr/include/sys/cdefs.h
@@ -108,7 +108,7 @@ a. DIRS section specification lines
 
 ----------
    2  {\nls $LSOPTIONS;\n}
-      {\nls $LSOPTIONS;\n}
+      {\nls -l;\n}
 
 ----------
    3  bld.example/example/C:^g\.x\.C$:{\n$CC -c $INCLUDE $s;\n}
@@ -147,7 +147,7 @@ a. DIRS section specification lines
 
 ----------
    5  bld.example/example/C:^(h|i)\.c$:{ls -l $s;$CC -c $INCLUDE $s;}
-      {ls -l $s;gcc -c -I bld.example/example/include $s;}
+      {ls -l $s;$CC -c $INCLUDE $s;}
           bld.example/example/C/i.c
               /usr/include/stdc-predef.h
               bld.example/example/C/../include/head.h
