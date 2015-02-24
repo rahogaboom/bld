@@ -49,7 +49,7 @@ use Digest::SHA qw(
 # installed modules
 #
 
-#use Modern::Perl 2011;
+#use Modern::Perl 2014;
 
 # this module allows the use of experimental perl language features(given, when, ~~) without generating warnings.
 # to see exactly where smartmatch features are being used just comment out this line.  bld will run, but with warnings
@@ -450,15 +450,17 @@ use BldRoutines;
 
                 $cmd =~ s{^\{|\}$}{}g; # remove $cmd delimiters
 
+                # interpolate perl variables in $cmd
                 $cmd_var_sub = var_sub( $cmd );
 
                 if ( $cmd_var_sub ne $EMPTY )
                 {
                     my ( $status, $error_msg );
 
+                    # convert '!!!' strings back to newlines for execution
                     $cmd_var_sub =~ s{!!!}{\n}g;
 
-                    # execute $cmd's
+                    # execute $cmd_var_sub's
                     $status = system "$cmd_var_sub";
 
                     if ( $status != 0 )
@@ -487,6 +489,7 @@ use BldRoutines;
                 $regex_srcs =~ s{^\{|\}$}{}g; # remove $regex_srcs regex delimiters
                 $cmd =~ s{^\{|\}$}{}g; # remove $cmd delimiters
 
+                # interpolate perl variables in $dir
                 $dir = var_sub( $dir );
 
                 opendir my ( $dirfh ), $dir;
@@ -612,7 +615,7 @@ use BldRoutines;
 
 
 #
-# SUBROUTINES SECTION - Global data dependent(var_sub())
+# SUBROUTINES SECTION - Global data dependent(only var_sub())
 #
 #     Note: The global data is all of the variables imported from the EVAL section of the $BFN file by the eval "" of that section
 #
@@ -1618,22 +1621,16 @@ bld [-h]
 
    Software Development:
 
- . add ability to interpolate perl variables in the DIRS section line specifications directory field
-
- . write executable to compare Bld.sig signatures with Bld.<project>/<version> source for security
-   purposes.  with Bld.sig protected then sofware build is protected.  write executable to do
+ . write new executable to compare Bld.sig signatures with Bld.<project>/<version> source for security
+   purposes.  with Bld.sig protected then sofware build is protected.  write new executable to do
    Bld.sig signature compare against source for all the targets in a project build.
 
  . investigate `cd Bld.systemd/systemd-208; ldd ` cd before ldd
-
- . investigate elimination of -L(use lib_dirs?) option in Bld.<project>.<target> files
 
  . check: is $lib_dirs working? does this require a full path? 
 
  . Bld.example/example/Bld.example.rdx-c - mod rdx to delete() and search() on from one to n keys
        - do not require the full set of keys - should be easy
-
- . Use Modern::Perl with bld
 
  . Use Find::File::Rule and File::Slurp in bld
 
@@ -1701,7 +1698,7 @@ bld [-h]
 
    Release:
 
- . on release ask for users to compile new projects and incorporate them into a Release bld.<project>.<version>.tar.gx file
+ . on release ask for users to compile new projects and incorporate them into a Release bld.<project>.<version>.tar.gz file
  . slide presentation
  . article
  . LLVM community
@@ -1719,14 +1716,13 @@ bld [-h]
  . note on how to build both static and dynamic libraries
  . why no 'include' DIRS directive?
  . exit codes 0=success, 255=error - see bld.*
- . EVAL section %@ defines are ignored - only scalar variables - $cmd to EVAL 0
+ . EVAL section %@ defines are ignored - only scalar variables - $cmd to EVAL
  . if a source is moved it will rebuild since the Bld.sig signature is keyed to the source
        file and it's path from the bld parent directory
  . same basename with different extensions will fail and same basename with same extension
        in different locations will fail because same named object will be created
  . symbolic links to source files should work - a file in one place and a link to that same
        file in another place will be detected/warned/fatal
- . g++ is installed with the gcc-c++ package
 
    Consult:
 

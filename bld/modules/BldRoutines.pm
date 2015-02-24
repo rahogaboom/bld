@@ -72,7 +72,7 @@ package BldRoutines
     # installed modules
     #
 
-    #use Modern::Perl 2011;
+    #use Modern::Perl 2014;
 
     # this module allows the use of experimental perl language features(given, when, ~~) without generating warnings.
     # to see exactly where smartmatch features are being used just comment out this line.  bld will run, but with warnings
@@ -81,7 +81,7 @@ package BldRoutines
 
 
     #
-    # SUBROUTINES SECTION - Global data independent
+    # GLOBAL DATA INDEPENDENT SUBROUTINES
     #
     #     Note: All subroutine data comes from their arguments(except globally defined constants).
     #           They return all data thru their return lists.  No global data is used.  Some routines
@@ -96,7 +96,7 @@ package BldRoutines
     # Purpose    : source file processing
     #
     # Parameters : $s           - code source file
-    #            : $cmd_var_sub - rebuild cmds
+    #            : $cmd_var_sub - rebuild cmds - all perl variables should already be interpolated
     #            : $bld         - the target to built e.g. executable or libx.a or libx.so
     #            : $opt_s       - to use system header files in dependency checking("system" or "nosystem")
     #            : $opt_r       - to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
@@ -204,6 +204,8 @@ package BldRoutines
 
 	if ( $hdr eq "hdr" )
 	{
+	    my ( @hdeps );
+
 	    # calculate signatures of header files for this source code file($s).
 	    # For each header file $h(in @hdeps):
 	    #     a. add $SigdataNew{$h}[SIG_SRC] = sha1_hex( $h );
@@ -211,7 +213,7 @@ package BldRoutines
 
 	    # for interpolated $cmd_var_sub of this source find the header file dependencies.
 	    # do not require header files to be searched for in the path(-MG).
-	    my @hdeps = hdr_depend( $cmd_var_sub, $s, "-MG" );
+	    @hdeps = hdr_depend( $cmd_var_sub, $s, "-MG" );
 
 	    foreach my $h ( @hdeps )
 	    {
@@ -308,7 +310,9 @@ package BldRoutines
 		# to the directory of the $s source
 		while ( @difference )
 		{
-		    my $newfile = shift @difference;
+		    my ( $newfile );
+
+		    $newfile = shift @difference;
 
 		    $status = system "mv", "$newfile", "$srcpath";
 
@@ -459,7 +463,7 @@ package BldRoutines
 		    my $cmd = $line;
 
 		    # variable interpolate cmd block
-		    my $cmd_var_sub =&main::var_sub( $cmd );
+		    my $cmd_var_sub = &main::var_sub( $cmd );
 
 		    push @bldcmds, "      $cmd_var_sub\n";
 		    push @bldcmds, "\n";
@@ -473,7 +477,7 @@ package BldRoutines
 		    ($dir, $regex_srcs, $cmd) = split $COLON, $line;
 
 		    # variable interpolate $dir variable
-		    $dir =&main::var_sub( $dir );
+		    $dir = &main::var_sub( $dir );
 
 		    # check $dir for existence and readability
 		    if ( not -e "$dir" or not -r "$dir" )
@@ -502,7 +506,7 @@ package BldRoutines
 		    }
 
 		    # variable interpolate $cmd - exclude $s interpolation
-		    my $cmd_var_sub =&main::var_sub( $cmd, '$s' );
+		    my $cmd_var_sub = &main::var_sub( $cmd, '$s' );
 
 		    # scan $cmd_var_sub for '$s' and fatal() if none found and warning() if more than one found
 		    {
@@ -1788,7 +1792,7 @@ package BldRoutines
 	    #        5. No '$s' variable specified in DIRS line command field
 	    #        6. No sources matched in $BFN DIRS section line $line
 	    #        7. Source file specified in more than one DIRS line specification
-	    my ( @tmp ) = &main::accum_blddotinfo_output( $opt_s, @dirs );
+	    my ( @tmp ) = accum_blddotinfo_output( $opt_s, @dirs );
 
 	    my $fatal_not_readable = shift @tmp;
 	    my $fatal_multiple_sources = shift @tmp;
@@ -2694,7 +2698,7 @@ package BldRoutines
 
 
     #
-    # file local routines
+    # FILE LOCAL SUBROUTINES
     #
  
     # 
