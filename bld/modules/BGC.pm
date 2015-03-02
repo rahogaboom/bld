@@ -43,7 +43,7 @@ package BGC
     use diagnostics;
     use autodie;
 
-    $VERSION = "1.0.2";
+    $VERSION = "1.0.3";
 
     # file names
     $SIGFN = "Bld.sig";       # SIGnature File Name
@@ -75,11 +75,11 @@ package BGC
              "     The following are examples of bld'ing complex multi-target projects.  They are\n".
              "     provided with releases. Unpack them in the main bld directory in the same place as\n".
              "     the bld.example and Bld.example directories:\n".
-             "         bld.git.git-1.9.rc0.tar.gz -\n".
+             "         bld-$BGC::VERSION-git.tar.xz -\n".
              "             the git project http://git-scm.com/\n".
-             "         bld.svn.subversion-1.8.5.tar.gz -\n".
+             "         bld-$BGC::VERSION-svn.tar.xz -\n".
              "             the subversion project http://subversion.apache.org/\n".
-             "         bld.systemd.systemd-208.tar.gz -\n".
+             "         bld-$BGC::VERSION-systemd.tar.xz -\n".
              "             the systemd project http://www.freedesktop.org/wiki/Software/systemd/\n\n".
              " Dependencies:\n".
              "     Required for execution:\n".

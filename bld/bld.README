@@ -45,7 +45,7 @@ PROJECT STATE
     with the new versions is welcome.
 
  5. I need someone with substantial experience building the linux kernel to advise me or partner
-    with me on the construction of 3.19 or later.
+    with me on the construction of 4.0 or later.
 
  6. If you successfully bld a new project and wish to contribute the bld, please do so.  I'm 
     interested in how others construct/organize/document/debug projects and their Bld files.
@@ -60,15 +60,15 @@ DEPENDENCIES
         experimental.pm(3pm) - for smartmatch and switch features
         cpp(1) - gnu cpp cmd is required for dependency determination
         ldd(1) - used for library dependency determination
+        cpan install cpanm
+        cpanm experimental.pm
 
     Required for test:
         gcc(1)/g++(1) (http://gcc.gnu.org/)
         clang(1) (http://llvm.org/)
         yacc(1)/flex(1)
 
-    Some variation might be required on:
-        cpan install cpanm
-        cpanm experimental.pm
+    Some variation might be required on(all for git, svn, systemd test):
         yum install gcc.x86_64
         yum install gcc-c++.x86_64
         yum install gcc-objc.x86_64
@@ -89,6 +89,7 @@ DEPENDENCIES
         yum install libcap-devel
         yum install gtk-doc
         yum install lzma.x86_64
+        yum install libmount-devel.x86_64
 
     Always remember for missing requirements that generate the following ./configure msg:
 
@@ -519,10 +520,11 @@ Bld FILE FORMAT
 NOTES
 
     1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
-       have the same root name as the source.
+       have the same root name as the source.  of course, a subsequent Bld file {} block can rename
+       and move the .o files.
 
     2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
-       into the same project directory.
+       into the same project directory before distribution for installation.
 
     3. Some projects violate either or both of these target naming or object file naming/location
        requirements, but reconstructing these projects with bld should be relatively easy

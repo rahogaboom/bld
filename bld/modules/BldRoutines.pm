@@ -53,13 +53,8 @@ package BldRoutines
                              extract_bracketed
                          );
 
-    # croak() - used in fatal() to die with better info than die()
-    # cluck() - used for full stack trace debugging, outputs to stdout
-    # shortmess() - used for full stack trace debugging, returns stack trace
+    # longmess() - used for full stack trace debugging, returns stack trace
     use Carp qw(
-                   croak
-                   cluck
-                   shortmess
                    longmess
                );
 
@@ -119,277 +114,286 @@ package BldRoutines
     #
     sub src_pro
     {
-	my (
-	       $s,
-	       $cmd_var_sub,
-	       $bld,
-	       $opt_s,
-	       $opt_r,
-	       $Sigdata_ref,
-	       $Depend_ref,
-	       $SigdataNew_ref,
-	       $SourceSig_ref,
-	       $Objects_ref,
-	       $Targets_ref,
-	   ) = @_;
+        my (
+               $s,
+               $cmd_var_sub,
+               $bld,
+               $opt_s,
+               $opt_r,
+               $Sigdata_ref,
+               $Depend_ref,
+               $SigdataNew_ref,
+               $SourceSig_ref,
+               $Objects_ref,
+               $Targets_ref,
+           ) = @_;
 
-	fatal("FID 26: src_pro(): wrong number of args") if @_ != 11;
-
-	my ( $hdr, $srcext, $tgtextorfile );
-	my ( $buildopt );
-	my ( $srcvol, $srcpath, $srcfile );
-	my ( %SigdataNew_tmp );
-
-
-	( $srcvol, $srcpath, $srcfile ) = File::Spec->splitpath( $s );
-
-	# set $srcext for later use
-	if ( $srcfile =~ m{.*[.]$RGX_FILE_EXT} )
-	{
-	    $srcext = $1;
-	}
-	else
-	{
-	    fatal("FID 27: Valid file extension not found in $s");
-	}
-
-	# set $hdr to indicate the $s source file is or is not header processible
-	given ( $srcext )
-	{
-	    when (
-		     $srcext ~~ $Depend{'hdr'}{'c'} or
-		     $srcext ~~ $Depend{'hdr'}{'S'} or
-		     $srcext ~~ $Depend{'hdr'}{'E'} or
-		     $srcext ~~ $Depend{'hdr'}{'n'}
-		 )
-	    {
-		# $s is a hdr processible file
-		$hdr = "hdr";
-	    }
-	    when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
-	    {
-		# $s is a not hdr processible file
-		$hdr = "nothdr";
-	    }
-	    default
-	    {
-		fatal("FID 28: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
-	    }
-	}
-
-	# calculate signature of source file and save in %SigdataNew
-	$SigdataNew_tmp{$s}[$SIG_SRC] = file_sig_calc( $s );
-
+        if ( @_ != 11 )
         {
-	    my ( $cmd_sig );
-
-	    # for the signature calculation only compress out '!!!'s - this makes the signature insensitive to
-	    # bracketing changes or added/deleted newlines.  when the cmd is executed and printed, however, the
-	    # '!!!'s will be translated back to newlines.
-	    $cmd_sig = $cmd_var_sub;
-	    $cmd_sig =~ s{!!!}{}g;
-
-	    # calculate signature of variable substituted source $cmd_sig
-	    $SigdataNew_tmp{$s}[$SIG_CMD] = sha1_hex( $cmd_sig );
+            my $msg = "FATAL: src_pro(): wrong number of args";
+            fatal($msg);
         }
 
-	# populate source signature hash %SourceSig - see definition above
-	${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
+        my ( $hdr, $srcext, $tgtextorfile );
+        my ( $buildopt );
+        my ( $srcvol, $srcpath, $srcfile );
+        my ( %SigdataNew_tmp );
 
-	# return which cmd line option(-c or -S or -E or (none of these)) is in effect
-	$buildopt = buildopt( $s, $cmd_var_sub, $hdr, $srcext, $Depend_ref, $Objects_ref );
 
-	# return the $s target extension or file name
-	$tgtextorfile = tgtextorfile( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, \%SigdataNew_tmp, $Depend_ref );
+        ( $srcvol, $srcpath, $srcfile ) = File::Spec->splitpath( $s );
 
-	if ( $hdr eq "hdr" )
-	{
-	    my ( @hdeps );
+        # set $srcext for later use
+        if ( $srcfile =~ m{.*[.]$RGX_FILE_EXT} )
+        {
+            $srcext = $1;
+        }
+        else
+        {
+            my $msg = sprintf "FATAL: Valid file extension not found in %s", $s;
+            fatal($msg);
+        }
 
-	    # calculate signatures of header files for this source code file($s).
-	    # For each header file $h(in @hdeps):
-	    #     a. add $SigdataNew{$h}[SIG_SRC] = sha1_hex( $h );
-	    #     b. add $SigdataNew{$s}[HDR_DEP]{$h} = undef;
+        # set $hdr to indicate the $s source file is or is not header processible
+        given ( $srcext )
+        {
+            when (
+                     $srcext ~~ $Depend{'hdr'}{'c'} or
+                     $srcext ~~ $Depend{'hdr'}{'S'} or
+                     $srcext ~~ $Depend{'hdr'}{'E'} or
+                     $srcext ~~ $Depend{'hdr'}{'n'}
+                 )
+            {
+                # $s is a hdr processible file
+                $hdr = "hdr";
+            }
+            when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
+            {
+                # $s is a not hdr processible file
+                $hdr = "nothdr";
+            }
+            default
+            {
+                my $msg = sprintf "FATAL: %s DIRS section source file %s has no recognizable extension(see %Depend)", $BFN, $s;
+                fatal($msg);
+            }
+        }
 
-	    # for interpolated $cmd_var_sub of this source find the header file dependencies.
-	    # do not require header files to be searched for in the path(-MG).
-	    @hdeps = hdr_depend( $cmd_var_sub, $s, "-MG" );
+        # calculate signature of source file and save in %SigdataNew
+        $SigdataNew_tmp{$s}[$SIG_SRC] = file_sig_calc( $s );
 
-	    foreach my $h ( @hdeps )
-	    {
-		if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
+        {
+            my ( $cmd_sig );
 
-		# calculate signature of header file
-		if ( not $h ~~ %SigdataNew_tmp )
-		{
-		    $SigdataNew_tmp{$h}[$SIG_SRC] = file_sig_calc( $h );
-		}
+            # for the signature calculation only compress out '!!!'s - this makes the signature insensitive to
+            # bracketing changes or added/deleted newlines.  when the cmd is executed and printed, however, the
+            # '!!!'s will be translated back to newlines.
+            $cmd_sig = $cmd_var_sub;
+            $cmd_sig =~ s{!!!}{}g;
 
-		# add header files to %SigdataNew header dependencies
-		$SigdataNew_tmp{$s}[$HDR_DEP]{$h} = undef;
-	    } # END: foreach my $line ( @hdeps ){}
-	}
+            # calculate signature of variable substituted source $cmd_sig
+            $SigdataNew_tmp{$s}[$SIG_CMD] = sha1_hex( $cmd_sig );
+        }
 
-	# DEBUG
+        # populate source signature hash %SourceSig - see definition above
+        ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
+
+        # return which cmd line option(-c or -S or -E or (none of these)) is in effect
+        $buildopt = buildopt( $s, $cmd_var_sub, $hdr, $srcext, $Depend_ref, $Objects_ref );
+
+        # return the $s target extension or file name
+        $tgtextorfile = tgtextorfile( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, \%SigdataNew_tmp, $Depend_ref );
+
+        if ( $hdr eq "hdr" )
+        {
+            my ( @hdeps );
+
+            # calculate signatures of header files for this source code file($s).
+            # For each header file $h(in @hdeps):
+            #     a. add $SigdataNew{$h}[SIG_SRC] = sha1_hex( $h );
+            #     b. add $SigdataNew{$s}[HDR_DEP]{$h} = undef;
+
+            # for interpolated $cmd_var_sub of this source find the header file dependencies.
+            # do not require header files to be searched for in the path(-MG).
+            @hdeps = hdr_depend( $cmd_var_sub, $s, "-MG" );
+
+            foreach my $h ( @hdeps )
+            {
+                if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
+
+                # calculate signature of header file
+                if ( not $h ~~ %SigdataNew_tmp )
+                {
+                    $SigdataNew_tmp{$h}[$SIG_SRC] = file_sig_calc( $h );
+                }
+
+                # add header files to %SigdataNew header dependencies
+                $SigdataNew_tmp{$s}[$HDR_DEP]{$h} = undef;
+            } # END: foreach my $line ( @hdeps ){}
+        }
+
+        # DEBUG
 =for
-	print "DEBUG:\n".
-	      "\$s = $s\n".
-	      "\$buildopt = $buildopt\n".
-	      "\$srcext = $srcext\n".
-	      "\$tgtextorfile = $tgtextorfile\n".
-	      "\$srcvol = $srcvol\n".
-	      "\$srcpath = $srcpath\n".
-	      "\$srcfile = $srcfile\n".
-	      "ENDDEBUG\n";
+        print "DEBUG:\n".
+              "\$s = $s\n".
+              "\$buildopt = $buildopt\n".
+              "\$srcext = $srcext\n".
+              "\$tgtextorfile = $tgtextorfile\n".
+              "\$srcvol = $srcvol\n".
+              "\$srcpath = $srcpath\n".
+              "\$srcfile = $srcfile\n".
+              "ENDDEBUG\n";
 =cut
 
-	# see if $s should be rebuilt by testing %Sigdata against %SigdataNew
-	if ( rebuild_src_bool( $s, $tgtextorfile, $Sigdata_ref, \%SigdataNew_tmp ) eq "true" )
-	{
-	    # print source file names that will be rebuilt, but do not rebuild
-	    if ( $opt_r eq "norebuild" )
-	    {
-		print "---WILL--- be rebuilt: $s\n";
-	    }
-	    else
-	    {
-		my ( $status, $error_msg );
-		my ( %before, %after, @difference );
-		my ( $dirfh );
+        # see if $s should be rebuilt by testing %Sigdata against %SigdataNew
+        if ( rebuild_src_bool( $s, $tgtextorfile, $Sigdata_ref, \%SigdataNew_tmp ) eq "true" )
+        {
+            # print source file names that will be rebuilt, but do not rebuild
+            if ( $opt_r eq "norebuild" )
+            {
+                print "---WILL--- be rebuilt: $s\n";
+            }
+            else
+            {
+                my ( $status, $error_msg );
+                my ( %before, %after, @difference );
+                my ( $dirfh );
 
-		# create hash of files in the bld directory before "$cmd_var_sub" execution
-		opendir $dirfh, ".";
-		while ( readdir $dirfh )
-		{
-		    $_ =~ s{\n}{};
-		    $before{"$_"} = undef;
-		}
-		closedir $dirfh;
+                # create hash of files in the bld directory before "$cmd_var_sub" execution
+                opendir $dirfh, ".";
+                while ( readdir $dirfh )
+                {
+                    $_ =~ s{\n}{};
+                    $before{"$_"} = undef;
+                }
+                closedir $dirfh;
 
-		$cmd_var_sub =~ s{!!!}{\n}g;
+                $cmd_var_sub =~ s{!!!}{\n}g;
 
-		# execute $cmd's
-		$status = system "$cmd_var_sub";
+                # execute $cmd's
+                $status = system "$cmd_var_sub";
 
-		if ( $status != 0 )
-		{
-		    $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                if ( $status != 0 )
+                {
+                    $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-		    fatal("FID 36: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
-		}
+                    my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $status;
+                    fatal($msg);
+                }
 
-		print "$cmd_var_sub\n";
+                print "$cmd_var_sub\n";
 
-		# create hash of files in the bld directory after "$cmd_var_sub" execution
-		opendir $dirfh, ".";
-		while ( readdir $dirfh )
-		{
-		    $_ =~ s{\n}{};
-		    $after{"$_"} = undef;
-		}
-		closedir $dirfh;
+                # create hash of files in the bld directory after "$cmd_var_sub" execution
+                opendir $dirfh, ".";
+                while ( readdir $dirfh )
+                {
+                    $_ =~ s{\n}{};
+                    $after{"$_"} = undef;
+                }
+                closedir $dirfh;
 
-		# create array of new files created by "$cmd_var_sub" execution
-		foreach my $f ( keys %after )
-		{
-		    if ( not exists $before{$f} )
-		    {
-			push @difference, $f;
-		    }
-		}
+                # create array of new files created by "$cmd_var_sub" execution
+                foreach my $f ( keys %after )
+                {
+                    if ( not exists $before{$f} )
+                    {
+                        push @difference, $f;
+                    }
+                }
 
-		if ( @difference == 0 )
-		{
-		    fatal("FID 37: No new target files created by command:\nCmd: \"$cmd_var_sub\"");
-		}
+                if ( @difference == 0 )
+                {
+                    my $msg = sprintf "FATAL: No new target files created by command:\nCmd: \"%s\"", $cmd_var_sub;
+                    fatal($msg);
+                }
 
-		# 
-		tgt_signature( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, \%SigdataNew_tmp, $Depend_ref, \@difference, $Targets_ref);
+                # 
+                tgt_signature( $s, $hdr, $srcext, $srcpath, $srcfile, $buildopt, \%SigdataNew_tmp, $Depend_ref, \@difference, $Targets_ref);
 
-		# move all new files in the bld directory created by "$cmd_var_sub" execution
-		# to the directory of the $s source
-		while ( @difference )
-		{
-		    my ( $newfile );
+                # move all new files in the bld directory created by "$cmd_var_sub" execution
+                # to the directory of the $s source
+                while ( @difference )
+                {
+                    my ( $newfile );
 
-		    $newfile = shift @difference;
+                    $newfile = shift @difference;
 
-		    $status = system "mv", "$newfile", "$srcpath";
+                    $status = system "mv", "$newfile", "$srcpath";
 
-		    if ( $status != 0 )
-		    {
-			$error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                    if ( $status != 0 )
+                    {
+                        $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-			fatal("FID 41: Error msg: $error_msg\n\"mv $newfile $srcpath\" fail status: $status");
-		    }
-		}
-	    }
+                        my $msg = sprintf "FATAL: Error msg: %s\n\"mv %s %s\" fail status: %s", $error_msg, $newfile, $srcpath, $status;
+                        fatal($msg);
+                    }
+                }
+            }
 
-	    # since the $cmd_var_sub has built successfully add the tmp data stored in the local
-	    # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
-	    $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
-	    $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
-	    $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
+            # since the $cmd_var_sub has built successfully add the tmp data stored in the local
+            # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
+            $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
+            $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
+            $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
 
-	    # populate source signature hash %SourceSig - see definition above
-	    ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
+            # populate source signature hash %SourceSig - see definition above
+            ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
 
-	    if ( $hdr eq "hdr" )
-	    {
-		foreach my $h ( keys %SigdataNew_tmp )
-		{
-		    if ( $h ne $s )
-		    {
-			$SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
-			$SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
+            if ( $hdr eq "hdr" )
+            {
+                foreach my $h ( keys %SigdataNew_tmp )
+                {
+                    if ( $h ne $s )
+                    {
+                        $SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
+                        $SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
 
-			# populate source signature hash %SourceSig - see definition above
-			${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
-		    }
-		}
-	    }
+                        # populate source signature hash %SourceSig - see definition above
+                        ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
+                    }
+                }
+            }
 
-	    return "true";
-	}
-	else
-	{
-	    # print source file names that will not be rebuilt
-	    if ( $opt_r eq "norebuild" )
-	    {
-		print "$s will NOT be rebuilt.\n";
-	    }
-	    else
-	    {
-		print "$s is up to date.\n";
-	    }
+            return "true";
+        }
+        else
+        {
+            # print source file names that will not be rebuilt
+            if ( $opt_r eq "norebuild" )
+            {
+                print "$s will NOT be rebuilt.\n";
+            }
+            else
+            {
+                print "$s is up to date.\n";
+            }
 
-	    # since the $cmd_var_sub has built successfully add the tmp data stored in the local
-	    # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
-	    $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
-	    $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
-	    $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
+            # since the $cmd_var_sub has built successfully add the tmp data stored in the local
+            # hash %SigdataNew_tmp to the passed in \%SigdataNew hash references
+            $SigdataNew_ref->{$s}[$SIG_SRC] = $SigdataNew_tmp{$s}[$SIG_SRC];
+            $SigdataNew_ref->{$s}[$SIG_CMD] = $SigdataNew_tmp{$s}[$SIG_CMD];
+            $SigdataNew_ref->{$s}[$SIG_TGT] = $SigdataNew_tmp{$s}[$SIG_TGT];
 
-	    # populate source signature hash %SourceSig - see definition above
-	    ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
+            # populate source signature hash %SourceSig - see definition above
+            ${$SourceSig_ref}{"$SigdataNew_tmp{$s}[$SIG_SRC]"}{$s} = undef;
 
-	    if ( $hdr eq "hdr" )
-	    {
-		foreach my $h ( keys %SigdataNew_tmp )
-		{
-		    if ( $h ne $s )
-		    {
-			# move header file signatures and source header file dependencies to \%SigdataNew
-			$SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
-			$SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
+            if ( $hdr eq "hdr" )
+            {
+                foreach my $h ( keys %SigdataNew_tmp )
+                {
+                    if ( $h ne $s )
+                    {
+                        # move header file signatures and source header file dependencies to \%SigdataNew
+                        $SigdataNew_ref->{$h}[$SIG_SRC] = $SigdataNew_tmp{$h}[$SIG_SRC];
+                        $SigdataNew_ref->{$s}[$HDR_DEP]{$h} = $SigdataNew_tmp{$s}[$HDR_DEP]{$h};
 
-			# populate source signature hash %SourceSig - see definition above
-			${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
-		    }
-		}
-	    }
+                        # populate source signature hash %SourceSig - see definition above
+                        ${$SourceSig_ref}{"$SigdataNew_tmp{$h}[$SIG_SRC]"}{$h} = undef;
+                    }
+                }
+            }
 
-	    return "false";
-	}
+            return "false";
+        }
     }
 
 
@@ -408,14 +412,12 @@ package BldRoutines
     #            :        4. Invalid regular expression - "$regex_srcs"
     #            :        5. No '$s' variable specified in DIRS line command field
     #            :        6. No sources matched in $BFN DIRS section line $line
-    #            :        7. Source file specified in more than one DIRS line specification
+    #            :        7. Same source file specified in more than one DIRS line specification
     #
     # Parameters : $opt_s - to use system header files in dependency checking("system" or "nosystem")
     #            : @dirs  - @dirs will have one cmd block({}) or one '[R] dir:regex:{cmds}' specification per array element
     #
-    # Returns    : $fatal_not_readable     - either a directory or a source file is not readable
-    #            : $fatal_multiple_sources - multiple build entries in $BFN file DIRS section lines matching same source file
-    #            : @bldcmds                - output for Bld.info
+    # Returns    : @bldcmds - output for Bld.info
     #
     # Globals    : None
     #
@@ -427,215 +429,263 @@ package BldRoutines
     #
     sub accum_blddotinfo_output
     {
-	my (
-	       $opt_s,
-	       @dirs,
-	   ) = @_;
+        my (
+               $opt_s,
+               @dirs,
+           ) = @_;
 
-	# output for Bld.info
-	my ( @bldcmds );
+        # output for Bld.info
+        my ( @bldcmds );
 
-	# either a directory or a source file is not readable
-	my ( $fatal_not_readable ) = "false";
+        # hash with keys of the source file names(basename only) for detection of multiple source
+        # files of the same name in different DIRS line specifications.  if a file name is detected
+        # in multiple directories warning() and print all of the directories.  if a file name is
+        # specified twice in the same directory fatal() and print the directory/filename.
+        my ( %s );
 
-	# multiple build entries in $BFN file DIRS section lines matching same source file
-	my ( $fatal_multiple_sources ) = "false";
-
-	# hash with keys of the source file names(basename only) for detection of multiple source
-	# files of the same name in different DIRS line specifications
-	my ( %s );
-
-	# integer count of the DIRS section specification lines
-	my ( $count ) = 0;
+        # integer count of the DIRS section specification lines
+        my ( $count ) = 0;
 
 
-	foreach my $line ( @dirs )
-	{
-	    $count++;
+        foreach my $line ( @dirs )
+        {
+            $count++;
 
-	    push @bldcmds, sprintf "----------\n%4d  %s\n", $count, $line;
+            push @bldcmds, sprintf "----------\n%4d  %s\n", $count, $line;
 
-	    given ( $line )
-	    {
-		when ( m{$RGX_CMD_BLOCK} )
-		{
-		    # DIRS section cmd block
-		    my $cmd = $line;
+            given ( $line )
+            {
+                when ( m{$RGX_CMD_BLOCK} )
+                {
+                    # DIRS section cmd block
+                    my $cmd = $line;
 
-		    # variable interpolate cmd block
-		    my $cmd_var_sub = &main::var_sub( $cmd );
+                    # variable interpolate cmd block
+                    my $cmd_var_sub = &main::var_sub( $cmd );
 
-		    push @bldcmds, "      $cmd_var_sub\n";
-		    push @bldcmds, "\n";
-		}
-		when ( m{$RGX_VALID_DIRS_LINE} )
-		{
-		    # DIRS section three field specification line
-		    my ($dir, $regex_srcs, $cmd);
+                    push @bldcmds, "      $cmd_var_sub\n";
+                    push @bldcmds, "\n";
+                }
+                when ( m{$RGX_VALID_DIRS_LINE} )
+                {
+                    # DIRS section three field specification line
+                    my ($dir, $regex_srcs, $cmd);
 
-		    chomp $line;
-		    ($dir, $regex_srcs, $cmd) = split $COLON, $line;
+                    chomp $line;
+                    ($dir, $regex_srcs, $cmd) = split $COLON, $line;
 
-		    # variable interpolate $dir variable
-		    $dir = &main::var_sub( $dir );
+                    # variable interpolate $dir variable
+                    $dir = &main::var_sub( $dir );
 
-		    # check $dir for existence and readability
-		    if ( not -e "$dir" or not -r "$dir" )
-		    {
-			{
-			    open my $bffnfh, ">>", $BFFN;
-			    print {$bffnfh} "Directory \"$dir\" specification in $BFN file DIRS line $count cannot be read.\n";
-			    close $bffnfh;
-			}
+                    # check $dir for existence and readability
+                    if ( not -e "$dir" or not -r "$dir" )
+                    {
+                        my $msg = sprintf "FATAL: Directory %s does not exist or is not readable in %s file DIRS line:\n   %4d  %s", $dir, $BFN, $count, $line;
+                        fatal($msg);
+                    }
 
-			$fatal_not_readable = "true";
-			next;
-		    }
+                    # check $dir for invalid chars
+                    if ( $dir !~ m{^$RGX_VALID_PATH_CHARS+$} )
+                    {
+                        my $msg = sprintf "FATAL: Bad(really weird) char(not %s) in directory specification: %s", $RGX_VALID_PATH_CHARS, $dir;
+                        fatal($msg);
+                    }
 
-		    # check $dir for invalid chars
-		    if ( $dir !~ m{^$RGX_VALID_PATH_CHARS+$} )
-		    {
-			fatal("FID 48: Bad(really weird) char(not $RGX_VALID_PATH_CHARS) in directory specification: $dir");
-		    }
+                    # check $regex_srcs for valid regular expression
+                    eval { $EMPTY =~ m{$regex_srcs} };
+                    if ( $EVAL_ERROR )
+                    {
+                        my $msg = sprintf "FATAL: Invalid regular expression - \"%s\".", $regex_srcs;
+                        fatal($msg);
+                    }
 
-		    # check $regex_srcs for valid regular expression
-		    eval { $EMPTY =~ m{$regex_srcs} };
-		    if ( $EVAL_ERROR )
-		    {
-			fatal("FID 49: Invalid regular expression - \"$regex_srcs\".");
-		    }
+                    # variable interpolate $cmd - exclude $s interpolation
+                    my $cmd_var_sub = &main::var_sub( $cmd, '$s' );
 
-		    # variable interpolate $cmd - exclude $s interpolation
-		    my $cmd_var_sub = &main::var_sub( $cmd, '$s' );
+                    # scan $cmd_var_sub for '$s' and fatal() if none found and warning() if more than one found
+                    {
+                        my ( $n );
 
-		    # scan $cmd_var_sub for '$s' and fatal() if none found and warning() if more than one found
-		    {
-			my ( $n );
+                        while ( $cmd_var_sub =~ m{ \$s }gx )
+                        {
+                            $n++;
+                        }
 
-			while ( $cmd_var_sub =~ m{ \$s }gx )
-			{
-			    $n++;
-			}
+                        if ( $n == 0 )
+                        {
+                            my $msg = sprintf "FATAL: No '\$s' variable specified in DIRS line command field: %s", $cmd_var_sub;
+                            fatal($msg);
+                        }
 
-			if ( $n == 0 )
-			{
-			    fatal("FID 50: No '\$s' variable specified in DIRS line command field: $cmd_var_sub");
-			}
+                        if ( $n > 1 )
+                        {
+                            my $msg = sprintf "WARNING: Multiple(%s) '\$s' variables specified in DIRS line command field: %s", $n, $cmd_var_sub;
+                            warning($msg);
+                        }
+                    }
 
-			if ( $n > 1 )
-			{
-			    warning("WID 11: Multiple($n) '\$s' variables specified in DIRS line command field: $cmd_var_sub");
-			}
-		    }
+                    push @bldcmds, "      $cmd_var_sub\n";
 
-		    push @bldcmds, "      $cmd_var_sub\n";
+                    # accumulate source files that match this directory search criteria
+                    opendir my ( $dirfh ), $dir;
+                    my @Sources = map { "$dir/$_" } grep { $_ =~ m{$regex_srcs} and -f "$dir/$_" } readdir $dirfh;
+                    closedir $dirfh;
 
-		    # accumulate source files that match this directory search criteria
-		    opendir my ( $dirfh ), $dir;
-		    my @Sources = map { "$dir/$_" } grep { $_ =~ m{$regex_srcs} and -f "$dir/$_" } readdir $dirfh;
-		    closedir $dirfh;
+                    if ( @Sources == 0 )
+                    {
+                        my $msg = sprintf "FATAL: No sources matched in %s DIRS section line: %s", $BFN, $line;
+                        fatal($msg);
+                    }
 
-		    if ( @Sources == 0 )
-		    {
-			warning("WID 12: No sources matched in $BFN DIRS section line $line");
-		    }
+                    {
+                        # dummy variable
+                        my ( $vol );
 
-		    {
-			# dummy variable
-			my ( $vol, $path );
+                        # directory path
+                        my ( $path );
 
-			# source file name(with extension)
-			my $basename;
+                        # source file name(with extension)
+                        my ( $basename );
 
 
-			# loop over all source files matched by this ($dir, $regex_srcs, $cmd) DIRS line specification $regex_srcs
-			foreach my $s ( @Sources )
-			{
-			    # check $s for existence and readability
-			    if ( not -e "$s" or not -r "$s" )
-			    {
-				my $string = sprintf "Source file %s does not exist or is not readable.\n   %4d  %s", $s, $count, $line;
-				warning("WID 13: $string");
+                        # loop over all source files matched by this ($dir, $regex_srcs, $cmd) DIRS line specification $regex_srcs
+                        foreach my $s ( @Sources )
+                        {
+                            # check $s for existence and readability
+                            if ( not -e "$s" or not -r "$s" )
+                            {
+                                my $msg = sprintf "FATAL: Source file %s does not exist or is not readable.\n   %4d  %s", $s, $count, $line;
+                                fatal($msg);
+                            }
 
-				$fatal_not_readable = "true";
-				next;
-			    }
+                            # extract the basename
+                            ( $vol, $path, $basename ) = File::Spec->splitpath( $s );
 
-			    # extract the basename
-			    ( $vol, $path, $basename ) = File::Spec->splitpath( $s );
+                            {
+                                my ( $dirs_line );
 
-			    # if $basename already exists in %s then the same source file has been specified in more than one DIRS line specification - warn and fatal
-			    if ( $basename ~~ %s )
-			    {
-				# error msg will print the line count and the line for both DIRS line specifications
-				my $string = sprintf "Source file %s specified in more than one DIRS line specification:\n   %s\n   %4d  %s", $s, $s{"$basename"}, $count, $line;
-				warning("WID 14: $string");
+                                # save DIRS line, $dirs_line, in %s indexed by $basename and $path
+                                $dirs_line = sprintf "%4d  %s", $count, $line;
+                                $s{"$basename"}{"$path"}{"$dirs_line"} = undef;
+                            }
 
-				$fatal_multiple_sources = "true";
-			    }
-			    else
-			    {
-				# save $basename in %s with the line count and the line
-				$s{"$basename"} = sprintf "%4d  %s", $count, $line;
-			    }
+                            push @bldcmds, "          $s\n";
 
-			    push @bldcmds, "          $s\n";
+                            my ( @hdeps, $srcext );
 
-			    my ( @hdeps, $srcext );
+                            # capture file name extension
+                            if ( $s =~ m{.*[.]$RGX_FILE_EXT} )
+                            {
+                                $srcext = $1;
+                            }
+                            else
+                            {
+                                my $msg = sprintf "FATAL: Valid file extension not found in %s", $s;
+                                fatal($msg);
+                            }
 
-			    # capture file name extension
-			    if ( $s =~ m{.*[.]$RGX_FILE_EXT} )
-			    {
-				$srcext = $1;
-			    }
-			    else
-			    {
-				fatal("FID 51: Valid file extension not found in $s");
-			    }
+                            given ( $srcext )
+                            {
+                                when (
+                                         $srcext ~~ $Depend{'hdr'}{'c'} or
+                                         $srcext ~~ $Depend{'hdr'}{'S'} or
+                                         $srcext ~~ $Depend{'hdr'}{'E'} or
+                                         $srcext ~~ $Depend{'hdr'}{'n'}
+                                     )
+                                {
+                                    # $s is a hdr processible file
+                                    # find all header file dependencies of source file
+                                    @hdeps = hdr_depend( $cmd_var_sub, $s, "" );
+                                }
+                                when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
+                                {
+                                    ; # noop for recognizable not header file processible $srcext
+                                }
+                                default
+                                {
+                                    my $msg = sprintf "FATAL: %s DIRS section source file %s has no recognizable extension(see %Depend)", $BFN, $s;
+                                    fatal($msg);
+                                }
+                            }
 
-			    given ( $srcext )
-			    {
-				when (
-					 $srcext ~~ $Depend{'hdr'}{'c'} or
-					 $srcext ~~ $Depend{'hdr'}{'S'} or
-					 $srcext ~~ $Depend{'hdr'}{'E'} or
-					 $srcext ~~ $Depend{'hdr'}{'n'}
-				     )
-				{
-				    # $s is a hdr processible file
-				    # find all header file dependencies of source file
-				    @hdeps = hdr_depend( $cmd_var_sub, $s, "" );
-				}
-				when ( $srcext ~~ $Depend{'nothdr'}{'c'} )
-				{
-				    ; # noop for recognizable not header file processible $srcext
-				}
-				default
-				{
-				    fatal("FID 52: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
-				}
-			    }
+                            # accumulate header file in @bldcmds appropriate for $opt_s
+                            foreach my $h ( @hdeps )
+                            {
+                                # 
+                                if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
 
-			    # accumulate header file in @bldcmds appropriate for $opt_s
-			    foreach my $h ( @hdeps )
-			    {
-				# 
-				if ( $opt_s eq "nosystem" and $h =~ m{ ^\/.*[.]$RGX_HDR_EXT$ }x ) {next;}
+                                push @bldcmds, "              $h\n";
+                            } # END: foreach my $line ( @hdeps ){}
+                        } # END: foreach my $s ( @Sources ){}
+                    }
+                    push @bldcmds, "\n";
+                }
+                default
+                {
+                    my $msg = sprintf "FATAL: %s DIRS section line is incorrectly formatted(see %s): %s", $BFN, $BIFN, $line;
+                    fatal($msg);
+                }
+            } # END: given ( $line ){}
+        } # END: foreach my $line ( @dirs ){}
 
-				push @bldcmds, "              $h\n";
-			    } # END: foreach my $line ( @hdeps ){}
-			} # END: foreach my $s ( @Sources ){}
-		    }
-		    push @bldcmds, "\n";
-		}
-		default
-		{
-		    fatal("FID 53: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
-		}
-	    } # END: given ( $line ){}
-	} # END: foreach my $line ( @dirs ){}
+        {
+            # %s - $s{"$basename"}{"$path"}{"$dirs_line"} - is indexed by the source file name, the
+            # path to that source file and the DIRS line that will build that source file.
+            # examine %s for instances of source files specifed in multiple directories(warning) or
+            # source files specified in the same directory(fatal).  %s is built from source files
+            # actually matched in the source file tree.
 
-	return ( $fatal_not_readable, $fatal_multiple_sources, @bldcmds );
+            my ( $warning_msg, $fatal_msg );
+
+            my @basename = sort keys %s;
+            my $basename_size = scalar @basename;
+            foreach my $basename ( @basename )
+            {
+                my @path = sort keys $s{$basename};
+                my $path_size = scalar @path;
+                if ( $path_size > 1 )
+                {
+                    $warning_msg .= "Same source file \'$basename\" specified in more than one directory:\n";
+                    foreach my $path ( @path )
+                    {
+                        $warning_msg .= "$path\n";
+                        my @dirs_line = sort keys $s{$basename}{$path};
+                        my $dirs_line_size = scalar @dirs_line;
+                        foreach my $dirs_line ( @dirs_line )
+                        {
+                            $warning_msg .= "$dirs_line\n";
+                        }
+                    }
+                }
+                foreach my $path ( @path )
+                {
+                    my @dirs_line = sort keys $s{$basename}{$path};
+                    my $dirs_line_size = scalar @dirs_line;
+                    if ( $dirs_line_size > 1 )
+                    {
+                        $fatal_msg .= "Same source file \'$basename\" specified in same directory:\n";
+                        $fatal_msg .= "$path\n";
+                        foreach my $dirs_line ( @dirs_line )
+                        {
+                            $fatal_msg .= "$dirs_line\n";
+                        }
+                    }
+                }
+            }
+
+            if ( length $warning_msg )
+            {
+                my $msg = sprintf "WARNING: %s", $warning_msg;
+                warning($msg);
+            }
+            if ( length $fatal_msg )
+            {
+                my $msg = sprintf "FATAL: %s", $fatal_msg;
+                fatal($msg);
+            }
+        }
+
+        return ( @bldcmds );
     }
 
 
@@ -661,113 +711,116 @@ package BldRoutines
     #
     sub variable_match
     {
-	my (
-	       $eval_ref,
-	       $dirs_ref,
-	   ) = @_;
+        my (
+               $eval_ref,
+               $dirs_ref,
+           ) = @_;
 
-	my ( %eval_vars, %dirs_vars );
+        my ( %eval_vars, %dirs_vars );
 
 
-	# scan EVAL section and make %eval_vars hash
-	foreach my $line ( @{$eval_ref} )
-	{
-	    chomp $line;
+        # scan EVAL section and make %eval_vars hash
+        foreach my $line ( @{$eval_ref} )
+        {
+            chomp $line;
 
-	    # create hash of all variable name/variable value pairs in $eval_vars with all mandatory defines excluded
-	    my %eval_vars_tmp = &main::var_sub( $line, '$bld', '$bldcmd', '$lib_dirs', '$O', '$opt_s', '$opt_r', '$opt_lib' );
-	    %eval_vars = ( %eval_vars, %eval_vars_tmp );
+            # create hash of all variable name/variable value pairs in $eval_vars with all mandatory defines excluded
+            my %eval_vars_tmp = &main::var_sub( $line, '$bld', '$bldcmd', '$lib_dirs', '$O', '$opt_s', '$opt_r', '$opt_lib' );
+            %eval_vars = ( %eval_vars, %eval_vars_tmp );
 
-	    if ( "\$s" ~~ %eval_vars )
-	    {
-		fatal("FID 55: The scalar variable \$s may not be specified in the EVAL section, as this is used in the DIRS".
-				    " section command field to signify matched source files.");
-	    }
-	}
+            if ( "\$s" ~~ %eval_vars )
+            {
+                my $msg = "FATAL: The scalar variable \$s may not be specified in the EVAL section, as this is used in the DIRS".
+                          " section command field to signify matched source files.";
+                fatal($msg);
+            }
+        }
 
-	# scan DIRS section and substitute scalar variables and make %dirs_vars hash
-	foreach my $line ( @{$dirs_ref} )
-	{
-	    chomp $line;
+        # scan DIRS section and substitute scalar variables and make %dirs_vars hash
+        foreach my $line ( @{$dirs_ref} )
+        {
+            chomp $line;
 
-	    given ( $line )
-	    {
-		when ( m{$RGX_CMD_BLOCK} )
-		{
-		    # DIRS section cmd block
-		    my $cmd = $line;
+            given ( $line )
+            {
+                when ( m{$RGX_CMD_BLOCK} )
+                {
+                    # DIRS section cmd block
+                    my $cmd = $line;
 
-		    my %dirs_vars_tmp = &main::var_sub( $cmd );
-		    %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
-		}
-		when ( m{$RGX_VALID_DIRS_LINE} )
-		{
-		    # DIRS section three field specification line
-		    my ($dir, $regex_srcs, $cmd);
+                    my %dirs_vars_tmp = &main::var_sub( $cmd );
+                    %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
+                }
+                when ( m{$RGX_VALID_DIRS_LINE} )
+                {
+                    # DIRS section three field specification line
+                    my ($dir, $regex_srcs, $cmd);
 
-		    ($dir, $regex_srcs, $cmd) = split $COLON, $line;
+                    ($dir, $regex_srcs, $cmd) = split $COLON, $line;
 
-		    my %dirs_vars_tmp = &main::var_sub( $cmd, '$s' );
-		    %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
-		}
-		default
-		{
-		    fatal("FID 56: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
-		}
-	    }
-	}
+                    my %dirs_vars_tmp = &main::var_sub( $cmd, '$s' );
+                    %dirs_vars = ( %dirs_vars, %dirs_vars_tmp );
+                }
+                default
+                {
+                    my $msg = sprintf "FATAL: %s DIRS section line is incorrectly formatted(see %s): %s", $BFN, $BIFN, $line;
+                    fatal($msg);
+                }
+            }
+        }
 
-	{
-	    # if %eval_vars variables not in %dirs_vars then issue warnings and if %dirs_vars variables not in
-	    # %eval_vars then issue warnings and fatal errors
+        {
+            # if %eval_vars variables not in %dirs_vars then issue warnings and if %dirs_vars variables not in
+            # %eval_vars then issue warnings and fatal errors
 
-	    my (@evalextra, @dirsextra);
+            my (@evalextra, @dirsextra);
 
-	    # find all variables in EVAL section that are not in DIRS cmds excluding mandatory defines
-	    foreach my $key ( keys %eval_vars )
-	    {
-		if ( not $key ~~ %dirs_vars )
-		{
-		    push @evalextra, $key;
-		}
-	    }
+            # find all variables in EVAL section that are not in DIRS cmds excluding mandatory defines
+            foreach my $key ( keys %eval_vars )
+            {
+                if ( not $key ~~ %dirs_vars )
+                {
+                    push @evalextra, $key;
+                }
+            }
 
-	    # find all variables in DIRS cmds that are not in EVAL section(excluding $s)
-	    foreach my $key ( keys %dirs_vars )
-	    {
-		if ( not $key ~~ %eval_vars )
-		{
-		    push @dirsextra, $key;
-		}
-	    }
+            # find all variables in DIRS cmds that are not in EVAL section(excluding $s)
+            foreach my $key ( keys %dirs_vars )
+            {
+                if ( not $key ~~ %eval_vars )
+                {
+                    push @dirsextra, $key;
+                }
+            }
 
-	    if ( not @evalextra == 0 )
-	    {
-		warning("WID 16: EVAL defined variable(s) not used in DIRS cmds: @evalextra");
-	    }
+            if ( not @evalextra == 0 )
+            {
+                my $msg = sprintf "WARNING: EVAL defined variable(s) not used in DIRS cmds: @evalextra", @evalextra;
+                warning($msg);
+            }
 
-	    if ( not @dirsextra == 0 )
-	    {
-		warning("WID 17: DIRS cmd variable(s) not defined in EVAL section: @dirsextra");
-		fatal("FID 57: Extra unused variable(s) in DIRS section - see $BWFN.");
-	    }
-	}
+            if ( not @dirsextra == 0 )
+            {
+                my $msg = sprintf "FATAL: Extra unused variable(s), @dirsextra, in DIRS section - see %s.", @dirsextra, $BWFN;
+                fatal($msg);
+            }
+        }
 
-	{
-	    open my $bifnfh, ">>", $BIFN;
+        {
+            open my $bifnfh, ">>", $BIFN;
 
-	    # print expansion of eval{} section defined variables that appear in $cmd's
-	    print {$bifnfh} "\n####################################################################################################\n";
-	    print {$bifnfh} "EVAL section expansion of defined variables used in DIRS section cmd fields:\n\n";
-	    foreach my $key ( sort keys %eval_vars )
-	    {
-		print {$bifnfh} "$key = $eval_vars{$key}\n";
-	    }
-	    print {$bifnfh} "\n";
-	    close $bifnfh;
-	}
+            # print expansion of eval{} section defined variables that appear in $cmd's
+            print {$bifnfh} "\n####################################################################################################\n";
+            print {$bifnfh} "EVAL section expansion of defined variables used in DIRS section cmd fields:\n\n";
+            foreach my $key ( sort keys %eval_vars )
+            {
+                print {$bifnfh} "$key = $eval_vars{$key}\n";
+            }
+            print {$bifnfh} "\n";
+            close $bifnfh;
+        }
 
-	return;
+        return;
     }
 
 
@@ -796,97 +849,97 @@ package BldRoutines
     #
     sub init_blddotinfo
     {
-	my (
-	       $bld,
-	       $bldcmd,
-	       $lib_dirs,
-	       $opt_s,
-	       $opt_r,
-	       $opt_lib,
-	       $comment_section,
-	   ) = @_;
+        my (
+               $bld,
+               $bldcmd,
+               $lib_dirs,
+               $opt_s,
+               $opt_r,
+               $opt_lib,
+               $comment_section,
+           ) = @_;
 
 
-	open my $bifnfh, ">>", $BIFN;
+        open my $bifnfh, ">>", $BIFN;
 
-	print {$bifnfh} "\nOS: $OSNAME\n";
+        print {$bifnfh} "\nOS: $OSNAME\n";
 
-	print {$bifnfh} "\nbld version: $VERSION\n\n";
+        print {$bifnfh} "\nbld version: $VERSION\n\n";
 
-	my $perl = `which perl 2>&1`;
-	chomp $perl;
-	if ( $perl =~ m{which:\sno} )
-	{
-	    print {$bifnfh} sprintf "perl full path: No perl in \$PATH\n";
-	}
-	else
-	{
-	    print {$bifnfh} sprintf "perl full path: %s\n", $perl;
-	    print {$bifnfh} sprintf "perl version: %s\n", `perl -V 2>&1`;
-	}
+        my $perl = `which perl 2>&1`;
+        chomp $perl;
+        if ( $perl =~ m{which:\sno} )
+        {
+            print {$bifnfh} sprintf "perl full path: No perl in \$PATH\n";
+        }
+        else
+        {
+            print {$bifnfh} sprintf "perl full path: %s\n", $perl;
+            print {$bifnfh} sprintf "perl version: %s\n", `perl -V 2>&1`;
+        }
 
-	my $cpp = `which cpp 2>&1`;
-	chomp $cpp;
-	if ( $cpp =~ m{which:\sno} )
-	{
-	    print {$bifnfh} sprintf "cpp full path: No cpp in \$PATH\n";
-	}
-	else
-	{
-	    print {$bifnfh} sprintf "cpp full path: %s\n", $cpp;
-	    print {$bifnfh} sprintf "cpp version: %s\n", `cpp --version 2>&1`;
-	}
+        my $cpp = `which cpp 2>&1`;
+        chomp $cpp;
+        if ( $cpp =~ m{which:\sno} )
+        {
+            print {$bifnfh} sprintf "cpp full path: No cpp in \$PATH\n";
+        }
+        else
+        {
+            print {$bifnfh} sprintf "cpp full path: %s\n", $cpp;
+            print {$bifnfh} sprintf "cpp version: %s\n", `cpp --version 2>&1`;
+        }
 
-	my $gcc = `which gcc 2>&1`;
-	chomp $gcc;
-	if ( $gcc =~ m{which:\sno} )
-	{
-	    print {$bifnfh} sprintf "gcc full path: No gcc in \$PATH\n";
-	}
-	else
-	{
-	    print {$bifnfh} sprintf "gcc full path: %s\n", $gcc;
-	    print {$bifnfh} sprintf "gcc version: %s\n", `gcc --version 2>&1`;
-	}
+        my $gcc = `which gcc 2>&1`;
+        chomp $gcc;
+        if ( $gcc =~ m{which:\sno} )
+        {
+            print {$bifnfh} sprintf "gcc full path: No gcc in \$PATH\n";
+        }
+        else
+        {
+            print {$bifnfh} sprintf "gcc full path: %s\n", $gcc;
+            print {$bifnfh} sprintf "gcc version: %s\n", `gcc --version 2>&1`;
+        }
 
-	my $gpp = `which g++ 2>&1`;
-	chomp $gpp;
-	if ( $gpp =~ m{which:\sno} )
-	{
-	    print {$bifnfh} sprintf "g++ full path: No g++ in \$PATH\n";
-	}
-	else
-	{
-	    print {$bifnfh} sprintf "g++ full path: %s\n", $gpp;
-	    print {$bifnfh} sprintf "g++ version: %s\n", `g++ --version 2>&1`;
-	}
+        my $gpp = `which g++ 2>&1`;
+        chomp $gpp;
+        if ( $gpp =~ m{which:\sno} )
+        {
+            print {$bifnfh} sprintf "g++ full path: No g++ in \$PATH\n";
+        }
+        else
+        {
+            print {$bifnfh} sprintf "g++ full path: %s\n", $gpp;
+            print {$bifnfh} sprintf "g++ version: %s\n", `g++ --version 2>&1`;
+        }
 
-	my $clang = `which clang 2>&1`;
-	chomp $clang;
-	if ( $clang =~ m{which:\sno} )
-	{
-	    print {$bifnfh} sprintf "clang full path: No clang in \$PATH\n";
-	}
-	else
-	{
-	    print {$bifnfh} sprintf "clang full path: %s\n", $clang;
-	    print {$bifnfh} sprintf "clang version: %s\n", `clang --version 2>&1`;
-	}
+        my $clang = `which clang 2>&1`;
+        chomp $clang;
+        if ( $clang =~ m{which:\sno} )
+        {
+            print {$bifnfh} sprintf "clang full path: No clang in \$PATH\n";
+        }
+        else
+        {
+            print {$bifnfh} sprintf "clang full path: %s\n", $clang;
+            print {$bifnfh} sprintf "clang version: %s\n", `clang --version 2>&1`;
+        }
 
-	print {$bifnfh} "\n####################################################################################################\n";
-	print {$bifnfh} "comments section of Bld file:\n";
-	print {$bifnfh} "$comment_section";
+        print {$bifnfh} "\n####################################################################################################\n";
+        print {$bifnfh} "comments section of Bld file:\n";
+        print {$bifnfh} "$comment_section";
 
-	print {$bifnfh} "\n####################################################################################################\n";
-	print {$bifnfh} "EVAL section expansion of \$bld, \$bldcmd and \$lib_dirs mandatory variables(\$O is object files):\n\n";
-	print {$bifnfh} "\$bld = $bld\n";
-	print {$bifnfh} "\$bldcmd = \"$bldcmd\"\n";
-	print {$bifnfh} "\$lib_dirs = \"$lib_dirs\"\n\n";
-	print {$bifnfh} "EVAL section expansion of \$opt_s and \$opt_r and \$opt_lib mandatory option variables:\n\n";
-	print {$bifnfh} "\$opt_s = \"$opt_s\"\n";
-	print {$bifnfh} "\$opt_r = \"$opt_r\"\n";
-	print {$bifnfh} "\$opt_lib = \"$opt_lib\"\n";
-	close $bifnfh;
+        print {$bifnfh} "\n####################################################################################################\n";
+        print {$bifnfh} "EVAL section expansion of \$bld, \$bldcmd and \$lib_dirs mandatory variables(\$O is object files):\n\n";
+        print {$bifnfh} "\$bld = $bld\n";
+        print {$bifnfh} "\$bldcmd = \"$bldcmd\"\n";
+        print {$bifnfh} "\$lib_dirs = \"$lib_dirs\"\n\n";
+        print {$bifnfh} "EVAL section expansion of \$opt_s and \$opt_r and \$opt_lib mandatory option variables:\n\n";
+        print {$bifnfh} "\$opt_s = \"$opt_s\"\n";
+        print {$bifnfh} "\$opt_r = \"$opt_r\"\n";
+        print {$bifnfh} "\$opt_lib = \"$opt_lib\"\n";
+        close $bifnfh;
     }
 
 
@@ -910,79 +963,84 @@ package BldRoutines
     #
     sub read_Blddotsig
     {
-	my (
-	       $bld,
-	       $Sigdata_ref,
-	   ) = @_;
+        my (
+               $bld,
+               $Sigdata_ref,
+           ) = @_;
 
 
-	if ( not -e "$SIGFN" )
-	{
-	    return;
-	}
+        if ( not -e "$SIGFN" )
+        {
+            return;
+        }
 
-	my $RGX_SHA1 = "[0-9a-f]\{40\}";  # regex to validate SHA1 signatures - 40 chars and all 0-9a-f
+        my $RGX_SHA1 = "[0-9a-f]\{40\}";  # regex to validate SHA1 signatures - 40 chars and all 0-9a-f
 
-	# open $SIGFN signature file
-	open my $sigfn, "<", $SIGFN;
+        # open $SIGFN signature file
+        open my $sigfn, "<", $SIGFN;
 
-	# build hash of $SIGFN file signatures with source file names as keys
-	while ( my $line = <$sigfn> )
-	{
-	    next if $line =~ $RGX_BLANK_LINE;
+        # build hash of $SIGFN file signatures with source file names as keys
+        while ( my $line = <$sigfn> )
+        {
+            next if $line =~ $RGX_BLANK_LINE;
 
-	    given ( $line )
-	    {
-		when ( m{^'(.*?)'\s($RGX_SHA1)$} )
-		{
-		    my $file = $1;
-		    my $sigsource = $2;
+            given ( $line )
+            {
+                when ( m{^'(.*?)'\s($RGX_SHA1)$} )
+                {
+                    my $file = $1;
+                    my $sigsource = $2;
 
-		    if ( $sigsource !~ m{^$RGX_SHA1$} )
-		    {
-			fatal("FID 12: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
-		    }
+                    if ( $sigsource !~ m{^$RGX_SHA1$} )
+                    {
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigsource:\n%s", $SIGFN, $line;
+                        fatal($msg);
+                    }
 
-		    $Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
+                    $Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
 
-		    if ( $file =~ m{$RGX_LIBS} )
-		    {
-			$Sigdata_ref->{$bld}[$LIB_DEP]{$file} = undef;
-		    }
-		}
-		when ( m{^'(.*?)'\s($RGX_SHA1)\s($RGX_SHA1)\s($RGX_SHA1)$} )
-		{
-		    my $file = $1;
-		    my $sigsource = $2;
-		    my $sigcmd = $3;
-		    my $sigtarget = $4;
+                    if ( $file =~ m{$RGX_LIBS} )
+                    {
+                        $Sigdata_ref->{$bld}[$LIB_DEP]{$file} = undef;
+                    }
+                }
+                when ( m{^'(.*?)'\s($RGX_SHA1)\s($RGX_SHA1)\s($RGX_SHA1)$} )
+                {
+                    my $file = $1;
+                    my $sigsource = $2;
+                    my $sigcmd = $3;
+                    my $sigtarget = $4;
 
-		    if ( $sigsource !~ m{^$RGX_SHA1$} )
-		    {
-			fatal("FID 13: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
-		    }
+                    if ( $sigsource !~ m{^$RGX_SHA1$} )
+                    {
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigsource:\n%s", $SIGFN, $line;
+                        fatal($msg);
+                    }
 
-		    if ( $sigcmd !~ m{^$RGX_SHA1$} )
-		    {
-			fatal("FID 14: Malformed $SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
-		    }
+                    if ( $sigcmd !~ m{^$RGX_SHA1$} )
+                    {
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigcmd:\n%s", $SIGFN, $line;
+                        fatal($msg);
+                    }
 
-		    if ( $sigtarget !~ m{^$RGX_SHA1$} )
-		    {
-			fatal("FID 15: Malformed $SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
-		    }
+                    if ( $sigtarget !~ m{^$RGX_SHA1$} )
+                    {
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigtarget:\n%s", $SIGFN, $line;
+                        fatal($msg);
+                    }
 
-		    $Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
-		    $Sigdata_ref->{$file}[$SIG_CMD] = $sigcmd;
-		    $Sigdata_ref->{$file}[$SIG_TGT] = $sigtarget;
-		}
-		default
-		{
-		    fatal("FID 16: Malformed $SIGFN file - invalid format line:\n$line");
-		}
-	    }
-	}
-	close $sigfn;
+                    $Sigdata_ref->{$file}[$SIG_SRC] = $sigsource;
+                    $Sigdata_ref->{$file}[$SIG_CMD] = $sigcmd;
+                    $Sigdata_ref->{$file}[$SIG_TGT] = $sigtarget;
+                }
+                default
+                {
+                    my $msg = sprintf "FATAL: Malformed %s file - invalid format line:\n%s", $SIGFN, $line;
+                    fatal($msg);
+                }
+            }
+        }
+        close $sigfn;
     }
 
 
@@ -1013,119 +1071,145 @@ package BldRoutines
     #
     sub rebuild_target_bool
     {
-	my (
-	       $bld,
-	       $bldcmd,
-	       $lib_dirs,
-	       $opt_lib,
-	       $Sigdata_ref,
-	       $SigdataNew_ref,
-	   ) = @_;
+        my (
+               $bld,
+               $bldcmd,
+               $lib_dirs,
+               $opt_lib,
+               $Sigdata_ref,
+               $SigdataNew_ref,
+           ) = @_;
 
-	my ( $rebuild ) = "false";
+        my ( $rebuild ) = "false";
 
 
-	# if $bld does not exists or is zero length return "true"
-	if ( not -f $bld or -z $bld )
-	{
-	    $rebuild = "true";
-	    return $rebuild;
-	}
+        # if $bld does not exists or is zero length return "true"
+        if ( not -f $bld or -z $bld )
+        {
+            $rebuild = "true";
+            return $rebuild;
+        }
 
-	my $sig = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
+        my $sig = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
 
-	# signature of $bld is defined as the signature of the concatenation of the file $bld and "$bld . $bldcmd . $lib_dirs".
-	# this ensures that any change to the file or these mandatory defines forces a rebuild.
-	if (
-	       (not $bld ~~ %{$Sigdata_ref}) or
-	       ($Sigdata_ref->{$bld}[$SIG_SRC] ne $sig)
-	   )
-	{
-	    # rebuild exec if $bld signature does not exist or signature is different
-	    $rebuild = "true";
-	    return $rebuild;
-	}
+        # signature of $bld is defined as the signature of the concatenation of the file $bld and "$bld . $bldcmd . $lib_dirs".
+        # this ensures that any change to the file or these mandatory defines forces a rebuild.
+        if (
+               (not $bld ~~ %{$Sigdata_ref}) or
+               ($Sigdata_ref->{$bld}[$SIG_SRC] ne $sig)
+           )
+        {
+            # rebuild exec if $bld signature does not exist or signature is different
+            $rebuild = "true";
+            return $rebuild;
+        }
 
-	if ( $opt_lib ne "nolibcheck" )
-	{
-	    my @libs_removed;
+        if ( $opt_lib ne "nolibcheck" )
+        {
+            my @libs_removed;
 
-	    # do ldd on target executable or library and set target library dependencies and calculate library signatures
-	    my $ldd = `ldd $bld 2>&1`;
+            # do ldd on target executable or library and set target library dependencies and calculate library signatures
+            my $ldd = `ldd $bld 2>&1`;
 
-	    # to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
-	    if ( $ldd =~ m{not a dynamic executable} )
-	    {
-		fatal("FID 20: ldd return: $bld is 'not a dynamic executable'");
-	    }
+            # to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
+            if ( $ldd =~ m{not a dynamic executable} )
+            {
+                my $msg = sprintf "FATAL: ldd return: %s is 'not a dynamic executable'", $bld;
+                fatal($msg);
+            }
 
-	    # scan ldd return for full path library strings
-	    while ( $ldd =~ m{ ^\s+(\S+)\s=>\s(\S+)\s.*$ }gxm )
-	    {
-		my $libname = $1;
-		my $lib = $2;
+            # scan ldd return for full path library strings
+            while ( $ldd =~ m{ ^\s+(\S+)\s=>\s(\S+)\s.*$ }gxm )
+            {
+                my $libname = $1;
+                my $lib = $2;
 
-		# the $lib variable should have either a full path library name or the word 'not'
-		if ( $lib =~ m{not} )
-		{
-		    warning("WID 1: ldd return: $libname library is 'not found'");
-		}
-		else
-		{
-		    $SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
-		    $SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
-		}
-	    }
+                # the $lib variable should have either a full path library name or the word 'not'
+                if ( $lib =~ m{not} )
+                {
+                    my $msg = sprintf "WARNING: ldd return: %s library is 'not found'", $libname;
+                    warning($msg);
+                }
+                else
+                {
+                    $SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
+                    $SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
+                }
+            }
 
-	    # compare %Sigdata(populated from $BFN) and %SigdataNew(populated from ldd) for removed libraries
-	    foreach my $l ( sort keys %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
-	    {
-		if ( not $l ~~ %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
-		{
-		    push @libs_removed, $l;
-		}
-	    }
+            # compare %Sigdata(populated from $BFN) and %SigdataNew(populated from ldd) for removed libraries
+            foreach my $l ( sort keys %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
+            {
+                if ( not $l ~~ %{$Sigdata_ref->{$bld}[$LIB_DEP]} )
+                {
+                    push @libs_removed, $l;
+                }
+            }
 
-	    # if removed libraries rebuild and warn/fatal
-	    if ( @libs_removed )
-	    {
-		$rebuild = "true";
-		warning("WID 2: Libraries removed: @libs_removed") if $opt_lib eq "warnlibcheck";
-		fatal("FID 21: Libraries removed: @libs_removed") if $opt_lib eq "fatallibcheck";
-	    }
+            # if removed libraries rebuild and warn/fatal
+            if ( @libs_removed )
+            {
+                $rebuild = "true";
+                if ( $opt_lib eq "warnlibcheck" )
+                {
+                    my $msg = sprintf "WARNING: Libraries removed: %s", @libs_removed;
+                    warning($msg);
+                }
+                if ( $opt_lib eq "fatallibcheck" )
+                {
+                    my $msg = sprintf "FATAL: Libraries removed: %s", @libs_removed;
+                    fatal($msg);
+                }
+            }
 
-	    # check each library file for this target and set $rebuild to true if library is new or library has changed
-	    foreach my $l ( keys %{$SigdataNew_ref->{$bld}[$LIB_DEP]} )
-	    {
-		if ( $l ~~ %{$Sigdata_ref} )
-		{
-		    # rebuild if library has changed
-		    if ( $Sigdata_ref->{$l}[$SIG_SRC] ne $SigdataNew_ref->{$l}[$SIG_SRC] )
-		    {
-			$rebuild = "true";
-			warning("WID 3: Library changed: $l") if $opt_lib eq "warnlibcheck";
-			fatal("FID 22: Library changed: $l") if $opt_lib eq "fatallibcheck";
-		    }
-		    next;
-		}
-		else
-		{
-		    # rebuild if library is new
-		    $rebuild = "true";
-		    warning("WID 4: Libraries added: @libs_removed") if $opt_lib eq "warnlibcheck";
-		    fatal("FID 23: Libraries added: @libs_removed") if $opt_lib eq "fatallibcheck";
-		    next;
-		}
-	    }
-	}
+            # check each library file for this target and set $rebuild to true if library is new or library has changed
+            foreach my $l ( keys %{$SigdataNew_ref->{$bld}[$LIB_DEP]} )
+            {
+                if ( $l ~~ %{$Sigdata_ref} )
+                {
+                    # rebuild if library has changed
+                    if ( $Sigdata_ref->{$l}[$SIG_SRC] ne $SigdataNew_ref->{$l}[$SIG_SRC] )
+                    {
+                        $rebuild = "true";
+                        if ( $opt_lib eq "warnlibcheck" )
+                        {
+                            my $msg = sprintf "WARNING: Library changed: %s", $l;
+                            warning($msg);
+                        }
+                        if ( $opt_lib eq "fatallibcheck" )
+                        {
+                            my $msg = sprintf "FATAL: Library changed: %s", $l;
+                            fatal($msg);
+                        }
+                    }
+                    next;
+                }
+                else
+                {
+                    # rebuild if library is new
+                    $rebuild = "true";
+                    if ( $opt_lib eq "warnlibcheck" )
+                    {
+                        my $msg = sprintf "WARNING: Libraries added: %s", @libs_removed;
+                        warning($msg);
+                    }
+                    if ( $opt_lib eq "fatallibcheck" )
+                    {
+                        my $msg = sprintf "FATAL: Libraries added: %s", @libs_removed;
+                        fatal($msg);
+                    }
+                    next;
+                }
+            }
+        }
 
-	if ( $rebuild eq "false" )
-	{
-	    # add old signature to %SigdataNew to output to $SIGFN file
-	    $SigdataNew_ref->{$bld}[$SIG_SRC] = $Sigdata_ref->{$bld}[$SIG_SRC];
-	}
+        if ( $rebuild eq "false" )
+        {
+            # add old signature to %SigdataNew to output to $SIGFN file
+            $SigdataNew_ref->{$bld}[$SIG_SRC] = $Sigdata_ref->{$bld}[$SIG_SRC];
+        }
 
-	return $rebuild;
+        return $rebuild;
     }
 
 
@@ -1153,71 +1237,74 @@ package BldRoutines
     #
     sub rebuild_exec
     {
-	my (
-	       $bld,
-	       $bldcmd,
-	       $lib_dirs,
-	       $opt_lib,
-	       $Objects_ref,
-	       $SigdataNew_ref,
-	   ) = @_;
+        my (
+               $bld,
+               $bldcmd,
+               $lib_dirs,
+               $opt_lib,
+               $Objects_ref,
+               $SigdataNew_ref,
+           ) = @_;
+
+        my ( $tmp, $status, $error_msg, $O );
 
 
-	my ( $tmp, $status, $error_msg, $O );
+        # extract %Objects hash object file keys and concatenate onto $O
+        foreach my $o ( sort keys %{$Objects_ref} )
+        {
+           $O .= "$o ";
+        }
 
-	# extract %Objects hash object file keys and concatenate onto $O
-	foreach my $o ( sort keys %{$Objects_ref} )
-	{
-	   $O .= "$o ";
-	}
+        $tmp = $bldcmd;
+        $tmp =~ s{(\$\w+)}{$1}gee;
 
-	$tmp = $bldcmd;
-	$tmp =~ s{(\$\w+)}{$1}gee;
+        $tmp =~ s{!!!}{\n}g;
 
-	$tmp =~ s{!!!}{\n}g;
+        # use $bld and %Objects to rebuild target
+        $status = system "$tmp";
 
-	# use $bld and %Objects to rebuild target
-	$status = system "$tmp";
+        if ( $status != 0 )
+        {
+            $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-	if ( $status != 0 )
-	{
-	    $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $status;
+            fatal($msg);
+        }
 
-	    fatal("FID 24: Error msg: $error_msg\nCmd: \"$tmp\"\nFail status: $status");
-	}
+        $SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
 
-	$SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
+        if ( $opt_lib ne "nolibcheck" )
+        {
+            # do ldd on target executable or library and set target library dependencies and calculate library signatures
+            my $ldd = `ldd $bld 2>&1`;
 
-	if ( $opt_lib ne "nolibcheck" )
-	{
-	    # do ldd on target executable or library and set target library dependencies and calculate library signatures
-	    my $ldd = `ldd $bld 2>&1`;
+            if ( $ldd =~ m{not a dynamic executable} )
+            {
+                my $msg = sprintf "FATAL: ldd return: %s is 'not a dynamic executable'", $bld;
+                fatal($msg);
+            }
 
-	    if ( $ldd =~ m{not a dynamic executable} )
-	    {
-		fatal("FID 25: ldd return: $bld is 'not a dynamic executable'");
-	    }
+            while ( $ldd =~ m{ ^\s+(\S+)\s=>\s(\S+)\s.*$ }gxm )
+            {
+                my $libname = $1;
+                my $lib = $2;
 
-	    while ( $ldd =~ m{ ^\s+(\S+)\s=>\s(\S+)\s.*$ }gxm )
-	    {
-		my $libname = $1;
-		my $lib = $2;
+                # the $lib variable should have either a full path library name or the word 'not'
+                if ( $lib =~ m{not} )
+                {
+                    my $msg = sprintf "";
+                    warning("WARNING: ldd return: $libname library is 'not found'");
+                }
+                else
+                {
+                    $SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
+                    $SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
+                }
+            }
+        }
 
-		# the $lib variable should have either a full path library name or the word 'not'
-		if ( $lib =~ m{not} )
-		{
-		    warning("WID 5: ldd return: $libname library is 'not found'");
-		}
-		else
-		{
-		    $SigdataNew_ref->{$bld}[$LIB_DEP]{$lib} = undef;
-		    $SigdataNew_ref->{$lib}[$SIG_SRC] = file_sig_calc( $lib );
-		}
-	    }
-	}
-
-	print "$tmp\n";
-	print "$bld rebuilt.\n";
+        print "$tmp\n";
+        print "$bld rebuilt.\n";
     }
 
 
@@ -1241,43 +1328,45 @@ package BldRoutines
     #
     sub multiple_sigs
     {
-	my (
-	       $SourceSig_ref,
-	   ) = @_;
+        my (
+               $SourceSig_ref,
+           ) = @_;
+
+        my ( $printonce ) = 0;
 
 
-	my $printonce = 0;
+        # loop over all unique source file signatures
+        foreach my $signature ( sort keys %{$SourceSig_ref} )
+        {
+            # get the number of unique source file paths for a given source signature
+            my $n = keys %{$SourceSig_ref->{$signature}};
 
-	# loop over all unique source file signatures
-	foreach my $signature ( sort keys %{$SourceSig_ref} )
-	{
-	    # get the number of unique source file paths for a given source signature
-	    my $n = keys %{$SourceSig_ref->{$signature}};
+            if ( $n > 1 )
+            {
+                my ( $warn );
 
-	    if ( $n > 1 )
-	    {
-		my ( $warn );
+                if ( $printonce == 0 )
+                {
+                    $warn = "Multiple source files with the same signature:\n";
+                    $warn .= "--------------------------------------------------------------------------------------\n";
+                    $printonce = 1;
+                    chomp $warn;
+                    my $msg = sprintf "";
+                    warning("WARNING: $warn");
+                }
 
-		if ( $printonce == 0 )
-		{
-		    $warn = "Multiple source files with the same signature:\n";
-		    $warn .= "--------------------------------------------------------------------------------------\n";
-		    $printonce = 1;
-		    chomp $warn;
-		    warning("WID 6: $warn");
-		}
+                $warn = sprintf "%*d  %s\n", 31, $n, $signature;
 
-		$warn = sprintf "%*d  %s\n", 31, $n, $signature;
-
-		# loop over all source file names with $signature
-		foreach my $file ( sort keys %{$SourceSig_ref->{$signature}} )
-		{
-		    $warn .= sprintf "%*s\n", 86, $file;
-		}
-		chomp $warn;
-		warning("WID 7: $warn");
-	    }
-	}
+                # loop over all source file names with $signature
+                foreach my $file ( sort keys %{$SourceSig_ref->{$signature}} )
+                {
+                    $warn .= sprintf "%*s\n", 86, $file;
+                }
+                chomp $warn;
+                my $msg = sprintf "";
+                warning("WARNING: $warn");
+            }
+        }
     }
 
 
@@ -1341,7 +1430,8 @@ package BldRoutines
 
                 if ( not exists ${$Depend_ref}{$hdr}{'c'}{$srcext}{'ext'} )
                 {
-                    fatal("FID 29: Invalid combination of source extension: $srcext and build option: -c.");
+                    my $msg = sprintf "FATAL: Invalid combination of source extension: %s and build option: -c.", $srcext;
+                    fatal($msg);
                 }
 
                 # check if '-c' specified multiple times
@@ -1352,7 +1442,8 @@ package BldRoutines
 
                     $tmp = $cmd_var_sub;
                     $tmp =~ s{!!!}{\\n}g;
-                    warning("WID 8: Multiple instances of '-c' detected in compile options(might just be conditional compilation).\n--->$tmp");
+                    my $msg = sprintf "WARNING: Multiple instances of '-c' detected in compile options(might just be conditional compilation).\n--->%s", $tmp;
+                    warning($msg);
                 }
 
                 # change any suffix to .o suffix and push on %Objects for use in rebuild
@@ -1365,7 +1456,8 @@ package BldRoutines
                 {
                     if ( $o eq $basenametgt )
                     {
-                        fatal("FID 30: Object file conflict - $s produces an object file $basenametgt that already exists.");
+                        my $msg = sprintf "FATAL: Object file conflict - %s produces an object file %s that already exists.", $s, $basenametgt;
+                        fatal($msg);
                     }
                 }
 
@@ -1379,7 +1471,8 @@ package BldRoutines
 
                 if ( not exists ${$Depend_ref}{'hdr'}{'S'}{$srcext}{'ext'} )
                 {
-                    fatal("FID 31: Invalid combination of source extension: $srcext and build option: -S.");
+                    my $msg = sprintf "FATAL: Invalid combination of source extension: %s and build option: -S.", $srcext;
+                    fatal($msg);
                 }
 
                 # check if '-S' specified multiple times
@@ -1390,7 +1483,8 @@ package BldRoutines
 
                     $tmp = $cmd_var_sub;
                     $tmp =~ s{!!!}{\\n}g;
-                    warning("WID 9: Multiple instances of '-S' detected in compile options(might just be conditional compilation).\n--->$tmp");
+                    my $msg = sprintf "WARNING: Multiple instances of '-S' detected in compile options(might just be conditional compilation).\n--->%s", $tmp;
+                    warning($msg);
                 }
 
                 $buildopt = 'S';
@@ -1401,7 +1495,8 @@ package BldRoutines
 
                 if ( not exists ${$Depend_ref}{'hdr'}{'E'}{$srcext}{'ext'} )
                 {
-                    fatal("FID 32: Invalid combination of source extension: $srcext and build option: -E.");
+                    my $msg = sprintf "FATAL: Invalid combination of source extension: %s and build option: -E.", $srcext;
+                    fatal($msg);
                 }
 
                 # check if '-E' specified multiple times
@@ -1412,7 +1507,8 @@ package BldRoutines
 
                     $tmp = $cmd_var_sub;
                     $tmp =~ s{!!!}{\\n}g;
-                    warning("WID 10: Multiple instances of '-E' detected in compile options(might just be conditional compilation).\n--->$tmp");
+                    my $msg = sprintf "WARNING: Multiple instances of '-E' detected in compile options(might just be conditional compilation).\n--->%s", $tmp;
+                    warning($msg);
                 }
 
                 $buildopt = 'E';
@@ -1421,14 +1517,16 @@ package BldRoutines
             {
                 if ( not exists ${$Depend_ref}{'hdr'}{'n'}{$srcext}{'ext'} )
                 {
-                    fatal("FID 33: Invalid combination of source extension: $srcext and build option: non of -c/-S/-E exists.");
+                    my $msg = sprintf "FATAL: Invalid combination of source extension: %s and build option: non of -c/-S/-E exists.", $srcext;
+                    fatal($msg);
                 }
 
                 $buildopt = 'n';
             }
             default
             {
-                fatal("FID 34: Multiple options -c/-S/-E specified in cmd: $cmd_var_sub.");
+                my $msg = sprintf "FATAL: Multiple options -c/-S/-E specified in cmd: %s.", $cmd_var_sub;
+                fatal($msg);
             }
         }
 
@@ -1477,11 +1575,9 @@ package BldRoutines
            ) = @_;
 
         my ( $tgtextorfile );
-
-
-        my ( @tgtfiles );
         my ( $tgtfilesboolean ) = "false"; # indicates that the target file is not derived from a file name extension,
-				       # but is specified in %Depend as an actual file name
+                                           # but is specified in %Depend as an actual file name
+        my ( @tgtfiles );
 
         # accumulate source files in $srcpath
         opendir my ( $dirfh ), $srcpath;
@@ -1490,66 +1586,67 @@ package BldRoutines
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
         {
-	    foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
-	    {
-	        if ( $tgtfile ~~ @Sources )
-	        {
-		    push @tgtfiles, $tgtfile;
-		    $tgtfilesboolean = "true";
-	        }
-	    }
+            foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+            {
+                if ( $tgtfile ~~ @Sources )
+                {
+                    push @tgtfiles, $tgtfile;
+                    $tgtfilesboolean = "true";
+                }
+            }
         }
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
         {
-	    foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
-	    {
-	        my ( $tmp );
+            foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+            {
+                my ( $tmp );
 
-	        $tmp = $srcfile;
-	        $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
-	        if ( $tmp ~~ @Sources )
-	        {
-		    push @tgtfiles, $tmp;
-		    $tgtfilesboolean = "false";
-	        }
-	    }
+                $tmp = $srcfile;
+                $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
+                if ( $tmp ~~ @Sources )
+                {
+                    push @tgtfiles, $tmp;
+                    $tgtfilesboolean = "false";
+                }
+            }
         }
 
         # check for multiple target files in the $srcpath directory.  if more than one target file do fatal().
         if ( @tgtfiles > 1 )
         {
-	    fatal("FID 35: More than one target file for $srcfile in $srcpath: @tgtfiles");
+            my $msg = sprintf "FATAL: More than one target file for %s in %s: %s", $srcfile, $srcpath, @tgtfiles;
+            fatal($msg);
         }
 
         if ( @tgtfiles == 1 )
         {
-	    if ( $tgtfilesboolean eq "true" )
-	    {
-	        # save file name
-	        $tgtextorfile = $tgtfiles[0];
-	    }
-	    else
-	    {
-	        # save file name extension
-	        if ( $tgtfiles[0] =~ m{.*[.]$RGX_FILE_EXT} )
-	        {
-		    $tgtextorfile = $1;
-	        }
-	    }
+            if ( $tgtfilesboolean eq "true" )
+            {
+                # save file name
+                $tgtextorfile = $tgtfiles[0];
+            }
+            else
+            {
+                # save file name extension
+                if ( $tgtfiles[0] =~ m{.*[.]$RGX_FILE_EXT} )
+                {
+                    $tgtextorfile = $1;
+                }
+            }
 
-	    # calculate signature of previously already existing target file - if no target file ignore.
-	    # why?  if the old target file has been corrupted or compromised then it's signature will not match
-	    # the signature in $BFN even if the source and the cmd to build the source have not changed.  this
-	    # should cause a rebuild.  if a re-compile is triggered by either a source change, a build cmd change
-	    # or a change in the target file signature then the signature calculated here will be overwritten
-	    # by the after compile new signature.
-	    ${$SigdataNew_tmp_ref}{$s}[$SIG_TGT] = file_sig_calc( "$srcpath/$tgtfiles[0]" );
+            # calculate signature of previously already existing target file - if no target file ignore.
+            # why?  if the old target file has been corrupted or compromised then it's signature will not match
+            # the signature in $BFN even if the source and the cmd to build the source have not changed.  this
+            # should cause a rebuild.  if a re-compile is triggered by either a source change, a build cmd change
+            # or a change in the target file signature then the signature calculated here will be overwritten
+            # by the after compile new signature.
+            ${$SigdataNew_tmp_ref}{$s}[$SIG_TGT] = file_sig_calc( "$srcpath/$tgtfiles[0]" );
         }
         else
         {
-	    # no previous target file in $srcpath directory
-	    $tgtextorfile = $EMPTY;
+            # no previous target file in $srcpath directory
+            $tgtextorfile = $EMPTY;
         }
 
         return $tgtextorfile;
@@ -1600,45 +1697,46 @@ package BldRoutines
            ) = @_;
 
         my ( $tgtextorfile );
-
-
         my ( @tgtfiles );
+
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
         {
-	    foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
-	    {
-	        if ( $tgtfile ~~ @{$difference_ref} )
-	        {
-		    push @tgtfiles, $tgtfile;
-	        }
-	    }
+            foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+            {
+                if ( $tgtfile ~~ @{$difference_ref} )
+                {
+                    push @tgtfiles, $tgtfile;
+                }
+            }
         }
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
         {
-	    foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
-	    {
-	        my ( $tmp );
+            foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+            {
+                my ( $tmp );
 
-	        $tmp = $srcfile;
-	        $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
-	        if ( $tmp ~~ @{$difference_ref} )
-	        {
-		    push @tgtfiles, $tmp;
-	        }
-	    }
+                $tmp = $srcfile;
+                $tmp =~ s{$RGX_FILE_EXT}{$tgtext};
+                if ( $tmp ~~ @{$difference_ref} )
+                {
+                    push @tgtfiles, $tmp;
+                }
+            }
         }
 
         if ( @tgtfiles == 0 )
         {
-	    fatal("FID 38: No target file for $srcfile in $srcpath: @tgtfiles");
+            my $msg = sprintf "FATAL: No target file for %s in %s: %s", $srcfile, $srcpath, @tgtfiles;
+            fatal($msg);
         }
 
         # check for multiple target files created by $cmd_var_sub.  if more than one target file created do fatal().
         if ( @tgtfiles > 1 )
         {
-	    fatal("FID 39: More than one target file for $srcfile in $srcpath: @tgtfiles");
+            my $msg = sprintf "FATAL: More than one target file for %s in %s: %s", $srcfile, $srcpath, @tgtfiles;
+            fatal($msg);
         }
 
         # calculate signature of target
@@ -1646,11 +1744,12 @@ package BldRoutines
 
         if ( exists $Targets_ref->{"${srcpath}$tgtfiles[0]"} )
         {
-	    fatal("FID 40: An identical target file(name) has been created twice: ${srcpath}$tgtfiles[0]");
+            my $msg = sprintf "FATAL: An identical target file(name) has been created twice: %s%s", $srcpath, $tgtfiles[0];
+            fatal($msg);
         }
         else
         {
-	    $Targets_ref->{"${srcpath}$tgtfiles[0]"} = undef;
+            $Targets_ref->{"${srcpath}$tgtfiles[0]"} = undef;
         }
     }
 
@@ -1706,7 +1805,8 @@ package BldRoutines
 
         if ( not defined $dirs )
         {
-            fatal("FID 42: $BFN DIRS section is empty.");
+            my $msg = sprintf "FATAL: %s DIRS section is empty.", $BFN;
+            fatal($msg);
         }
 
         #  convert $dirs scalar to @dirs array.  $dirs holds the entire contents of the Bld
@@ -1716,7 +1816,8 @@ package BldRoutines
 
         if ( @dirs == 0 )
         {
-            fatal("FID 46: $BFN DIRS section is empty.");
+            my $msg = sprintf "FATAL: %s DIRS section is empty.", $BFN;
+            fatal($msg);
         }
 
         {
@@ -1774,78 +1875,45 @@ package BldRoutines
         {
             if ( not $line =~ m{^.*:.*:.*$} and not $line =~ m{$RGX_CMD_BLOCK} )
             {
-                fatal("FID 47: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+                my $msg = sprintf "FATAL: %s DIRS section line is incorrectly formatted(see %s): %s", $BFN, $BIFN, $line;
+                fatal($msg);
             }
         }
 
         {
-	    # accumulate lines to be printed to the $BIFN file:
-	    #     a. DIRS section specification lines with a line count number
-	    #     b. variable interpolated(except for \$s) specification line cmd field
-	    #     c. matching compilation unit source file(s)
-	    #     d. source file header dependencies
-	    #     e. check for the following error conditions:
-	    #        1. either a directory or a source file is not readable
-	    #        2. multiple build entries in $BFN file DIRS section lines matching same source file
-	    #        3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
-	    #        4. Invalid regular expression - "$regex_srcs"
-	    #        5. No '$s' variable specified in DIRS line command field
-	    #        6. No sources matched in $BFN DIRS section line $line
-	    #        7. Source file specified in more than one DIRS line specification
-	    my ( @tmp ) = accum_blddotinfo_output( $opt_s, @dirs );
+            # accumulate lines to be printed to the $BIFN file:
+            #     a. DIRS section specification lines with a line count number
+            #     b. variable interpolated(except for \$s) specification line cmd field
+            #     c. matching compilation unit source file(s)
+            #     d. source file header dependencies
+            #     e. check for the following error conditions:
+            #        1. either a directory or a source file is not readable
+            #        2. multiple build entries in $BFN file DIRS section lines matching same source file
+            #        3. Bad char(not [\/A-Za-z0-9-_.]) in directory specification "$dir"
+            #        4. Invalid regular expression - "$regex_srcs"
+            #        5. No '$s' variable specified in DIRS line command field
+            #        6. No sources matched in $BFN DIRS section line $line
+            #        7. Source file specified in more than one DIRS line specification
+            my ( @tmp ) = accum_blddotinfo_output( $opt_s, @dirs );
 
-	    my $fatal_not_readable = shift @tmp;
-	    my $fatal_multiple_sources = shift @tmp;
-	    my @bldcmds =  @tmp;
+            my @bldcmds =  @tmp;
 
-	    # write fatal msg to $BFFN
-	    if ( $fatal_not_readable eq "true" )
-	    {
-	        {
-		    open my $bffnfh, ">>", $BFFN;
-		    print {$bffnfh} "Directory or source file specification in $BFN file DIRS line cannot be read.\n";
-		    close $bffnfh;
-	        }
-	    }
+            {
+                open my $bifnfh, ">>", $BIFN;
 
-	    # write fatal msg to $BFFN
-	    if ( $fatal_multiple_sources eq "true" )
-	    {
-	        {
-		    open my $bffnfh, ">>", $BFFN;
-		    print {$bffnfh} "Multiple build entries in $BFN file DIRS section lines matching same source file.\n";
-		    close $bffnfh;
-	        }
-	    }
+                print {$bifnfh} "\n####################################################################################################\n";
+                print {$bifnfh} "a. DIRS section specification lines\n".
+                          "    b. variable interpolated(except for \$s) specification line cmd field\n".
+                          "        c. matching compilation unit source file(s)\n".
+                          "            d. source file header dependencies:\n\n";
 
-	    if ( $fatal_not_readable eq "true" or $fatal_multiple_sources eq "true" )
-	    {
-	        my $msg = "$BFN DIRS section has one or more of:\n".
-		          "a. Directory or source file specification cannot be read\n".
-		          "b. No sources matched\n".
-		          "c. Multiple build entries matching same source file";
-
-	        warning("WID 15: $msg");
-
-	        fatal("FID 54: $msg   - see $BWFN.\n");
-	    }
-
-	    {
-	        open my $bifnfh, ">>", $BIFN;
-
-	        print {$bifnfh} "\n####################################################################################################\n";
-	        print {$bifnfh} "a. DIRS section specification lines\n".
-		          "    b. variable interpolated(except for \$s) specification line cmd field\n".
-		          "        c. matching compilation unit source file(s)\n".
-		          "            d. source file header dependencies:\n\n";
-
-	        foreach my $line ( @bldcmds )
-	        {
-		    $line =~ s{!!!}{\\n}g;
-		    print {$bifnfh} "$line";
-	        }
-	        close $bifnfh;
-	    }
+                foreach my $line ( @bldcmds )
+                {
+                    $line =~ s{!!!}{\\n}g;
+                    print {$bifnfh} "$line";
+                }
+                close $bifnfh;
+            }
         }
 
         return @dirs;
@@ -1886,33 +1954,33 @@ package BldRoutines
 
         # this should return an array with either the '$dir:$regex:' string followed by the '$cmd' string or a cmd block string '{}' by itself
         my @fields = extract_multiple(
-				         $dirs,                                      # extract fields from DIRS section
-				         [ sub { extract_bracketed($_[0],'{}') } ],  # extract {} stuff
-				         undef,                                      # match till end of string
-				         0                                           # return unmatched strings as well - the stuff outside of {}
-				     );
+                                         $dirs,                                      # extract fields from DIRS section
+                                         [ sub { extract_bracketed($_[0],'{}') } ],  # extract {} stuff
+                                         undef,                                      # match till end of string
+                                         0                                           # return unmatched strings as well - the stuff outside of {}
+                                     );
 
         foreach my $line ( @fields )
         {
-	    if ( $line =~ m{^[{].*[}]$}s ) # matches a line of '{stuff}' exactly - a $cmd
-	    {
-	        $line =~ s{\n}{!!!}gs; # translate \n's in a '{}' to '!!!'
-	    }
+            if ( $line =~ m{^[{].*[}]$}s ) # matches a line of '{stuff}' exactly - a $cmd
+            {
+                $line =~ s{\n}{!!!}gs; # translate \n's in a '{}' to '!!!'
+            }
 
-	    # compress multiple whitespace chars([ \t\n\r\f\v]) to a single space
-	    $line =~ s{\s+}{ }g;
-	    $line =~ s{^\s+}{}g;
-	    $line =~ s{!!!\s}{!!!}g;
+            # compress multiple whitespace chars([ \t\n\r\f\v]) to a single space
+            $line =~ s{\s+}{ }g;
+            $line =~ s{^\s+}{}g;
+            $line =~ s{!!!\s}{!!!}g;
 
-	    # all of the following substitutions are designed to eliminate single spaces before/after the four chars "{};:"
-	    $line =~ s{\s\{}{\{}g;
-	    $line =~ s{\{\s}{\{}g;
-	    $line =~ s{\s\}}{\}}g;
-	    $line =~ s{\}\s}{\}}g;
-	    $line =~ s{\s\;}{\;}g;
-	    $line =~ s{\;\s}{\;}g;
-	    $line =~ s{\s:}{:}g;
-	    $line =~ s{:\s}{:}g;
+            # all of the following substitutions are designed to eliminate single spaces before/after the four chars "{};:"
+            $line =~ s{\s\{}{\{}g;
+            $line =~ s{\{\s}{\{}g;
+            $line =~ s{\s\}}{\}}g;
+            $line =~ s{\}\s}{\}}g;
+            $line =~ s{\s\;}{\;}g;
+            $line =~ s{\;\s}{\;}g;
+            $line =~ s{\s:}{:}g;
+            $line =~ s{:\s}{:}g;
         }
 
         # reassemble '$dir:$regex:' and '$cmd' strings to a single string '$dir:$regex:$cmd' and push on @dirs
@@ -1921,43 +1989,46 @@ package BldRoutines
         my $dir_regex;
         foreach my $line ( @fields )
         {
-	    next if $line =~ $RGX_BLANK_LINE;
+            next if $line =~ $RGX_BLANK_LINE;
 
-	    if ( $line =~ m{^[{].*[}]$} ) # matches a line of '{stuff}' exactly - a $cmd
-	    {
-	        if ( $prevline eq "cmd" )
-	        {
-		    if ( not $line =~ m{$RGX_CMD_BLOCK} )
-		    {
-		        fatal("FID 43: $BFN DIRS section line is not valid(doesn't match $RGX_CMD_BLOCK): $line");
-		    }
+            if ( $line =~ m{^[{].*[}]$} ) # matches a line of '{stuff}' exactly - a $cmd
+            {
+                if ( $prevline eq "cmd" )
+                {
+                    if ( not $line =~ m{$RGX_CMD_BLOCK} )
+                    {
+                        my $msg = sprintf "FATAL: %s DIRS section line is not valid(doesn't match %s): %s", $BFN, $RGX_CMD_BLOCK, $line;
+                        fatal($msg);
+                    }
 
-		    # lone cmd block string
-		    push @dirs, $line;
-	        }
-	        else
-	        {
-		    if ( not $dir_regex.$line =~ m{$RGX_VALID_DIRS_LINE} )
-		    {
-		        fatal("FID 44: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $dir_regex.$line");
-		    }
+                    # lone cmd block string
+                    push @dirs, $line;
+                }
+                else
+                {
+                    if ( not $dir_regex.$line =~ m{$RGX_VALID_DIRS_LINE} )
+                    {
+                        my $msg = sprintf "FATAL: %s DIRS section line is not valid(doesn't match %s): %s.%s", $BFN, $RGX_VALID_DIRS_LINE, $dir_regex, $line;
+                        fatal($msg);
+                    }
 
-		    # concatenate '$dir:$regex:' and '$cmd' strings
-		    push @dirs, $dir_regex.$line;
-		    $prevline = "cmd";
-	        }
-	    }
-	    else
-	    {
-	        if ( not $line =~ m{$RGX_VALID_DIRS_LINE} )
-	        {
-		    fatal("FID 45: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $line");
-	        }
+                    # concatenate '$dir:$regex:' and '$cmd' strings
+                    push @dirs, $dir_regex.$line;
+                    $prevline = "cmd";
+                }
+            }
+            else
+            {
+                if ( not $line =~ m{$RGX_VALID_DIRS_LINE} )
+                {
+                    my $msg = sprintf "FATAL: %s DIRS section line is not valid(doesn't match %s): %s", $BFN, $RGX_VALID_DIRS_LINE, $line;
+                    fatal($msg);
+                }
 
-	        # save '$dir:$regex:' line for next loop iteration
-	        $dir_regex = $line;
-	        $prevline = "dir_regex";
-	    }
+                # save '$dir:$regex:' line for next loop iteration
+                $dir_regex = $line;
+                $prevline = "dir_regex";
+            }
         }
 
         return @dirs;
@@ -1987,37 +2058,37 @@ package BldRoutines
                @dirs,
            ) = @_;
 
-
         my ( %dirs ); # hash holding unique subdirs of the "$dir" directory
         my ( @tmp );
+
 
         # accumulate expanded and unexpanded DIRS lines in @tmp
         foreach my $line ( @dirs )
         {
-	    # if '\s*R\s+' appears at the start of a DIRS line then do recursive build.  replace each R line with one or
-	    # more lines - each line with the same regex field and build command field, but each line directory first
-	    # field is the start directory and all recursive subdirectories
-	    if ( $line =~ m{^\s*R\s+(.*?)\s*(:.*)} )
-	    {
-	        my $dir = $1;
-	        my $restofline = $2;
+            # if '\s*R\s+' appears at the start of a DIRS line then do recursive build.  replace each R line with one or
+            # more lines - each line with the same regex field and build command field, but each line directory first
+            # field is the start directory and all recursive subdirectories
+            if ( $line =~ m{^\s*R\s+(.*?)\s*(:.*)} )
+            {
+                my $dir = $1;
+                my $restofline = $2;
 
-	        %dirs = ();
-	        # recursively find all subdirs from $dir as the start point
-	        # Note: if a directory is empty find() will not find it.  this is not a problem since a DIRS section
-	        #       line with no source files to match cause a fatal() error.
-	        find(sub {no warnings 'File::Find'; $dirs{"$File::Find::dir"} = 1;}, $dir);
+                %dirs = ();
+                # recursively find all subdirs from $dir as the start point
+                # Note: if a directory is empty find() will not find it.  this is not a problem since a DIRS section
+                #       line with no source files to match cause a fatal() error.
+                find(sub {no warnings 'File::Find'; $dirs{"$File::Find::dir"} = 1;}, $dir);
 
-	        # push recursively expanded dirs onto @tmp
-	        foreach my $k ( sort keys %dirs )
-	        {
-		    push @tmp, "$k$restofline";
-	        }
-	    }
-	    else
-	    {
-	        push @tmp, $line;
-	    }
+                # push recursively expanded dirs onto @tmp
+                foreach my $k ( sort keys %dirs )
+                {
+                    push @tmp, "$k$restofline";
+                }
+            }
+            else
+            {
+                push @tmp, $line;
+            }
         }
 
         # replace @dirs with new expanded array
@@ -2053,10 +2124,12 @@ package BldRoutines
         my ( $bfnfile );
         my ( $dirs, $comment_section, $eval_section, $dirs_section );
 
+
         # slurp in whole file to scalar
         if ( not -e "$BFN" )
         {
-	    fatal("FID 3: $BFN file missing.");
+            my $msg = sprintf "FATAL: %s file missing.", $BFN;
+            fatal($msg);
         }
         open my $bfnfh, "<", "Bld";
         my @bfnfile = <$bfnfh>;
@@ -2065,44 +2138,45 @@ package BldRoutines
 
         # match $BFN for EVAL and DIRS sections and extract them
         if (
-	       $bfnfile =~ m{
-			        (.*?)  # matches comment section - minimal match guarantees that only first EVAL will match
-			        ^EVAL$ # matches ^EVAL$ line
-			        (.*?)  # matches EVAL section lines - minimal match guarantees that only first DIRS will match
-			        ^DIRS$ # matches ^DIRS$ line
-			        (.*)   # matches DIRS section lines - maximal match picks up rest of file
-			    }xms
+               $bfnfile =~ m{
+                                (.*?)  # matches comment section - minimal match guarantees that only first EVAL will match
+                                ^EVAL$ # matches ^EVAL$ line
+                                (.*?)  # matches EVAL section lines - minimal match guarantees that only first DIRS will match
+                                ^DIRS$ # matches ^DIRS$ line
+                                (.*)   # matches DIRS section lines - maximal match picks up rest of file
+                            }xms
            )
         {
-	    $comment_section = $1;
-	    $eval_section = $2;
-	    $dirs_section = $3;
+            $comment_section = $1;
+            $eval_section = $2;
+            $dirs_section = $3;
         }
         else
         {
-	    fatal("FID 4: $BFN invalid format - need EVAL and DIRS sections.");
+            my $msg = sprintf "FATAL: %s invalid format - need EVAL and DIRS sections.", $BFN;
+            fatal($msg);
         }
 
         # accumulate EVAL section lines in @eval
         while ( $eval_section =~ m{ ^(.*)$ }gxm )
         {
-	    my $eval_line = $1;
+            my $eval_line = $1;
 
-	    # ignore if comment or blank line(s)
-	    next if ( $eval_line =~ $RGX_COMMENT_LINE or $eval_line =~ $RGX_BLANK_LINE );
+            # ignore if comment or blank line(s)
+            next if ( $eval_line =~ $RGX_COMMENT_LINE or $eval_line =~ $RGX_BLANK_LINE );
 
-	    push @eval, $eval_line;
+            push @eval, $eval_line;
         }
 
         # accumulate DIRS section lines in $dirs - including newlines
         while ( $dirs_section =~ m{ ^(.*)$ }gxm )
         {
-	    my $dirs_line = $1;
+            my $dirs_line = $1;
 
-	    # ignore if comment or blank line(s)
-	    next if ( $dirs_line =~ $RGX_COMMENT_LINE or $dirs_line =~ $RGX_BLANK_LINE );
+            # ignore if comment or blank line(s)
+            next if ( $dirs_line =~ $RGX_COMMENT_LINE or $dirs_line =~ $RGX_BLANK_LINE );
 
-	    $dirs .= "$dirs_line\n";
+            $dirs .= "$dirs_line\n";
         }
 
         return ( $comment_section, @eval, $dirs );
@@ -2364,7 +2438,8 @@ package BldRoutines
 
             print "$cpperror\n";
 
-            fatal("FID 58: $cpperror");
+            my $msg = sprintf "FATAL: %s", $cpperror;
+            fatal($msg);
         }
 
         # populate %hdr_dep with all unique header files returned by cpp
@@ -2511,12 +2586,14 @@ package BldRoutines
 
         if ( not -e $filename )
         {
-            fatal("FID 59: File: $filename does not exit.");
+            my $msg = sprintf "FATAL: File: %s does not exit.", $filename;
+            fatal($msg);
         }
 
         if ( not -e $BFN )
         {
-            fatal("FID 60: File: open() error on $filename.");
+            my $msg = sprintf "FATAL: File: open() error on %s.", $filename;
+            fatal($msg);
         }
         open my $fh, "<", $filename;
 
@@ -2524,7 +2601,8 @@ package BldRoutines
 
         if ( $inputfilesize == 0 )
         {
-            fatal("FID 61: File: $filename is of zero size - a useful signature cannot be taken of an empty file.");
+            my $msg = sprintf "FATAL: File: %s is of zero size - a useful signature cannot be taken of an empty file.", $filename;
+            fatal($msg);
         }
 
         read $fh, $inputfile, $inputfilesize;
@@ -2595,9 +2673,9 @@ package BldRoutines
 
 
     # 
-    # Usage      : warning("warning msg");
+    # Usage      : warning($msg);
     #
-    # Purpose    : accept msg as arg and append it to $BWFN file, then return.
+    # Purpose    : report warnings
     #
     # Parameters : $msg - a single scalar msg
     #
@@ -2617,10 +2695,17 @@ package BldRoutines
                $msg,
            ) = @_;
 
-        my ( $package, $filename, $line ) = caller;
+        my ( $package, $filename, $line );
+        my ( $output );
+
+
+        # get package, filename and line of error in calling file
+        ( $package, $filename, $line ) = caller;
+
+        $output  = sprintf "Package: %s  Filename: %s  Line: %4d - %s\n\n", $package, $filename, $line, $msg;
 
         open my $bwfnfh, ">>", $BWFN;
-        printf {$bwfnfh} "line: %4d - %s\n\n", $line, $msg;
+        printf {$bwfnfh} "$output";
         close $bwfnfh;
 
         return;
@@ -2628,14 +2713,14 @@ package BldRoutines
 
 
     # 
-    # Usage      : fatal("fatal msg");
+    # Usage      : fatal($msg);
     #
-    # Purpose    : accept msg as arg and append it to $BFFN file, then self 'kill INT' to
-    #            : call the anonymous interrupt($SIG{INT}) handler routine to croak().
+    # Purpose    : report fatal errors - write identical diagnostic information to
+    #            : the $BFFN file and standard output - then exit.
     #
     # Parameters : $msg - a single scalar msg
     #
-    # Returns    : Does not return
+    # Returns    : exit;
     #
     # Globals    : None
     #
@@ -2647,36 +2732,39 @@ package BldRoutines
     #
     sub fatal
     {
-	my (
-	       $msg,
-	   ) = @_;
+        my (
+               $msg,
+           ) = @_;
 
-	my ( $package, $filename, $line );
+        my ( $package, $filename, $line );
+        my ( $output );
 
 
-	( $package, $filename, $line ) = caller;
+        # get package, filename and line of error in calling file
+        ( $package, $filename, $line ) = caller;
 
-	open my $bffnfh, ">>", $BFFN;
-	printf {$bffnfh} "package: %s\n", $package;
-	printf {$bffnfh} "filename: %s  line: %4d\n", $filename, $line;
-	printf {$bffnfh} "stack trace: %s\n", longmess("");
-	printf {$bffnfh} "fatal(\$msg) msg: %s\n\n", $msg;
-	close $bffnfh;
+        $output  = sprintf "Package: %s  Filename: %s  Line: %4d\n\n", $package, $filename, $line;
+        $output .= sprintf "Fatal: %s\n\n", $msg;
+        $output .= sprintf "Stack Trace: %s\n\n", longmess("longmess()");
 
-	croak("\n$msg");
+        open my $bffnfh, ">>", $BFFN;
+        printf {$bffnfh} "$output";
+        close $bffnfh;
 
-	return;
+        print "$output";
+
+        exit;
     }
 
 
     # 
     # Usage      : bld -h
     #
-    # Purpose    : help option
+    # Purpose    : print Usage msg
     #
     # Parameters : None
     #
-    # Returns    : Does not return
+    # Returns    : exit;
     #
     # Globals    : None
     #
@@ -2737,7 +2825,11 @@ package BldRoutines
             when( m{ ^[^\/].*$RGX_LIBS$ }x )       { $na = 3; }
             when( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x ) { $na = 4; }
             when( m{ .*[.]$RGX_SRC_EXT$ }x )       { $na = 5; }
-            default { fatal("FID 62: Invalid source format - $a"); }
+            my $msg = sprintf "";
+            default {
+                        my $msg = sprintf "FATAL: Invalid source format - $a";
+                        fatal($msg);
+                    }
         }
 
         given( $b )
@@ -2747,7 +2839,10 @@ package BldRoutines
             when( m{ ^[^\/].*$RGX_LIBS$ }x )       { $nb = 3; }
             when( m{ ^[^\/].*[.]$RGX_HDR_EXT$ }x ) { $nb = 4; }
             when( m{ .*[.]$RGX_SRC_EXT$ }x )       { $nb = 5; }
-            default { fatal("FID 63: Invalid source format - $b"); }
+            default {
+                        my $msg = sprintf "FATAL: Invalid source format - %s", $b;
+                        fatal($msg);
+                    }
         }
 
         ( $vol, $path, $basea ) = File::Spec->splitpath( $a );
@@ -2758,7 +2853,8 @@ package BldRoutines
         }
         else
         {
-            fatal("FID 64: Valid file extension not found in $basea");
+            my $msg = sprintf "FATAL: Valid file extension not found in %s", $basea;
+            fatal($msg);
         }
 
         ( $vol, $path, $baseb ) = File::Spec->splitpath( $b );
@@ -2769,7 +2865,8 @@ package BldRoutines
         }
         else
         {
-            fatal("FID 65: Valid file extension not found in $baseb");
+            my $msg = sprintf "FATAL: Valid file extension not found in %s", $baseb;
+            fatal($msg);
         }
 
         # DEBUG

@@ -1,7 +1,7 @@
 
 OS: linux
 
-bld version: 1.0.2
+bld version: 1.0.3
 
 perl full path: /usr/bin/perl
 perl version: Summary of my perl5 (revision 5 version 18 subversion 4) configuration:

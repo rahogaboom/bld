@@ -30,16 +30,6 @@ use Text::Balanced qw(
                          extract_bracketed
                      );
 
-# croak() - used in fatal() to die with better info than die()
-# cluck() - used for full stack trace debugging, outputs to stdout
-# shortmess() - used for full stack trace debugging, returns stack trace
-use Carp qw(
-               croak
-               cluck
-               shortmess
-               longmess
-           );
-
 # sha1_hex - the bld program SHA1 generator
 use Digest::SHA qw(
                       sha1_hex
@@ -267,22 +257,26 @@ use BldRoutines;
                 #          already exists will fatal().  if a source is not rebuilt then it will not be added to %Targets.  only rebuilt targets are added.
     );
 
-    # initially interrupts just croak(); after the $BFN file has been processed and the $SIGFN has been read in, int_sig_handler()
-    # will handle them and first write out any partially accumulated new signatures to $SIGFN and then croak().
+    # initially interrupts just fatal(); after the $BFN file has been processed and the $SIGFN has been read in, int_sig_handler()
+    # will handle them and first write out any partially accumulated new signatures to $SIGFN and then fatal().
     local $SIG{INT} = sub {
                               my (
                                      $signame,
                                  ) = @_;
 
-                                 croak("\nInterrupted with signal $signame");
+                                 fatal("\nInterrupted with signal $signame");
                           };
 
     GetOptions
     (
         "h" => \$opt_h,
-    ) or fatal("FID 1: GetOptions() failed(use bld -h).");
+    ) or fatal("FATAL: GetOptions() failed(use bld -h).");
 
-    fatal("FID 2: Arguments specified - takes only options.") if @ARGV > 0;
+    if ( @ARGV > 0 )
+    {
+        my $msg = sprintf "FATAL: Arguments specified - takes only options.";
+        fatal($msg);
+    }
 
     # help msg
     opt_help() if $opt_h;
@@ -306,7 +300,8 @@ use BldRoutines;
 
     if ( @eval == 0 )
     {
-        fatal("FID 5: $BFN EVAL section is empty.");
+        my $msg = sprintf "FATAL: %s EVAL section is empty.", $BFN;
+        fatal($msg);
     }
 
     {
@@ -337,26 +332,42 @@ use BldRoutines;
         # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
         if ( $EVAL_ERROR )
         {
-            fatal("FID 6: $BFN EVAL section: Fatal eval error: $EVAL_ERROR");
+            my $msg = sprintf "FATAL: %s EVAL section: Fatal eval error: %s", $BFN, $EVAL_ERROR;
+            fatal($msg);
         }
 
-        fatal("FID 7: Invalid value for \$opt_s: \'$opt_s\'") if $opt_s ne "system" and $opt_s ne "nosystem";
-        fatal("FID 8: Invalid value for \$opt_r: \'$opt_r\'") if $opt_r ne "rebuild" and $opt_r ne "norebuild";
-        fatal("FID 9: Invalid value for \$opt_lib: \'$opt_lib\'") if
-            $opt_lib ne "nolibcheck" and
-            $opt_lib ne "libcheck" and
-            $opt_lib ne "warnlibcheck" and
-            $opt_lib ne "fatallibcheck";
+        if ( $opt_s ne "system" and $opt_s ne "nosystem" )
+        {
+            my $msg = sprintf "FATAL: Invalid value for \$opt_s: \'%s\'", $opt_s;
+            fatal($msg);
+        }
+        if ( $opt_r ne "rebuild" and $opt_r ne "norebuild" )
+        {
+            my $msg = sprintf "FATAL: Invalid value for \$opt_r: \'%s\'", $opt_r;
+            fatal($msg);
+        }
+        if (
+               $opt_lib ne "nolibcheck" and
+               $opt_lib ne "libcheck" and
+               $opt_lib ne "warnlibcheck" and
+               $opt_lib ne "fatallibcheck"
+           )
+        {
+            my $msg = sprintf "FATAL: Invalid value for \$opt_lib: \'%s\'", $opt_lib;
+            fatal($msg);
+        }
     }
 
     if ( not defined $bld or not defined $bldcmd or not defined $lib_dirs )
     {
-        fatal("FID 10: One or more of $BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
+        my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.", $BFN;
+        fatal($msg);
     }
 
     if ( not defined $opt_s or not defined $opt_r or not defined $opt_lib )
     {
-        fatal("FID 11: One or more of $BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
+        my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.", $BFN;
+        fatal($msg);
     }
 
     $bld =~ s{^\s*|\s*$}{}g; # strip pre/post white space
@@ -399,12 +410,12 @@ use BldRoutines;
     #
     # Parameters : called with the SIG name of the interrupt
     #
-    # Returns    : None
+    # Returns    : fatal()
     #
     # Globals    : %Sigdata
     #            : %SigdataNew
     #
-    # Throws     : croak()'s
+    # Throws     : None
     #
     # Notes      : None
     #
@@ -421,7 +432,7 @@ use BldRoutines;
 
         sig_file_update( $bld, \%SigdataNew );
 
-        croak("\nInterrupted with signal $signame");
+        fatal("\nInterrupted with signal $signame");
     }
 
 
@@ -467,7 +478,8 @@ use BldRoutines;
                     {
                         $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-                        fatal("FID 17: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
+                        my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $status;
+                        fatal($msg);
                     }
                 }
 
@@ -502,15 +514,15 @@ use BldRoutines;
                 {
                     my ( $cmd_var_sub, $truefalse );
 
-		    # find perl variables in $cmd and substitute EVAL section values for these variables
-		    # and substitute the $s variable from the @Sources array.
-		    # NOTE: do 'perldoc -q "How can I expand variables in text strings"' to see a discussion
-		    #       of how this(s{}{}gee) works and possible alternatives.
+                    # find perl variables in $cmd and substitute EVAL section values for these variables
+                    # and substitute the $s variable from the @Sources array.
+                    # NOTE: do 'perldoc -q "How can I expand variables in text strings"' to see a discussion
+                    #       of how this(s{}{}gee) works and possible alternatives.
 
                     $cmd_var_sub = $cmd;
-		    no strict;
-		    $cmd_var_sub =~ s{(\$$RGX_PERL_VARIABLE)}{$1}gee;
-		    use strict;
+                    no strict;
+                    $cmd_var_sub =~ s{(\$$RGX_PERL_VARIABLE)}{$1}gee;
+                    use strict;
 
                     $truefalse = src_pro( $s, $cmd_var_sub, $bld, $opt_s, $opt_r, \%Sigdata, \%Depend, \%SigdataNew, \%SourceSig, \%Objects, \%Targets );
 
@@ -523,14 +535,16 @@ use BldRoutines;
             }
             default
             {
-                fatal("FID 18: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
+                my $msg = sprintf "FATAL: %s DIRS section line is incorrectly formatted(see %s): %s", $BFN, $BIFN, $line;
+                fatal($msg);
             }
         }
     } # END: foreach my $line ( @dirs ){}
 
     if ( not %Objects )
     {
-        fatal("FID 19: No source file matched in any DIRS section line regular expression.");
+        my $msg = sprintf "FATAL: No source file matched in any DIRS section line regular expression.";
+        fatal($msg);
     }
 
 
@@ -993,10 +1007,11 @@ bld [-h]
 =head1 NOTES
 
  1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
-    have the same root name as the source.
+    have the same root name as the source.  of course, a subsequent Bld file {} block can rename 
+    and move the .o files.
 
  2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
-    into the same project directory.
+    into the same project directory before distribution for installation.
 
  3. Some projects violate either or both of these target naming or object file naming/location
     requirements, but reconstructing these projects with bld should be relatively easy
@@ -1004,7 +1019,6 @@ bld [-h]
 
  4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
     source directory.
-
 
     Very old notes - needs updating:
 
@@ -1261,363 +1275,19 @@ bld [-h]
 
 =head1 DIAGNOSTICS
 
- Warnings(Warning ID(WID)):
-
- # routine: rebuild_target_bool()
- # ldd return has a library 'not found' entry
- warning("WID 1: ldd return: $libname library is 'not found'");
-
- # routine: rebuild_target_bool()
- # warn if libraries have been removed from the bld
- warning("WID 2: Libraries removed: @libs_removed") if $opt_lib eq "warnlibcheck";
-
- # routine: rebuild_target_bool()
- # warn if a library has changed
- warning("WID 3: Library changed: $l") if $opt_lib eq "warnlibcheck";
-
- # routine: rebuild_target_bool()
- # warn if a library has been added to the bld
- warning("WID 4: Libraries added: @libs_removed") if $opt_lib eq "warnlibcheck";
-
- # routine: rebuild_exec()
- # ldd return has a library 'not found' entry
- warning("WID 5: ldd return: $libname library is 'not found'");
-
- # routine: multiple_sigs()
- # if there are multiple source files with the same signature print this header
- $warn = "Multiple source files with the same signature:\n";
- $warn .= "--------------------------------------------------------------------------------------\n";
- warning("WID 6: $warn");
-
- # routine: multiple_sigs()
- # warn if there are multiple source files with the same signature
- $warn = sprintf "%*d  %s\n", 31, $n, $signature;
- # loop over all source file names with $signature
- foreach my $file ( sort keys %{$SourceSig{$signature}} )
- {
-     $warn .= sprintf "%*s\n", 86, $file;
- }
- warning("WID 7: $warn");
-
- # routine: buildopt()
- # warn if multiple instances of '-c' option detected in {} cmds; this can occur if conditional compilation is used
- warning("WID 8: Multiple instances of '-c' detected in compile options(might just be conditional compilation).\n--->$tmp");
-
- # routine: buildopt()
- # warn if multiple instances of '-S' option detected in {} cmds; this can occur if conditional compilation is used
- warning("WID 9: Multiple instances of '-S' detected in compile options(might just be conditional compilation).\n--->$tmp");
-
- # routine: buildopt()
- # warn if multiple instances of '-E' option detected in {} cmds; this can occur if conditional compilation is used
- warning("WID 10: Multiple instances of '-E' detected in compile options(might just be conditional compilation).\n--->$tmp");
-
- # routine: accum_blddotinfo_output()
- # multiple $s variables specified in {} cmd field - not necessarily a problem
- warning("WID 11: Multiple($n) '\$s' variables specified in DIRS line command field: $cmd_var_sub");
-
- # routine: accum_blddotinfo_output()
- # the regex field of the cmd line specification did not match any source files
- warning("WID 12: No sources matched in $BFN DIRS section line $line");
-
- # routine: accum_blddotinfo_output()
- # warn if a source file does not exist or is not readable
- my $string = sprintf "Source file %s does not exist or is not readable.\n   %4d  %s", $s, $count, $line;
- warning("WID 13: $string");
-
- # routine: accum_blddotinfo_output()
- # warn and fatal if the same source file has been specified in multiple DIRS regex specifications
- my $string = sprintf "Source file %s specified in more than one DIRS line specification:\n   %s\n   %4d  %s", $s, $s{"$basename"}, $count, $line;
- warning("WID 14: $string");
-
- # routine: dirs_pro()
- # warn and fatal if any of the following three are detected
- my $msg = "$BFN DIRS section has one or more of:\n".
-    "a. Directory or source file specification cannot be read\n".
-    "b. No sources matched\n".
-    "c. Multiple build entries matching same source file";
- warning("WID 15: $msg");
-
- # routine: variable_match()
- # warn if variables defined in the EVAL section are not used in any DIRS section specification
- warning("WID 16: EVAL defined variable(s) not used in DIRS cmds: @evalextra");
-
- # routine: variable_match()
- # warn and fatal if variables used in the DIRS section specifications are not defined in the EVAL section
- warning("WID 17: DIRS cmd variable(s) not defined in EVAL section: @dirsextra");
-
-
- Fatals(Fatal ID(FID)):
-
- # routine: main bld program block
- # bad option entered - only '-h' allowed
- fatal("FID 1: GetOptions() failed(use bld -h).");
-
- # routine: main bld program block
- # bld does not take any arguments
- fatal("FID 2: Arguments specified - takes only options.") if @ARGV > 0;
-
- # routine: Bld_section_extract()
- # missing Bld file
- fatal("FID 3: $BFN file missing.");
-
- # routine: Bld_section_extract()
- # the Bld file requires sections separated by a line with EVAL at the beginning followed by a line with DIRS at the beginning
- fatal("FID 4: $BFN invalid format - need EVAL and DIRS sections.");
-
- # routine: main bld program block
- # the Bld file EVAL section requires the definition of six variables and optionally any others
- fatal("FID 5: $BFN EVAL section is empty.");
-
- # routine: main bld program block
- # the EVAL section is 'eval "@eval";'ed for errors
- fatal("FID 6: $BFN EVAL section: Fatal eval error: $EVAL_ERROR");
-
- # routine: main bld program block
- # $opt_s must be either "system" or "nosystem"
- fatal("FID 7: Invalid value for \$opt_s: \'$opt_s\'") if $opt_s ne "system" and $opt_s ne "nosystem";
-
- # routine: main bld program block
- # $opt_r must be either "rebuild" or "norebuild"
- fatal("FID 8: Invalid value for \$opt_r: \'$opt_r\'") if $opt_r ne "rebuild" and $opt_r ne "norebuild";
-
- # routine: main bld program block
- # $opt_lib must be either "nolibcheck" or "libcheck" or "warnlibcheck" or "fatallibcheck"
- fatal("FID 9: Invalid value for \$opt_lib: \'$opt_lib\'") if
-     $opt_lib ne "nolibcheck" and
-     $opt_lib ne "libcheck" and
-     $opt_lib ne "warnlibcheck" and
-     $opt_lib ne "fatallibcheck";
-
- # routine: main bld program block
- # $bld, $bldcmd and $lib_dirs are mandatory defines in the EVAL section
- fatal("FID 10: One or more of $BFN file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.");
-
- # routine: main bld program block
- # $opt_s and $opt_r and $opt_lib are mandatory defines in the EVAL section
- fatal("FID 11: One or more of $BFN file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.");
-
- # routine: read_Blddotsig()
- # invalid header file or library file SHA1 signature in Bld.sig file
- fatal("FID 12: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
-
- # routine: read_Blddotsig()
- # invalid source file SHA1 signature in Bld.sig file
- fatal("FID 13: Malformed $SIGFN file - invalid SHA1 signature \$sigsource:\n$line");
-
- # routine: read_Blddotsig()
- # invalid source file build cmd SHA1 signature in Bld.sig file
- fatal("FID 14: Malformed $SIGFN file - invalid SHA1 signature \$sigcmd:\n$line");
-
- # routine: read_Blddotsig()
- # invalid source target file SHA1 signature in Bld.sig file
- fatal("FID 15: Malformed $SIGFN file - invalid SHA1 signature \$sigtarget:\n$line");
-
- # routine: read_Blddotsig()
- # a line in the Bld.sig file did not match a recognized format
- fatal("FID 16: Malformed $SIGFN file - invalid format line:\n$line");
-
- # routine: main bld program block
- # execution of the {} field cmds with system() failed
- fatal("FID 17: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
-
- # routine: main bld program block
- # DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
- fatal("FID 18: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
-
- # routine: main bld program block
- # for regexs in DIRS section '[R] dir:regex:{cmds}' specifications the regex must match at lest one source file
- fatal("FID 19: No source file matched in any DIRS section line regular expression.");
-
- # routine: rebuild_target_bool()
- # if $opt_lib is "libcheck" or "warnlibcheck" or "fatallibcheck" the target must be dynamically linkable
- fatal("FID 20: ldd return: $bld is 'not a dynamic executable'");
-
- # routine: rebuild_target_bool()
- # a library has been removed from the bld and "fatallibcheck" has been specified
- fatal("FID 21: Libraries removed: @libs_removed") if $opt_lib eq "fatallibcheck";
-
- # routine: rebuild_target_bool()
- # a library has been changed from the bld and "fatallibcheck" has been specified
- fatal("FID 22: Library changed: $l") if $opt_lib eq "fatallibcheck";
-
- # routine: rebuild_target_bool()
- # a library has been added from the bld and "fatallibcheck" has been specified
- fatal("FID 23: Libraries added: @libs_removed") if $opt_lib eq "fatallibcheck";
-
- # routine: rebuild_exec()
- # error detected in rebuilding the target form $bldcmd
- fatal("FID 24: Error msg: $error_msg\nCmd: \"$tmp\"\nFail status: $status");
-
- # routine: rebuild_exec()
- # doing 'ldd' cmd on the target, $bld, indicated that the target wis not a dynamic executable
- fatal("FID 25: ldd return: $bld is 'not a dynamic executable'");
-
- # routine: src_pro()
- # wrong number of arguments specified for the src_pro() routine
- fatal("FID 26: src_pro(): wrong number of args") if @_ != 11;
-
- # routine: src_pro()
- # source files may only have valid file extensions
- fatal("FID 27: Valid file extension not found in $s");
-
- # routine: src_pro()
- # source files may only have valid file extensions
- fatal("FID 28: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
-
- # routine: buildopt()
- # the source file has an extension that does not match what is expected by the build option
- fatal("FID 29: Invalid combination of source extension: $srcext and build option: -c.");
-
- # routine: buildopt()
- # two objects files of the same name can't be produced in the same place
- fatal("FID 30: Object file conflict - $s produces an object file $basenametgt that already exists.");
-
- # routine: buildopt()
- # the source file has an extension that does not match what is expected by the build option
- fatal("FID 31: Invalid combination of source extension: $srcext and build option: -S.");
-
- # routine: buildopt()
- # the source file has an extension that does not match what is expected by the build option
- fatal("FID 32: Invalid combination of source extension: $srcext and build option: -E.");
-
- # routine: buildopt()
- # the source file has an extension that does not match what is expected by the build option
- fatal("FID 33: Invalid combination of source extension: $srcext and build option: non of -c/-S/-E exists.");
-
- # routine: buildopt()
- # only one of options -c/-S/-E may be specified in a cmd field for a source
- fatal("FID 34: Multiple options -c/-S/-E specified in cmd: $cmd_var_sub.");
-
- # routine: tgtextorfile()
- # multiple target files in the $srcpath directory.  if more than one target file do fatal().
- fatal("FID 35: More than one target file for $srcfile in $srcpath: @tgtfiles");
-
- # routine: src_pro()
- # execution of the {} field cmds with system() failed
- fatal("FID 36: Error msg: $error_msg\nCmd: \"$cmd_var_sub\"\nFail status: $status");
-
- # routine: src_pro()
- # execution of the {} field cmds with system() failed to produce any new target files
- fatal("FID 37: No new target files created by command:\nCmd: \"$cmd_var_sub\"");
-
- # routine: tgt_signature()
- # execution of the {} field cmds with system() failed to produce any new target files
- fatal("FID 38: No target file for $srcfile in $srcpath: @tgtfiles");
-
- # routine: tgt_signature()
- # check for multiple target files created by $cmd_var_sub
- fatal("FID 39: More than one target file for $srcfile in $srcpath: @tgtfiles");
-
- # routine: tgt_signature()
- # two target files of the same name and location cannot be created
- fatal("FID 40: An identical target file(name) has been created twice: ${srcpath}$tgtfiles[0]");
-
- # routine: src_pro()
- # moving all new files in the bld directory created by "$cmd_var_sub" execution
- # to the directory of the $s source failed
- fatal("FID 41: Error msg: $error_msg\n\"mv $newfile $srcpath\" fail status: $status");
-
- # routine: dirs_pro()
- # Bld file DIRS section cannot be empty
- fatal("FID 42: $BFN DIRS section is empty.");
-
- # routine: cvt_dirs_to_array()
- # Bld file DIRS section line should be a cmd block({}) but does not match this pattern
- fatal("FID 43: $BFN DIRS section line is not valid(doesn't match $RGX_CMD_BLOCK): $line");
-
- # routine: cvt_dirs_to_array()
- # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
- fatal("FID 44: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $dir_regex.$line");
-
- # routine: cvt_dirs_to_array()
- # Bld file DIRS section lines must be formatted with cmd blocks({}) or three field specification lines('[R] dir:regex:{cmds}')
- fatal("FID 45: $BFN DIRS section line is not valid(doesn't match $RGX_VALID_DIRS_LINE): $line");
-
- # routine: dirs_pro()
- # Bld file DIRS section cannot be empty
- fatal("FID 46: $BFN DIRS section is empty.");
-
- # routine: dirs_pro()
- # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
- fatal("FID 47: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
-
- # routine: accum_blddotinfo_output()
- # Bld file DIRS section directory specifications must have valid chars
- fatal("FID 48: Bad(really weird) char(not $RGX_VALID_PATH_CHARS) in directory specification: $dir");
-
- # routine: accum_blddotinfo_output()
- # do eval {} on regex to determine if regex is valid
- fatal("FID 49: Invalid regular expression - \"$regex_srcs\".");
-
- # routine: accum_blddotinfo_output()
- # each Bld file DIRS section cmd field must have at least on '$s' source file specification
- fatal("FID 50: No '\$s' variable specified in DIRS line command field: $cmd_var_sub");
-
- # routine: accum_blddotinfo_output()
- # source files may only have valid file extensions
- fatal("FID 51: Valid file extension not found in $s");
-
- # routine: accum_blddotinfo_output()
- # source files may only have valid file extensions
- fatal("FID 52: $BFN DIRS section source file $s has no recognizable extension(see %Depend)");
-
- # routine: accum_blddotinfo_output()
- # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
- fatal("FID 53: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
-
- # routine: dirs_pro()
- # Bld DIRS section has one or more of:
- #     a. Directory or source file specification cannot be read
- #     b. No sources matched
- #     c. Multiple build entries matching same source file
- fatal("FID 54: $msg   - see $BWFN.\n");
-
- # routine: variable_match()
- # the scalar variable '$s' may never be specified in the EVAL section
- fatal("FID 55: The scalar variable \$s may not be specified in the EVAL section, as this is used in the DIRS".
-       " section command field to signify matched source files.");
-
- # routine: variable_match()
- # a formatting error was detected in a DIRS section line; must be cmd block({}) or one '[R] dir:regex:{cmds}'
- fatal("FID 56: $BFN DIRS section line is incorrectly formatted(see $BIFN): $line");
-
- # routine: variable_match()
- # variables used in DIRS section cmd fields but not defined in the EVAL section
- fatal("FID 57: Extra unused variable(s) in DIRS section - see $BWFN.");
-
- # routine: hdr_depend()
- # doing the 'cpp' cmd on a source file failed
- fatal("FID 58: $cpperror");
-
- # routine: file_sig_calc()
- # file to calculate signature of does not exist
- fatal("FID 59: File: $filename does not exit.");
-
- # routine: file_sig_calc()
- # error on open attempt of Bld file
- fatal("FID 60: File: open() error on $filename.");
-
- # routine: file_sig_calc()
- # can't take a signature of a zero length file
- fatal("FID 61: File: $filename is of zero size - a useful signature cannot be taken of an empty file.");
-
- # routine: sourcesort()
- # the regex's for valid source, header or library files do not match
- fatal("FID 62: Invalid source format - $a");
-
- # routine: sourcesort()
- # the regex's for valid source, header or library files do not match
- fatal("FID 63: Invalid source format - $b");
-
- # routine: sourcesort()
- # the regex for valid file extensions did not match
- fatal("FID 64: Valid file extension not found in $basea");
-
- # routine: sourcesort()
- # the regex for valid file extensions did not match
- fatal("FID 65: Valid file extension not found in $baseb");
-
-=head1 TODO/CONTEMPLATE/INVESTIGATE/EXAMINE/CHECKOUT/THINK ABOUT/HACK ON
+ Diagnostics are either warnings(calling warning($msg)) or fatals(calling fatal($msg)).
+ Warnings and fatals are exclusive; specific conditions cause warnings and specific
+ other conditions cause fatals.  There is no overlap.  Warnings are conditions that may
+ be of interest e.g. same header file in multiple locations, but which should not
+ impact the full build of the project.  Fatals are conditions that either will
+ necessarily force the termination of the build or that indicate the construction of
+ the Bld file has some instructions that are contradictory or missing necessary
+ elements e.g. same source file compiled twice.  Warnings are written to the bld.warn
+ file only.  Fatals are written identically to standard out and the bld.fatal file.
+ Warnings all start with 'WARNING:' and fatals all start with 'FATAL:'.  There are
+ no other types of diagnostic msgs.
+
+=head1 TODO/CONTEMPLATE/INVESTIGATE/EXAMINE/CHECKOUT/THINK ABOUT/HACK ON/SPO
 
    Software Development:
 
@@ -1636,12 +1306,12 @@ bld [-h]
 
    Test:
 
- . bld - allow compile of a group od 1 or more *.c files without building an exec or library
+ . bld - allow compile of a group of 1 or more *.c files without building an exec or library
  . bld - install kernel - think about automation of 'make V=1' to Bld file
  . test execution of arbitrary perl code in Bld.<project>.gv and EVAL sections
  . do a 'make V-1 install' in the git project and see what it takes to install git
  . add new version of one of git/subversion/systemd to show how multiple versions of <project> are bld't
- . run on Mac
+ . run on Mac/PC
  . test library changes
  . investigate running under the debugger and profiling
  . Unit Tests:
@@ -1653,16 +1323,13 @@ bld [-h]
 
    Doc:
 
+ . add History file
  . Doc that bld has no inherent built in rules
  . add security info
  . add explanation of aux directory
- . go thru code line by line and do code scrub, comment scrub and make list of features and advantages
- . do bld perldoc
+ . go thru code line by line and do code scrub, comment scrub
  . doc extensions.pl and clang-gcc-headers.pl
  . Bld file with only a {} block will execute the block but fail because of no .o files to build the target
- . make list of install component requirements:
-       1. experimental.pm
-       2. gcc/clang
  . add note that two project builds cannot run at the same time - Bld.sig and Bld.gv files
  . add Note about if two targets are built from the same source files - they both use the same .o files
        and may compile different .o files depending on the compile options - this results in the building
