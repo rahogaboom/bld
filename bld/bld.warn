@@ -2,18 +2,18 @@ Package: BldRoutines  Filename: modules/BldRoutines.pm  Line:  523 - WARNING: Mu
 
 Package: BldRoutines  Filename: modules/BldRoutines.pm  Line:  523 - WARNING: Multiple(2) '$s' variables specified in DIRS line command field: {ls -l $s;$CC -c $INCLUDE $s;}
 
-Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1487 - WARNING: Multiple instances of '-S' detected in compile options(might just be conditional compilation).
+Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1484 - WARNING: Multiple instances of '-S' detected in compile options(might just be conditional compilation).
 --->\nif [ "a" == 'a' ];\nthen\ngcc -S -I bld.example/example/include "bld.example/example/C/main.c";\nfi\nif [ "a" == 'b' ];\nthen\ngcc -O4 -S -I bld.example/example/include "bld.example/example/C/main.c";\nfi\n
 
-Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1355 - WARNING: Multiple source files with the same signature:
+Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1353 - WARNING: Multiple source files with the same signature:
 --------------------------------------------------------------------------------------
 
-Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1367 - WARNING:                               3  7354a1b2a464cb3a0f6444d4363c4aae7e40b362
+Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1364 - WARNING:                               3  7354a1b2a464cb3a0f6444d4363c4aae7e40b362
                                                bld.example/example/C/../include/head.h
                                                           bld.example/example/C/head.h
                                                     bld.example/example/include/head.h
 
-Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1367 - WARNING:                               2  9811db426524b5cc3e453961e3294a9eb713ae60
+Package: BldRoutines  Filename: modules/BldRoutines.pm  Line: 1364 - WARNING:                               2  9811db426524b5cc3e453961e3294a9eb713ae60
                                                            bld.example/example/C/z/w.c
                                                           bld.example/example/C/z/w1.c
 
