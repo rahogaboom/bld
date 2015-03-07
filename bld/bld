@@ -769,6 +769,9 @@ bld [-h]
     gcc(1)/g++(1) (http://gcc.gnu.org/)
     clang(1) (http://llvm.org/)
 
+ See bld.README for a more extensive list of possible dependencies required to bld the git, svn and systemd
+ projects.
+
 =head1 FEATURES AND ADVANTAGES
 
  1. Everything is done with SHA1 signatures.  No dates are used anywhere.  Signatures are a property of the
@@ -840,7 +843,6 @@ bld [-h]
 
 =head1 PROJECT STATE
 
- Needed:
  1. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
     no options.  How options affect the generated code and thus the Bld files is important.
     Anyone willing to investigate configure options and how these options affect the Bld files
@@ -934,22 +936,22 @@ bld [-h]
     c. ./bld.systemd.rm --all     # cleans up everything
 
  2. Bld'ing the svn project - https://subversion.apache.org/
-    a. cd Bld.svn/subversion-1.8.5 # puts you into the svn(subversion-1.8.5) project directory
-    b. ./bld.svn --all             # bld's all of the svn targets and bld target output files -
-                                         the bld.info.svn.<target>,
-                                         the bld.warn.svn.<target>,
-                                         the bld.fatal.svn.<target>,
-                                         files
-    c. ./bld.svn.rm --all          # cleans up everything
+    a. cd Bld.svn/subversion-1.8.11 # puts you into the svn(subversion-1.8.11) project directory
+    b. ./bld.svn --all              # bld's all of the svn targets and bld target output files -
+                                          the bld.info.svn.<target>,
+                                          the bld.warn.svn.<target>,
+                                          the bld.fatal.svn.<target>,
+                                          files
+    c. ./bld.svn.rm --all           # cleans up everything
 
  3. Bld'ing the git project - http://www.git-scm.com/
-    a. cd Bld.git/git-1.9.rc0 # puts you into the git(git-1.9.rc0) project directory
-    b. ./bld.git --all        # bld's all of the git targets and bld target output files -
-                                    the bld.info.git.<target>,
-                                    the bld.warn.git.<target>,
-                                    the bld.fatal.git.<target>,
-                                    files
-    c. ./bld.git.rm --all     # cleans up everything
+    a. cd Bld.git/git-2.3.0 # puts you into the git(git-2.3.0) project directory
+    b. ./bld.git --all      # bld's all of the git targets and bld target output files -
+                                  the bld.info.git.<target>,
+                                  the bld.warn.git.<target>,
+                                  the bld.fatal.git.<target>,
+                                  files
+    c. ./bld.git.rm --all   # cleans up everything
 
  4. Bld'ing any single target
     a. cd bld       # the main bld directory - cd here when you unpack the bld.tar.xz file
@@ -979,7 +981,7 @@ bld [-h]
  ~/bld directories:
  Bld.<project>/<version> - has all files controlling <project> <version>s blds and bld target output files
  bld.<project>/<version> - source code for <project> <version>s
- aux                     - template scripts for <project> blds
+ aux                     - template scripts directory for <project> blds
 
  ~/bld/aux files:
  aux/bld.<project>       - template copied to Bld.<project>/<version> directories to bld multi-target projects
@@ -998,7 +1000,50 @@ bld [-h]
  bld.info.<project>.<target>   - the bld.info file for each <project> <target>
  bld.warn.<project>.<target>   - the bld.warn file for each <project> <target>
  bld.fatal.<project>.<target>  - the bld.fatal file for each <project> <target>
- bld.<project>.targets         - all of the <project> targets
+
+=head1 CALL TREE
+
+ Calls to imported functions from public CPAN modules are omitted.  Calls to some bld
+ coded routines are omitted:
+     opt_help()
+     system_error_msg()
+     warning()
+     fatal()
+     sourcesort()
+
+ bld
+     Bld_section_extract()
+     init_blddotinfo()
+     dirs_pro()
+         cvt_dirs_to_array()
+         expand_R_specification()
+         accum_blddotinfo_output()
+            var_sub()
+            var_sub()
+            var_sub()
+     variable_match()
+         var_sub()
+         var_sub()
+         var_sub()
+     read_Blddotsig()
+     var_sub()
+     var_sub()
+     src_pro()
+         file_sig_calc()
+         buildopt();
+         tgtextorfile();
+         hdr_depend()
+         file_sig_calc()
+         rebuild_src_bool()
+         tgt_signature()
+     rebuild_target_bool()
+         file_sig_calc()
+         file_sig_calc()
+     rebuild_exec()
+         file_sig_calc()
+         file_sig_calc()
+     multiple_sigs()
+     sig_file_update()
 
 =head1 PRIMARY PROGRAM DATA STRUCTURES
 
@@ -1007,11 +1052,12 @@ bld [-h]
 =head1 NOTES
 
  1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
-    have the same root name as the source.  of course, a subsequent Bld file {} block can rename 
-    and move the .o files.
+    have the same root name as the source.  a subsequent Bld file {} block can rename and move
+    the .o files.
 
  2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
-    into the same project directory before distribution for installation.
+    into the same project directory before distribution for installation.  installation can
+    then rename and distribute targets in any way desired.
 
  3. Some projects violate either or both of these target naming or object file naming/location
     requirements, but reconstructing these projects with bld should be relatively easy
@@ -1019,8 +1065,6 @@ bld [-h]
 
  4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
     source directory.
-
-    Very old notes - needs updating:
 
     1. bld uses two adjunct files: Bld and Bld.sig.  The Bld file describes all the sources,
        their locations, and the rules for building them.  Since bld is not hierarchical the
@@ -1045,6 +1089,7 @@ bld [-h]
        the command field will not affect any source rebuild.  If any source file in any of the
        directories is not selected by some regular expression, it is not included in the build.
        A simple and an extended example of Bld files is given below.
+
     2. The Bld.sig signature file is automatically created and updated.  It contains one line
        for each source, one line for each header file, and one line for the executable.  The
        header file lines and the executable line have two fields: the file name and its
@@ -1053,11 +1098,7 @@ bld [-h]
        user can modify this file to force the rebuild of files by altering the signature or
        even by deleting a line, however, any modification to a source or header file, or build
        command string will do the same thing.
-    3. The user should always run bld -b after completion of a new executable Bld file.
-       This option processes the Bld file and prints the expanded build command and all
-       source files that each specification line selects for.  Thus, the user can see
-       exactly what is going to be included in each build and how all files are going to
-       be rebuilt.  Any variables defined for use in the build rules are also printed out.
+
     4. A bld run may be ^C interrupted.  When a normal uninterrupted run is completed the
        Bld.sig file is rewritten using only those files that were included in the build.
        Thus, if files were added or deleted this would reflect in the new Bld.sig file.  If a
@@ -1066,11 +1107,7 @@ bld [-h]
        built and old files not yet examined will not be rebuilt.  This may result in some
        entries in the Bld.sig file that no longer exist, but this will be corrected at the end
        of the next normally completed run.
-    5. The -h, -r options exit without rebuilding the executable.
-    6. In the Bld file anything before the EVAL is ignored.  This allows Bld file explanatory
-       comments to be inserted at the start of this file.
-    7. There are no imported environment variables.  The mkdir, mv, and cpp commands must
-       be accessible, as well as, the commands in $cmd and $link variables.
+
     8. A non C or C++ source will be rebuilt if its build command has been changed or the
        source file itself has been changed.  The rebuilt output will be put back in the
        directory where the source came from under the assumption that it will be a C file
@@ -1081,25 +1118,39 @@ bld [-h]
  The Bld file(and Bld.gv) controls the entire target bld.  It is divided into three sections -
  Comment(s), EVAL and DIRS:
 
+ ##################################################
  Add comments before the EVAL line
 
  EVAL
+ # add perl variables to be used in the DIRS section 'dir' or {cmds} parts.  six are mandatory.
+
+ # e.g. $CCOPT = "-O";
 
  # mandatory defined variables
+     # the target to built e.g. executable, libx.a, libx.so
      $bld="";
+     # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
      $bldcmd = "";
+     # space separated list of directories to search for libraries
      $lib_dirs = "";
+     # use system header files in dependency checking("system" or "nosystem")
      $opt_s = "";
+     # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
      $opt_r = "";
+     # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
      $opt_lib = "";
 
  DIRS
- # {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications
+ # '{cmds}' cmd blocks or '[R] dir:regex:{cmds}' specifications
 
  {cmds}
- '[R] dir:regex:{cmds}'
- '[R] dir:regex:{cmds}'
+ [R] dir:regex:{cmds}
+ {cmds}
+ [R] dir:regex:{cmds}
+ [R] dir:regex:{cmds}
  ...
+ ...
+ ##################################################
 
  1. a comment section
 
@@ -1278,29 +1329,27 @@ bld [-h]
  Diagnostics are either warnings(calling warning($msg)) or fatals(calling fatal($msg)).
  Warnings and fatals are exclusive; specific conditions cause warnings and specific
  other conditions cause fatals.  There is no overlap.  Warnings are conditions that may
- be of interest e.g. same header file in multiple locations, but which should not
- impact the full build of the project.  Fatals are conditions that either will
- necessarily force the termination of the build or that indicate the construction of
- the Bld file has some instructions that are contradictory or missing necessary
- elements e.g. same source file compiled twice.  Warnings are written to the bld.warn
- file only.  Fatals are written identically to standard out and the bld.fatal file.
- Warnings all start with 'WARNING:' and fatals all start with 'FATAL:'.  There are
- no other types of diagnostic msgs.
+ be of interest e.g. same header file in multiple locations or multiple -c specifications
+ in a source compilation cmd, but which should not impact the full build of the project.
+ Fatals are conditions that either will necessarily force the termination of the build
+ e.g. a source file compile failure, or that indicate the construction of the Bld file
+ has some instructions that are contradictory or missing necessary elements e.g. same
+ source file matched twice in Bld file DIRS section specifications.  Warnings are written
+ to the bld.warn file only.  Fatals are written identically to standard out and the
+ bld.fatal file.  Warnings all start with 'WARNING:' and fatals all start with 'FATAL:'.
+ There are no other types of diagnostic msgs.
 
 =head1 TODO/CONTEMPLATE/INVESTIGATE/EXAMINE/CHECKOUT/THINK ABOUT/HACK ON/SPO
 
    Software Development:
 
+ . adjust format bld.warn warnings for multiple header files same name.
+
  . write new executable to compare Bld.sig signatures with Bld.<project>/<version> source for security
    purposes.  with Bld.sig protected then sofware build is protected.  write new executable to do
    Bld.sig signature compare against source for all the targets in a project build.
 
- . investigate `cd Bld.systemd/systemd-208; ldd ` cd before ldd
-
  . check: is $lib_dirs working? does this require a full path? 
-
- . Bld.example/example/Bld.example.rdx-c - mod rdx to delete() and search() on from one to n keys
-       - do not require the full set of keys - should be easy
 
  . Use Find::File::Rule and File::Slurp in bld
 
@@ -1352,17 +1401,6 @@ bld [-h]
  . write subroutines summary
  . add doc about the 6 required variables and how to construct them
 
-   Outside resources:
-
- . read Intermediate Perl 2nd Ed for ideas
- . investigate scons on scons.tigres.org
- . read "Managing Projects with GNU Make"
- . Links:
-     . http://www.scons.org/wiki/FromMakeToScons
-     . http://producingoss.com/ - Carl Fogel
-     . http://coding.smashingmagazine.com/2013/01/03/starting-open-source-project/
-     . http://oss-watch.ac.uk/resources/howtobuildcommunity
-
    Release:
 
  . on release ask for users to compile new projects and incorporate them into a Release bld.<project>.<version>.tar.gz file
@@ -1376,24 +1414,6 @@ bld [-h]
  . send the perlbrew team a copy
  . CPAN.org
  . hunspell
-
-   Notes:
-
- . to do a forced rebuild of everything delete Bld.sig or *.o
- . note on how to build both static and dynamic libraries
- . why no 'include' DIRS directive?
- . exit codes 0=success, 255=error - see bld.*
- . EVAL section %@ defines are ignored - only scalar variables - $cmd to EVAL
- . if a source is moved it will rebuild since the Bld.sig signature is keyed to the source
-       file and it's path from the bld parent directory
- . same basename with different extensions will fail and same basename with same extension
-       in different locations will fail because same named object will be created
- . symbolic links to source files should work - a file in one place and a link to that same
-       file in another place will be detected/warned/fatal
-
-   Consult:
-
- . open source release consult??
 
 =head1 INCOMPATIBILITIES
 
@@ -1422,8 +1442,11 @@ bld [-h]
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
-     bld-1.0.3.tar.gz - moved four more routines from bld to BldRoutines.pm.  added new project version builds
-                        for git(git-2.3.0.tar.gz) and svn(subversion-1.8.11.tar.gz).  improved error reporting.
+
+     bld-1.0.3.tar.gz - moved four more routines from bld to BldRoutines.pm.  added new project version builds for
+                        git(git-2.3.0.tar.gz) and svn(subversion-1.8.11.tar.gz).  improved error reporting.  multiple
+                        versions of git and svn are now built.  the naming convention for example project release
+                        files has changed - bld-1.0.3-git.tar.xz, bld-1.0.3-svn.tar.xz and bld-1.0.3-systemd.tar.xz.
      bld-1.0.2.tar.gz - added capability to set Bld file EVAL section variables for interpolation into DIRS section
                         directory specifications.  improved fatal() output. updated git/svn/systemd builds to
                         Fedora21.  doc improvements.  improved exports/imports of variables/functions between
