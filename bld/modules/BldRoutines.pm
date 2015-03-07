@@ -1292,7 +1292,6 @@ package BldRoutines
                 # the $lib variable should have either a full path library name or the word 'not'
                 if ( $lib =~ m{not} )
                 {
-                    my $msg = sprintf "";
                     warning("WARNING: ldd return: $libname library is 'not found'");
                 }
                 else
@@ -1351,7 +1350,6 @@ package BldRoutines
                     $warn .= "--------------------------------------------------------------------------------------\n";
                     $printonce = 1;
                     chomp $warn;
-                    my $msg = sprintf "";
                     warning("WARNING: $warn");
                 }
 
@@ -1363,7 +1361,6 @@ package BldRoutines
                     $warn .= sprintf "%*s\n", 86, $file;
                 }
                 chomp $warn;
-                my $msg = sprintf "";
                 warning("WARNING: $warn");
             }
         }
