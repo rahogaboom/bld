@@ -390,7 +390,7 @@ use BldRoutines;
     @dirs = dirs_pro( $dirs, $opt_s );
 
     # scan EVAL and DIRS sections for variables.  if variables in EVAL but not in DIRS do warning().
-    # if variables in DIRS but not in EVAL, do warning() and fatal().
+    # if variables in DIRS but not in EVAL do fatal().
     variable_match( \@eval, \@dirs );
 
     # read $SIGFN file data into %Sigdata
@@ -795,7 +795,8 @@ bld [-h]
     file and many Bld files - one to a target.  The source directory structure goes under bld.<project>/<version>
     and each target Bld file(Bld.<project>.<target>) encapsulates all the build information for all the
     source directories under bld.<project>/<version>.  All the built targets and build information files go
-    into the Bld.<project>/<version> directory.  See 13 below for reasons why recursive make causes problems.
+    into the Bld.<project>/<version> directory.  See "'make' and it's difficulties:" below for reasons why
+    recursive make causes problems.
  6. Each source file will have three signatures associated with it - one for the source file, one for the
     corresponding object file and one for the cmds use to rebuild the source.  A change in any of these will
     result in a rebuild.  A change in the target signature will result in a rebuild.  Optionally, the
@@ -1338,82 +1339,6 @@ bld [-h]
  to the bld.warn file only.  Fatals are written identically to standard out and the
  bld.fatal file.  Warnings all start with 'WARNING:' and fatals all start with 'FATAL:'.
  There are no other types of diagnostic msgs.
-
-=head1 TODO/CONTEMPLATE/INVESTIGATE/EXAMINE/CHECKOUT/THINK ABOUT/HACK ON/SPO
-
-   Software Development:
-
- . adjust format bld.warn warnings for multiple header files same name.
-
- . write new executable to compare Bld.sig signatures with Bld.<project>/<version> source for security
-   purposes.  with Bld.sig protected then sofware build is protected.  write new executable to do
-   Bld.sig signature compare against source for all the targets in a project build.
-
- . check: is $lib_dirs working? does this require a full path? 
-
- . Use Find::File::Rule and File::Slurp in bld
-
-   Test:
-
- . bld - allow compile of a group of 1 or more *.c files without building an exec or library
- . bld - install kernel - think about automation of 'make V=1' to Bld file
- . test execution of arbitrary perl code in Bld.<project>.gv and EVAL sections
- . do a 'make V-1 install' in the git project and see what it takes to install git
- . add new version of one of git/subversion/systemd to show how multiple versions of <project> are bld't
- . run on Mac/PC
- . test library changes
- . investigate running under the debugger and profiling
- . Unit Tests:
-      . empty Bld file
-      . Bld file with both, in order, EVAL and DIRS lines
-      . EVAL section is correct(required variables) and DIRS section is empty
-      . EVAL section is empty(required variables) and DIRS section is correct(non-empty)
-      . EVAL section is empty(required variables) and DIRS section is empty
-
-   Doc:
-
- . add History file
- . Doc that bld has no inherent built in rules
- . add security info
- . add explanation of aux directory
- . go thru code line by line and do code scrub, comment scrub
- . doc extensions.pl and clang-gcc-headers.pl
- . Bld file with only a {} block will execute the block but fail because of no .o files to build the target
- . add note that two project builds cannot run at the same time - Bld.sig and Bld.gv files
- . add Note about if two targets are built from the same source files - they both use the same .o files
-       and may compile different .o files depending on the compile options - this results in the building
-       of one target interfering with the build of the other target since the signature of the .o files
-       are now different because of the other build.
- . add doc/notes about ldd and env variable LD_LIBRARY_PATH - add code to add special paths to LD_LIBRARY_PATH??
- . doc packages needed for execution of all Bld.example's :
-       clang(LLVM), gcc, g++, GNUstep header of the GNUstep Base library package
- . add perldoc section on how to use bld to build a multi executable/library project e.g. subversion
- . major routine call tree
- . explain modules to install and all build/run requirements
-       experimental.pm
-       gcc/g++
-       clang
-       ldd
- . required executables are available and full paths - operation: ldd, cpp, mv, which - build: gcc, g++, clang, as
-       add doc with list of all external cmds
- . FFAQ - (Fake)FAQ
- . add section on design notes - section on design philosophy
- . write subroutines summary
- . add doc about the 6 required variables and how to construct them
-
-   Release:
-
- . on release ask for users to compile new projects and incorporate them into a Release bld.<project>.<version>.tar.gz file
- . slide presentation
- . article
- . LLVM community
- . GNU community
- . Contribute to Free Software Foundation
- . 37signals.com
- . Apache Software Foundation
- . send the perlbrew team a copy
- . CPAN.org
- . hunspell
 
 =head1 INCOMPATIBILITIES
 
