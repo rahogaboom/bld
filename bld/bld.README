@@ -200,6 +200,7 @@ QUICK START
    i. vi bld.warn  # warning msgs from the bld
    j. vi bld.fatal # fatal msgs that terminated the bld - should be empty if bld is successful
 
+
 ----------------------------------------------------------------------------------------------------
 BUILDING SINGLE TARGETS
     (a target is an executable or library(static or shared))
@@ -322,26 +323,41 @@ BUILDING MULTI-TARGET PROJECTS
 Bld FILE FORMAT
 
  The Bld file(and Bld.gv) controls the entire target bld.  It is divided into three sections -
- Comments, EVAL and DIRS:
+ Comment(s), EVAL and DIRS:
 
- Comments
+ ##################################################
+ Add comments before the EVAL line
+
  EVAL
+ # add perl variables to be used in the DIRS section 'dir' or {cmds} parts.  six are mandatory.
+
+ # e.g. $CCOPT = "-O";
 
  # mandatory defined variables
+     # the target to built e.g. executable, libx.a, libx.so
      $bld="";
+     # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
      $bldcmd = "";
+     # space separated list of directories to search for libraries
      $lib_dirs = "";
+     # use system header files in dependency checking("system" or "nosystem")
      $opt_s = "";
+     # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
      $opt_r = "";
+     # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
      $opt_lib = "";
 
  DIRS
- # {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications
+ # '{cmds}' cmd blocks or '[R] dir:regex:{cmds}' specifications
 
  {cmds}
- '[R] dir:regex:{cmds}'
- '[R] dir:regex:{cmds}'
+ [R] dir:regex:{cmds}
+ {cmds}
+ [R] dir:regex:{cmds}
+ [R] dir:regex:{cmds}
  ...
+ ...
+ ##################################################
 
  1. a comment section
 
