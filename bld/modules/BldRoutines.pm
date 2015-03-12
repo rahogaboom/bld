@@ -894,6 +894,11 @@ package BldRoutines
 
         open my $bifnfh, ">>", $BIFN;
 
+        {
+            my $date = localtime();
+            print {$bifnfh} "\n$date\n";
+        }
+
         print {$bifnfh} "\nOS: $OSNAME\n";
 
         print {$bifnfh} "\nbld version: $VERSION\n\n";
@@ -1385,12 +1390,12 @@ package BldRoutines
                     warning("WARNING: $warn");
                 }
 
-                $warn = sprintf "%*d  %s\n", 31, $n, $signature;
+                $warn = sprintf "%*d  %s\n", 3, $n, $signature;
 
                 # loop over all source file names with $signature
                 foreach my $file ( sort keys %{$SourceSig_ref->{$signature}} )
                 {
-                    $warn .= sprintf "%*s\n", 86, $file;
+                    $warn .= sprintf "%*s\n", 123, $file;
                 }
                 chomp $warn;
                 warning("WARNING: $warn");
