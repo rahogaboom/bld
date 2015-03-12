@@ -866,7 +866,9 @@ bld [-h]
      the Bld file EVAL section) and '[R] dir:regex:{cmds}' line specifications(in the Bld file DIRS section).
  13. 'make' and it's difficulties:
          http://www.scons.org/wiki/FromMakeToScons
-             a detailed critique of make and some alternatives
+             a detailed critique of make and some alternatives(Adrian Neagu)
+         http://freecode.com/articles/what-is-wrong-with-make
+             What is Wrong with Make?(Adrian Neagu)
          http://www.scons.org/architecture/
              a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
          ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
@@ -875,10 +877,20 @@ bld [-h]
              an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
          http://www.conifersystems.com/whitepapers/gnu-make/
              an in depth critique of make
+         http://www.conifersystems.com/whitepapers/gnu-make/
+             What’s Wrong With GNU make?
+         http://www.leosimons.com/2006/bettermake/what-is-a-better-make.html
+             What is a better make?
+         http://www.leosimons.com/2006/a-better-make.html
+             Building a better (make|ant|maven|...)
 
 =head1 PROJECT STATE
 
  1. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
+    no options.  How options affect the generated code and thus the Bld files is important.
+    Anyone willing to investigate configure options and how these options affect the Bld files
+    is welcome.
+
     no options.  How options affect the generated code and thus the Bld files is important.
     Anyone willing to investigate configure options and how these options affect the Bld files
     is welcome.
@@ -1338,10 +1350,6 @@ bld [-h]
         # Note: the $CC compile produces .o output by changing the c to an o.
         #       the as output needs to be specified by the -o option.
         bld.example/example/C     : ^main\.s$ : {as -c -o main.o $s;}
-
-        bld.example/example/C/ww  : ^u\.c$    : {$CC -c $INCLUDE $s;}
-
-        # example of use of recursive directory search - the same regex and cmd fields
         # are applied to all subdirectories of the specified dir field(right after the 'R')
         R bld.example/example/C/y : ^.*\.c$   : {$CC -c $INCLUDE $s;}
 
@@ -1384,7 +1392,9 @@ bld [-h]
 
  Critique of 'make':
      http://www.scons.org/wiki/FromMakeToScons
-         a detailed critique of make and some alternatives
+         a detailed critique of make and some alternatives(Adrian Neagu)
+     http://freecode.com/articles/what-is-wrong-with-make
+         What is Wrong with Make?(Adrian Neagu)
      http://www.scons.org/architecture/
          a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
      ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
@@ -1393,23 +1403,32 @@ bld [-h]
          an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
      http://www.conifersystems.com/whitepapers/gnu-make/
          an in depth critique of make
+     http://www.conifersystems.com/whitepapers/gnu-make/
+         What’s Wrong With GNU make?
+     http://www.leosimons.com/2006/bettermake/what-is-a-better-make.html
+         What is a better make?
+     http://www.leosimons.com/2006/a-better-make.html
+         Building a better (make|ant|maven|...)
 
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
 
-     bld-1.0.3.tar.gz - moved four more routines from bld to BldRoutines.pm.  added new project version builds for
+     bl::1.0.3.tar.gz - moved four more routines from bld to BldRoutines.pm.  added new project version builds for
                         git(git-2.3.0.tar.gz) and svn(subversion-1.8.11.tar.gz).  improved error reporting.  multiple
                         versions of git and svn are now built.  the naming convention for example project release
                         files has changed - bld-1.0.3-git.tar.xz, bld-1.0.3-svn.tar.xz and bld-1.0.3-systemd.tar.xz.
+
      bld-1.0.2.tar.gz - added capability to set Bld file EVAL section variables for interpolation into DIRS section
                         directory specifications.  improved fatal() output. updated git/svn/systemd builds to
                         Fedora21.  doc improvements.  improved exports/imports of variables/functions between
                         bld/BGC.pm/BldRoutines.pm.
+
      bld-1.0.1.tar.gz - added BGC.pm for global initialized constants and BldRoutines.pm for most subroutines.
                         rebuilt for Fedora21.  rebuilt bld.git.git-1.9.rc0.tar.gz and bld.svn.subversion-1.8.5.tar.gz
                         for Fedora21.  Dropped bld.systemd.systemd-208.tar.gz; will add systemd-218 or above in
                         the 1.0.2 release.  Many doc changes.
+
      bld-1.0.0.tar.gz - initial release
          bld.git.git-1.9.rc0.tar.gz
          bld.svn.subversion-1.8.5.tar.gz
