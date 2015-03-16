@@ -677,7 +677,7 @@ package BldRoutines
                 my $path_size = scalar @path;
                 if ( $path_size > 1 )
                 {
-                    $warning_msg .= "Same source file \'$basename\" specified in more than one directory:\n";
+                    $warning_msg .= "Same source file \'$basename\' specified in more than one directory:\n";
                     foreach my $path ( @path )
                     {
                         $warning_msg .= "$path\n";
@@ -695,7 +695,7 @@ package BldRoutines
                     my $dirs_line_size = scalar @dirs_line;
                     if ( $dirs_line_size > 1 )
                     {
-                        $fatal_msg .= "Same source file \'$basename\" specified in same directory:\n";
+                        $fatal_msg .= "Same source file \'$basename\' specified in same directory:\n";
                         $fatal_msg .= "$path\n";
                         foreach my $dirs_line ( @dirs_line )
                         {
