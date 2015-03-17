@@ -12,7 +12,7 @@ $CC = "gcc";
 
 # mandatory defined variables
 
-    # the target to built e.g. executable, libx.a, libx.so
+    # the target to build e.g. executable, libx.a, libx.so
     $bld="exec-c";
 
     # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
@@ -42,16 +42,16 @@ DIRS
 
 # example of use of conditional compilation
 bld.example/example/C : ^main\.c$ : {
-                          # can have comments here too
-                          if [ "$COND" == 'a' ];
-                          then
-                              $CC -S $INCLUDE $s;
-                          fi
-                          if [ "$COND" == 'b' ];
-                          then
-                              $CC -O4 -S $INCLUDE $s;
-                          fi
-                      }
+                                        # can have comments here too
+                                        if [ "$COND" == 'a' ];
+                                        then
+                                            $CC -S $INCLUDE $s;
+                                        fi
+                                        if [ "$COND" == 'b' ];
+                                        then
+                                            $CC -O4 -S $INCLUDE $s;
+                                        fi
+                                    }
 
 # example of execution of a bare block of cmds - '{' and '}' may be on seperate lines
 {

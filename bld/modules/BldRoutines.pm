@@ -134,7 +134,7 @@ package BldRoutines
     #            : \%Objects    - all object files for the build - see above
     #            : \%Targets    - all target files for the build - see above
     #
-    # Returns    : boolean("true"/"false") to indicate that any source file was rebuilt and thus $bld will need rebuilding
+    # Returns    : boolean("true"/"false") to indicate that any source file was re-built and thus $bld will need rebuilding
     #
     # Globals    : None
     #
@@ -276,13 +276,13 @@ package BldRoutines
               "ENDDEBUG\n";
 =cut
 
-        # see if $s should be rebuilt by testing %Sigdata against %SigdataNew
+        # see if $s should be re-built by testing %Sigdata against %SigdataNew
         if ( rebuild_src_bool( $s, $tgtextorfile, $Sigdata_ref, \%SigdataNew_tmp ) eq "true" )
         {
-            # print source file names that will be rebuilt, but do not rebuild
+            # print source file names that will be re-built, but do not rebuild
             if ( $opt_r eq "norebuild" )
             {
-                print "---WILL--- be rebuilt: $s\n";
+                print "---WILL--- be re-built: $s\n";
             }
             else
             {
@@ -389,10 +389,10 @@ package BldRoutines
         }
         else
         {
-            # print source file names that will not be rebuilt
+            # print source file names that will not be re-built
             if ( $opt_r eq "norebuild" )
             {
-                print "$s will NOT be rebuilt.\n";
+                print "$s will NOT be re-built.\n";
             }
             else
             {
@@ -1340,7 +1340,7 @@ package BldRoutines
         }
 
         print "$tmp\n";
-        print "$bld rebuilt.\n";
+        print "$bld re-built.\n";
     }
 
 
@@ -2493,7 +2493,7 @@ package BldRoutines
     # 
     # Usage      : $boolean = rebuild_src_bool( $s, $tgtextorfile, $Sigdata_ref, \%SigdataNew_tmp )
     #
-    # Purpose    : determine if source file $s needs to be rebuilt based on signature data in %Sigdata and %SigdataNew
+    # Purpose    : determine if source file $s needs to be re-built based on signature data in %Sigdata and %SigdataNew
     #
     # Parameters : $s               - relative path source file name starting from the bld home directory,
     #            :                    should only be compilation units(not header files)
