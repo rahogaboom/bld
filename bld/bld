@@ -1021,7 +1021,8 @@ bld [-h]
  The previous description material focused on the construction of a single target.  This requires only
  the use of the bld program and Bld file.  To bld complex multi-target projects requires use of some
  standard directory structure conventions, several programs for bld'ing targets and cleaning project
- directories and directory/file naming conventions.  For example, using git:
+ directories and directory/file naming conventions.  For example, using git-2.3.0 and a <project> name
+ of 'git':
 
      Bld.git/git-2.3.0
          All of the target Bld files and bld run output files are here.  During development the initiation
@@ -1034,6 +1035,59 @@ bld [-h]
          Template scripts for use in the Bld.git/git-2.3.0 directory.  The bld.<project> script is copied
          to Bld.git/git-2.3.0 as bld.git.  The bld.<project>.rm is copied to Bld.git/git-2.3.0 as bld.git.rm.
          No changes are required to the scripts code.
+
+     aux/bld.git
+         The bld.<project> file would be copied to Bld.git/git-2.3.0 as bld.git.  There is no need to change
+         the file; the file name is picked up internally.  This is the main project bld script.  It is
+         executed either with a sequence of target names or with '--all' for building all targets. Do
+         'perldoc bld.git' for the man page.
+
+     aux/bld.git.rm
+         The bld.<project>.rm file would be copied to Bld.git/git-2.3.0 as bld.git.rm.  There is no need to change
+         the file; the file name is picked up internally.  This script is used to remove build files related to
+         specific targets or clean files related to all targets.  It is executed either with a sequence of target
+         names or with '--all' for cleaning all targets.  For example, if test-wildmatch is used as a target then
+         the following files will be removed:
+             bld.fatal.git.test-wildmatch
+             bld.info.git.test-wildmatch
+             bld.warn.git.test-wildmatch
+             Bld.sig.git.test-wildmatch
+             test-wildmatch
+
+         The target Bld file, Bld.git.test-wildmatch, will not be removed. Do 'perldoc bld.git.rm' for the
+         man page.
+
+     bld.git.targets
+         All the project targets go here, one to a line.  The targets will be built in order from top to bottom.
+         Make sure than libraries that are required by subsequent targets are built first.  The file may have
+         any number of blank or comment lines.
+
+     bld.git.README
+         The bld.git.README file provide getting started and contact information.
+
+     bld.git.install
+         For installing the project.  This most likely will be a script to create an installable package. 
+         At present none are populated.
+
+     bld.git.script.<script>
+         These are scripts to call from the Bld files that do various functions required for target
+         construction.  There may be any number of these.  The git project did not require any.
+
+     Bld.git.<target>
+         The Bld file for a specific target.
+
+     Bld.gv.git
+         The project global values file.  This file is imported at the beginning of every project target
+         Bld file.  It has no structure.  It contains defined variables that are common to all project
+         Bld files e.g. $CC.
+
+     Bld.sig.git.<target>
+     bld.info.git.<target>
+     bld.warn.git.<target>
+     bld.fatal.git.<target>
+         See above for a description of these files.
+
+     See BUILDING MULTI-TARGET PROJECTS below for the detail steps in building complex multi-target projects.
 
 =head1 FEATURES AND ADVANTAGES
 
@@ -1115,17 +1169,59 @@ bld [-h]
 
 =head1 DEPENDENCIES
 
- Required for execution:
-    experimental.pm(3pm) - for smartmatch and switch features
-    cpp(1) - gnu cpp cmd is required for dependency determination
-    ldd(1) - used for library dependency determination
+    I use Fedora for development on an x86_64 architecture.  Yum is the package installation tool.
 
- Required for test:
-    gcc(1)/g++(1) (http://gcc.gnu.org/)
-    clang(1) (http://llvm.org/)
+    Required for execution:
+        experimental.pm(3pm) - for smartmatch and switch features
+        cpp(1) - gnu cpp cmd is required for dependency determination
+        ldd(1) - used for library dependency determination
 
- See bld.README for a more extensive list of possible dependencies required to bld the git, svn and systemd
- projects.
+        Do: cpan install cpanm
+            cpanm experimental.pm
+
+    Required for test:
+        gcc(1)/g++(1) (http://gcc.gnu.org/)
+        clang(1) (http://llvm.org/)
+        yacc(1)/flex(1)
+
+    Some variation might be required on(for git, svn, systemd test):
+        yum install gcc.x86_64
+        yum install gcc-c++.x86_64
+        yum install gcc-objc.x86_64
+        yum install gcc-objc++.x86_64
+        yum install libobjc.x86_64
+        yum install gnustep-base.x86_64
+        yum install gnustep-base-devel.x86_64
+        yum install clang
+        yum install byacc
+        yum install flex
+        yum install zlib-devel.x86_64
+        yum install libxdiff.x86_64
+        yum install apr.x86_64
+        yum install apr-util.x86_64
+        yum install apr-util-devel.x86_64
+        yum install sqlite-devel.x86_64
+        yum install intltool
+        yum install libcap-devel
+        yum install gtk-doc
+        yum install lzma.x86_64
+        yum install libmount-devel.x86_64
+
+    If ./configure generates the following msg about missing requirements:
+
+        "configure: error: Package requirements (foo) were not met:
+
+        No package 'foo' found
+
+        Consider adjusting the PKG_CONFIG_PATH environment variable if you
+        installed software in a non-standard prefix."
+
+    Do: yum install "pkgconfig(foo)"
+
+    Also check: http://who-t.blogspot.com/2014/05/configure-fails-with-no-package-foo.html
+
+    If the downloaded project code does not have a configure script then check for a configure.ac
+    file and run 'autoconf' with no arguments or options.  This will generate a configure script.
 
 =head1 PROJECT STATE
 
@@ -1401,6 +1497,120 @@ bld [-h]
  bld.warn.<project>.<target>   - the bld.warn file for each <project> <target>
  bld.fatal.<project>.<target>  - the bld.fatal file for each <project> <target>
 
+=head1 BUILDING SINGLE TARGETS
+    (a target is an executable or library(static or shared))
+
+    1. Construct the Bld file - see below for a Bld file example and see the Bld.example
+       directory for multiple examples.  A Bld.gv file is not needed for a single target.
+       Since there are no args or options to bld and no environment variables or rc files
+       are used, nothing else needs to be done.
+
+    2. Execute './bld'.  This will rebuild the target and create/update the Bld.sig signature
+       file.  The bld.info, bld.warn and bld.fatal files will be created.
+
+    3. Use './bld.rm' to clean the bld directory.
+
+=head1 BUILDING MULTI-TARGET PROJECTS
+    (a target is an executable or library(static or shared))
+
+    1. Pick a name for the project e.g. git, svn, systemd.
+
+    2. In the main bld directory(the location of the bld script) create a bld.<project>
+       directory.  Create another directory, bld.<project>/<version>, that describes the
+       version of the code it will hold e.g. systemd-208.  Any number of these version
+       directories may be created to maintain different versions of the code.  Unpack the
+       source code in the version directory e.g. bld.systemd/systemd-208/<systemd-208 src code>.
+
+    3. Create a Bld.<project> directory.  Create another directory, Bld.<project>/<version>,
+       that describes the version of the code it will maintain e.g. systemd-208.  There
+       should be one version directory for each version of the code being maintained.
+       These directories will hold:
+           a. all of the Bld.<project>.<target> and Bld.gv.<project> files that control the
+              construction of each project target
+           b. all of the target bld output files:
+                  bld.info.<project>.<target>(information describing the bld)
+                  bld.warn.<project>.<target>(bld warning msgs)
+                  bld.fatal.<project>.<target>(bld fatal msgs)
+           c. the bld scripts and script control files
+           d. all of the targets
+
+    4. Create a Bld.<project>.<target> file for each project target.  These control the bld
+       for each and only that target.  If there are variables that may be defined globally
+       over the entire project then set them in the Bld.gv.<project>(one per project) file.  
+       The Bld.gv.<project> file will be included in each Bld.<project>.<target> file before
+       it is evaluated.  All Bld.<project>.<target> files require six variables to be defined.
+       These are:
+
+       e.g.
+       # mandatory defined variables
+
+           # space separated list of directories to search for libraries
+           $lib_dirs = ""; 
+
+           # use system header files in dependency checking("system" or "nosystem")
+           $opt_s = "nosystem";
+
+           # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+           $opt_r = "rebuild";
+
+           # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+           $opt_lib = "nolibcheck";
+
+           # the target to built e.g. executable, libx.a, libx.so
+           $bld="accelerometer";
+
+           # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+           $bldcmd = "$CC $LIBSLINKOPTS -o \$bld \$O -LBld.systemd/systemd-208 -ludev -lsystemd-shared -ludev-core -lm -lrt -ldl";
+
+       The definition of these variables may be spread between the Bld.<project>.<target> and the imported Bld.gv.<project> files.
+       See the Bld FILE FORMAT section below for detailed instructions on Bld file construction.
+
+
+    5. Create a bld.<project>.targets file with all of the project target names, one to a line.
+       e.g.
+
+           # each line is a valid target argument to bld.<project> e.g. './bld.<project> target'
+           # and will build one(that named) library or executable.  the order of target bld's
+           # is important.  if 'bld.<project> --all' is used to bld all targets then dependencies
+           # must be built first, that is, libraries that executables depend on must be built at
+           # the start.
+
+           # 
+           libsystemd-shared.a
+
+           # 
+           libsystemd-login.so
+
+           # 
+           systemd-cgls
+
+           ...
+
+       The order is important; if an executable depends on a library then build the library first.
+
+    6. Copy the 'bld.<project>' and 'bld.<project>.rm' files from the aux directory to the source code
+       directory and rename them for that particular project.  These scripts use the <project> part
+       of the script name for building output files.
+
+    7. Run the ./bld.<project> script with the --all option or one or more target names from the bld.<project>.targets file.
+       This will bld all targets or the selected targets.  The:
+
+       bld.info.<project>.<target>(information describing the bld)
+       bld.warn.<project>.<target>(bld warning msgs)
+       bld.fatal.<project>.<target>(bld fatal msgs)
+
+       files will be created.  Examine these for the results of each target bld.  All of the  bld.fatal.<project>.<target>
+       files should be empty if everything bld's OK.
+
+    9. Run './bld.<project> --all' again to rebuild.  If everything built successfully the first time then this run
+       will indicate that everything is up to date.
+
+    8. Use './bld.<project>.rm [--all] [target, target, ...]' to clean up.
+
+    9. Use './bld.<project>.install' as root to install the project.
+
+    10. Examine the ./bld.<project>.README for project specific information.
+
 =head1 NOTES
 
  1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
@@ -1411,9 +1621,9 @@ bld [-h]
     into the same project directory before distribution for installation.  installation can
     then rename and distribute targets in any way desired.
 
- 3. Some projects violate either or both of these target naming or object file naming/location
-    requirements, but reconstructing these projects with bld should be relatively easy
-    e.g. systemd.
+ 3. Some projects(rarely) violate either or both of these target naming or object file
+    naming/location requirements, but reconstructing these projects with bld should be
+    relatively easy e.g. systemd.
 
  4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
     source directory.
@@ -1428,19 +1638,21 @@ bld [-h]
     of the next normally completed run.
 
  6. The Bld.sig signature file is automatically created and updated.  It contains one line
-    for each source, one line for each header file, and one line for the executable.  The
-    header file lines and the executable line have two fields: the file name and its
-    signature.  The source lines have four fields: the file name, the signatures of the
-    source file, the command use to build the source, and the object file.  The user can
-    modify this file to force the re-build of files by altering the signature or even by
-    deleting a line, however, any modification to a source or header file, or build command
-    string will do the same thing.
+    for each source, one line for each header file, optionally one line for each library and
+    one line for the executable.  The header file lines and the executable line have two
+    fields: the file name and its signature.  The source lines have four fields: the file
+    name, the signatures of the source file, the command use to build the source, and the
+    object file.  The user can modify this file to force the re-build of files by altering
+    the signature or even by deleting a line, however, any modification to a source or header
+    file, or build command string will do the same thing.  Removing the Bld.sig file will
+    re-build the entire target.
 
  7. A non C or C++ source will be re-built if its build command has been changed or the
     source file itself has been changed.  The re-built output will be put back in the
     directory where the source came from. The assumption is that it will be a file that will
     then act a source for subsequent build steps e.g. a lex or yacc that will produce a C
-    file as output which will then later need to be compiled.
+    file as output which will then later need to be compiled.  Bld file cmd({}) blocks can
+    modify this.
 
 =head1 CALL TREE
 
@@ -1511,33 +1723,17 @@ bld [-h]
 
 =head1 SEE ALSO
 
- bld.README
+ Do: perldoc 'bld.<project>'
+     perldoc 'bld.<project>.rm'
 
- 'make' and it's difficulties:
-     http://www.scons.org/wiki/FromMakeToScons
-         a detailed critique of make and some alternatives(Adrian Neagu)
-     http://freecode.com/articles/what-is-wrong-with-make
-         What is Wrong with Make?(Adrian Neagu)
-     http://www.scons.org/architecture/
-         a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
-     ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
-         a brief critique of make and how GNU automake from the GNU Build System contributes
-     http://aegis.sourceforge.net/auug97.pdf
-         an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
-     http://www.conifersystems.com/whitepapers/gnu-make/
-         an in depth critique of make
-     http://www.conifersystems.com/whitepapers/gnu-make/
-         What's Wrong With GNU make?
-     http://www.leosimons.com/2006/bettermake/what-is-a-better-make.html
-         What is a better make?
-     http://www.leosimons.com/2006/a-better-make.html
-         Building a better (make|ant|maven|...)
+ 'make' and it's difficulties - in FEATURES AND ADVANTAGES above
 
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
 
-     bld-1.0.4.tar.gz - 
+     bld-1.0.4.tar.gz - entirely perldoc updates.  example projects - bld-1.0.4-git.tar.xz, bld-1.0.4-svn.tar.xz
+                        and bld-1.0.4-systemd.tar.xz.
 
      bld-1.0.3.tar.gz - moved four more routines from bld to BldRoutines.pm.  added new project version builds for
                         git(git-2.3.0.tar.gz) and svn(subversion-1.8.11.tar.gz).  improved error reporting.  multiple
