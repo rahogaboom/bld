@@ -26,11 +26,11 @@ Current example projects:
     The following are examples of bld'ing complex multi-target projects.  They are
     provided with releases. Unpack them in the main bld directory in the same place as
     the bld.example and Bld.example directories:
-        bld-1.0.4-git.tar.xz -
+        bld-1.0.4-git.tar.gz -
             the git project http://git-scm.com/
-        bld-1.0.4-svn.tar.xz -
+        bld-1.0.4-svn.tar.gz -
             the subversion project http://subversion.apache.org/
-        bld-1.0.4-systemd.tar.xz -
+        bld-1.0.4-systemd.tar.gz -
             the systemd project http://www.freedesktop.org/wiki/Software/systemd/
 
  Dependencies:
