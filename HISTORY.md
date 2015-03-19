@@ -10,13 +10,6 @@
                     Fedora21.  doc improvements.  improved exports/imports of variables/functions between
                     bld/BGC.pm/BldRoutines.pm.
 
- bld-1.0.1.tar.gz - added BGC.pm for global initialized constants and BldRoutines.pm for most subroutines.
-                    rebuilt for Fedora21.  rebuilt bld.git.git-1.9.rc0.tar.gz and bld.svn.subversion-1.8.5.tar.gz
-                    for Fedora21.  Dropped bld.systemd.systemd-208.tar.gz; will add systemd-218 or above in
-                    the 1.0.2 release.  Many doc changes.
-
- bld-1.0.0.tar.gz - initial release
-     bld.git.git-1.9.rc0.tar.gz
-     bld.svn.subversion-1.8.5.tar.gz
-     bld.systemd.systemd-208.tar.gz
+ Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
+ about the most recent releases.  This may change in future.
 

@@ -23,7 +23,7 @@ Current example projects:
 
     Bld.example - several examples intended to show how to create Bld and Bld.gv files
 
-    The following are examples of bld'ing complex multi-target projects.  They are
+    The following are examples of building complex multi-target projects.  They are
     provided with releases. Unpack them in the main bld directory in the same place as
     the bld.example and Bld.example directories:
         bld-1.0.4-git.tar.gz -
@@ -38,9 +38,14 @@ Current example projects:
          experimental.pm(3pm) - for smartmatch and switch features
          cpp(1) - gnu cpp cmd is required for dependency determination
          ldd(1) - used for library dependency determination
+
+         Do: cpan install cpanm
+             cpanm experimental.pm
+
      Required for test:
          gcc(1)/g++(1) (http://gcc.gnu.org/)
          clang(1) (http://llvm.org/)
+         yacc(1)/flex(1)
 
 cd bld
 Do './bld -h' for the usage msg.
