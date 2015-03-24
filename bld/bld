@@ -316,6 +316,13 @@ use BldRoutines;
             close $bldrcfh;
 
             eval "@bldrc";
+
+            # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
+            if ( $EVAL_ERROR )
+            {
+                my $msg = sprintf "FATAL: %s EVAL section: Fatal eval error: %s", "$ENV{HOME}/.bldrc", $EVAL_ERROR;
+                fatal($msg);
+            }
         }
     }
 
@@ -333,6 +340,13 @@ use BldRoutines;
             close $bldrcfh;
 
             eval "@bldrc";
+
+            # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
+            if ( $EVAL_ERROR )
+            {
+                my $msg = sprintf "FATAL: %s EVAL section: Fatal eval error: %s", ".bldrc", $EVAL_ERROR;
+                fatal($msg);
+            }
         }
     }
 
@@ -398,6 +412,13 @@ use BldRoutines;
         eval "@eval";
         use strict;
 
+        # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
+        if ( $EVAL_ERROR )
+        {
+            my $msg = sprintf "FATAL: %s EVAL section: Fatal eval error: %s", $BFN, $EVAL_ERROR;
+            fatal($msg);
+        }
+
         if ( not defined $bld or not defined $bldcmd or not defined $lib_dirs )
         {
             my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.", $BFN;
@@ -407,13 +428,6 @@ use BldRoutines;
         if ( not defined $opt_s or not defined $opt_r or not defined $opt_lib )
         {
             my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.", $BFN;
-            fatal($msg);
-        }
-
-        # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
-        if ( $EVAL_ERROR )
-        {
-            my $msg = sprintf "FATAL: %s EVAL section: Fatal eval error: %s", $BFN, $EVAL_ERROR;
             fatal($msg);
         }
 
@@ -825,7 +839,8 @@ bld [-h]
 
 =head1 RC CONFIGURATION FILES
 
- For defining perl variables in the Bld file EVAL section.
+ For defining perl variables in the Bld file EVAL section.  Should be valid perl code.
+ Syntax errors will be reported.
 
  $ENV{HOME}/.bldrc - user bld run cmd file 
  .bldrc            - local bld run cmd file
