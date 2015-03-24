@@ -56,6 +56,7 @@ use English;
 use Getopt::Long;
 use File::Find;
 use Data::Dumper;
+use Safe;
 
 # extract_multiple - for parsing the $BFN DIRS section
 # extract_bracketed - used by extract_multiple for finding '{}''s
@@ -301,6 +302,40 @@ use BldRoutines;
                                  fatal("\nInterrupted with signal $signame");
                           };
 
+    {
+        # read $ENV{HOME}/.bldrc file and eval ""; contents which should be perl code.  for,
+        # if desired, setting the mandatory Bld file EVAL section variables.
+
+        my @bldrc;
+
+        # slurp in $ENV{HOME}/.bldrc file to array and eval
+        if ( -f "$ENV{HOME}/.bldrc" and -r "$ENV{HOME}/.bldrc" and not -z "$ENV{HOME}/.bldrc" )
+        {
+            open my $bldrcfh, "<", "$ENV{HOME}/.bldrc";
+            @bldrc = <$bldrcfh>;
+            close $bldrcfh;
+
+            eval "@bldrc";
+        }
+    }
+
+    {
+        # read .bldrc file and eval ""; contents which should be perl code.  for,
+        # if desired, setting the mandatory Bld file EVAL section variables.
+
+        my @bldrc;
+
+        # slurp in .bldrc file to array and eval
+        if ( -f ".bldrc" and -r ".bldrc" and not -z ".bldrc" )
+        {
+            open my $bldrcfh, "<", ".bldrc";
+            @bldrc = <$bldrcfh>;
+            close $bldrcfh;
+
+            eval "@bldrc";
+        }
+    }
+
     GetOptions
     (
         "h" => \$opt_h,
@@ -342,17 +377,17 @@ use BldRoutines;
         # if a $BGVFN file exists read in as an array and prepend to the @eval array.
         # this allows the $BGVFN file to serve as a source of global variable defines.
 
-        my @bldrc;
+        my @bgv;
 
         # slurp in $BGVFN file to array
         if ( -f "$BGVFN" and -r "$BGVFN" )
         {
-            open my $bldrcfh, "<", "$BGVFN";
-            @bldrc = <$bldrcfh>;
-            close $bldrcfh;
+            open my $bgvfh, "<", "$BGVFN";
+            @bgv = <$bgvfh>;
+            close $bgvfh;
         }
 
-        unshift @eval, @bldrc;
+        unshift @eval, @bgv;
     }
 
     {
@@ -362,6 +397,18 @@ use BldRoutines;
         no strict;
         eval "@eval";
         use strict;
+
+        if ( not defined $bld or not defined $bldcmd or not defined $lib_dirs )
+        {
+            my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.", $BFN;
+            fatal($msg);
+        }
+
+        if ( not defined $opt_s or not defined $opt_r or not defined $opt_lib )
+        {
+            my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.", $BFN;
+            fatal($msg);
+        }
 
         # check for syntax errors($@).  see perldoc.perl.org -> perlvar -> $EVAL_ERROR
         if ( $EVAL_ERROR )
@@ -390,18 +437,6 @@ use BldRoutines;
             my $msg = sprintf "FATAL: Invalid value for \$opt_lib: \'%s\'", $opt_lib;
             fatal($msg);
         }
-    }
-
-    if ( not defined $bld or not defined $bldcmd or not defined $lib_dirs )
-    {
-        my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$bld, \$bldcmd and \$lib_dirs are missing.", $BFN;
-        fatal($msg);
-    }
-
-    if ( not defined $opt_s or not defined $opt_r or not defined $opt_lib )
-    {
-        my $msg = sprintf "FATAL: One or more of %s file required variable definitions \$opt_s and \$opt_r and \$opt_lib are missing.", $BFN;
-        fatal($msg);
     }
 
     $bld =~ s{^\s*|\s*$}{}g; # strip pre/post white space
@@ -790,7 +825,10 @@ bld [-h]
 
 =head1 RC CONFIGURATION FILES
 
- None
+ For defining perl variables in the Bld file EVAL section.
+
+ $ENV{HOME}/.bldrc - user bld run cmd file 
+ .bldrc            - local bld run cmd file
 
 =head1 DESCRIPTION
 
@@ -799,8 +837,8 @@ bld [-h]
  SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
  and Bld.gv(bld global values) files.  See the bld.README file.  There are no cmd line arguments or
- options(except for -h) or $HOME/.bldrc or ./.bldrc files and no environment variables are
- used. A bld.rm program is provided to clean up the main bld directory.
+ options(except for -h) and no environment variables are used. A bld.rm program is provided to
+ clean up the main bld directory.
 
  bld is based upon taking the SHA1 signature of anything that, when changed, would require a
  re-build of the executable/library.  It is not, like 'make', based in any way on dates.  This
@@ -993,7 +1031,7 @@ bld [-h]
          $opt_lib = "fatallibcheck";
 
 
- To understand the bld'ing of complex multi-target projects the following directories and files should be understood:
+ To understand the building of complex multi-target projects the following directories and files should be understood:
 
      ~/bld directories:
      Bld.<project>/<version> - has all files controlling <project> <version>s blds and bld target output files
@@ -1141,7 +1179,7 @@ bld [-h]
      and saving of this information.  For multi-target projects with the target names appended to these files
      it allows quick investigation of the build process of many interrelated targets at the same time.
  11. Perl - since bld is all perl and since all warnings and fatals have the source line number associated with
-     them, it is very easy to locate in the souce code the exact location of an error and examine the context
+     them, it is very easy to locate in the source code the exact location of an error and examine the context
      about which the error occurred and routine that the error was produced in.
  12. Time - programmer time; learning about, maintaining/debugging Makefiles and Makefile hierarchies, dependency
      checking integration and formulation of Makefile strategies, automatic Makefile generation with Autotools -
@@ -1463,7 +1501,11 @@ bld [-h]
 
 =head1 FILES
 
+ $HOME directory files:
+ .bldrc     - user bld run cmd file
+
  ~/bld directory files:
+ .bldrc     - local bld run cmd file
  bld        - the bld perl script
  bld.rm     - script to clean the bld directory
  bld.README - for first point of contact quick start
@@ -1654,6 +1696,11 @@ bld [-h]
     file as output which will then later need to be compiled.  Bld file cmd({}) blocks can
     modify this.
 
+ 8. When blocks of cmds({}) are executed by the perl system() function, error reporting is
+    per system() call.  If you are executing multile cmds and want more granular error
+    reporting then break up the cmd block into multiple cmd blocks e.g {ls;pwd;} -> {ls;}
+    {pwd;} or dir:regex:{ls;pwd;$CC -c $s;} -> {dir/ls} {dir/pwd} dir:regex:{$CC -c $s}.
+
 =head1 CALL TREE
 
  Calls to imported functions from public CPAN modules are omitted.  Calls to some bld
@@ -1745,15 +1792,8 @@ bld [-h]
                         Fedora21.  doc improvements.  improved exports/imports of variables/functions between
                         bld/BGC.pm/BldRoutines.pm.
 
-     bld-1.0.1.tar.gz - added BGC.pm for global initialized constants and BldRoutines.pm for most subroutines.
-                        re-built for Fedora21.  re-built bld.git.git-1.9.rc0.tar.gz and bld.svn.subversion-1.8.5.tar.gz
-                        for Fedora21.  Dropped bld.systemd.systemd-208.tar.gz; will add systemd-218 or above in
-                        the 1.0.2 release.  Many doc changes.
-
-     bld-1.0.0.tar.gz - initial release
-         bld.git.git-1.9.rc0.tar.gz
-         bld.svn.subversion-1.8.5.tar.gz
-         bld.systemd.systemd-208.tar.gz
+     Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
+     about the most recent releases.  This may change in future.
  
 =head1 AUTHOR
 
