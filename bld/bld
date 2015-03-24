@@ -304,7 +304,7 @@ use BldRoutines;
 
     {
         # read $ENV{HOME}/.bldrc file and eval ""; contents which should be perl code.  for,
-        # if desired, setting the mandatory Bld file EVAL section variables.
+        # if desired, setting Bld file EVAL section variables.
 
         my @bldrc;
 
@@ -321,7 +321,7 @@ use BldRoutines;
 
     {
         # read .bldrc file and eval ""; contents which should be perl code.  for,
-        # if desired, setting the mandatory Bld file EVAL section variables.
+        # if desired, setting Bld file EVAL section variables.
 
         my @bldrc;
 
