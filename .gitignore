@@ -1,5 +1,6 @@
 /test
 *.o
+/bld/.bldrc
 /bld/bld.git
 /bld/Bld.git
 /bld/bld.svn
