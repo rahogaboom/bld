@@ -1,5 +1,8 @@
 /test
 *.o
+/bld/bld.info
+/bld/bld.warn
+/bld/bld.fatal
 /bld/.bldrc
 /bld/bld.git
 /bld/Bld.git
