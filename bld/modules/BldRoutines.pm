@@ -66,6 +66,7 @@ package BldRoutines
         hdr_depend
         rebuild_src_bool
         file_sig_calc
+        bldchg
         system_error_msg
         warning
         fatal
@@ -286,7 +287,7 @@ package BldRoutines
             }
             else
             {
-                my ( $status, $error_msg );
+                my ( $stdout, $stderr );
                 my ( %before, %after, @difference );
                 my ( $dirfh );
 
@@ -301,18 +302,30 @@ package BldRoutines
 
                 $cmd_var_sub =~ s{!!!}{\n}g;
 
-                # execute $cmd's
-                $status = system "$cmd_var_sub";
+                # execute {cmds}
+                $stdout = `{ $cmd_var_sub } 2>bld.stderr`;
 
-                if ( $status != 0 )
+                if ( not -z "bld.stderr" )
                 {
-                    $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                    open my $stderrfh, "<", "bld.stderr";
+                    $stderr = <$stderrfh>;
+                    close $stderrfh;
 
-                    my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $status;
-                    fatal($msg);
+                    foreach my $err ( @stderr_err_strs )
+                    {
+                        if ( $stderr =~ m/$err/ )
+                        {
+                            my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $stderr;
+                            fatal($msg);
+                        }
+                    }
                 }
+                `rm bld.stderr`;
 
-                print "$cmd_var_sub\n";
+                print "{cmds}: $cmd_var_sub\n";
+                print "stdout: $stdout\n";
 
                 # create hash of files in the bld directory after "$cmd_var_sub" execution
                 opendir $dirfh, ".";
@@ -349,15 +362,27 @@ package BldRoutines
 
                     $newfile = shift @difference;
 
-                    $status = system "mv", "$newfile", "$srcpath";
+                    # execute mv
+                    $stdout = `{ mv $newfile \'$srcpath\'; } 2>bld.stderr`;
 
-                    if ( $status != 0 )
+                    if ( not -z "bld.stderr" )
                     {
-                        $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                        open my $stderrfh, "<", "bld.stderr";
+                        $stderr = <$stderrfh>;
+                        close $stderrfh;
 
-                        my $msg = sprintf "FATAL: Error msg: %s\n\"mv %s %s\" fail status: %s", $error_msg, $newfile, $srcpath, $status;
-                        fatal($msg);
+                        foreach my $err ( @stderr_err_strs )
+                        {
+                            if ( $stderr =~ m/$err/ )
+                            {
+                                my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                                my $msg = sprintf "FATAL: Error msg: %s\n\"mv %s %s\" fail status: %s", $error_msg, $newfile, $srcpath, $stderr;
+                                fatal($msg);
+                            }
+                        }
                     }
+                    `rm bld.stderr`;
                 }
             }
 
@@ -757,7 +782,7 @@ package BldRoutines
             chomp $line;
 
             # create hash of all variable name/variable value pairs in $eval_vars with all mandatory defines excluded
-            my %eval_vars_tmp = &main::var_sub( $line, '$bld', '$bldcmd', '$lib_dirs', '$O', '$opt_s', '$opt_r', '$opt_lib' );
+            my %eval_vars_tmp = &main::var_sub( $line, '$bld', '$bldcmd', '$lib_dirs', '$O', '$opt_s', '$opt_r', '$opt_lib', '$opt_sig' );
             %eval_vars = ( %eval_vars, %eval_vars_tmp );
 
             if ( "\$s" ~~ %eval_vars )
@@ -842,13 +867,13 @@ package BldRoutines
             open my $bifnfh, ">>", $BIFN;
 
             # print expansion of eval{} section defined variables that appear in $cmd's
-            print {$bifnfh} "\n####################################################################################################\n";
-            print {$bifnfh} "EVAL section expansion of defined variables used in DIRS section cmd fields:\n\n";
+            print $bifnfh "\n####################################################################################################\n";
+            print $bifnfh "EVAL section expansion of defined variables used in DIRS section cmd fields:\n\n";
             foreach my $key ( sort keys %eval_vars )
             {
                 print {$bifnfh} "$key = $eval_vars{$key}\n";
             }
-            print {$bifnfh} "\n";
+            print $bifnfh "\n";
             close $bifnfh;
         }
 
@@ -896,86 +921,86 @@ package BldRoutines
 
         {
             my $date = localtime();
-            print {$bifnfh} "\n$date\n";
+            print $bifnfh "\n$date\n";
         }
 
-        print {$bifnfh} "\nOS: $OSNAME\n";
+        print $bifnfh "\nOS: $OSNAME\n";
 
-        print {$bifnfh} "\nbld version: $VERSION\n\n";
+        print $bifnfh "\nbld version: $VERSION\n\n";
 
         my $perl = `which perl 2>&1`;
         chomp $perl;
         if ( $perl =~ m{which:\sno} )
         {
-            print {$bifnfh} sprintf "perl full path: No perl in \$PATH\n";
+            print $bifnfh sprintf "perl full path: No perl in \$PATH\n";
         }
         else
         {
-            print {$bifnfh} sprintf "perl full path: %s\n", $perl;
-            print {$bifnfh} sprintf "perl version: %s\n", `perl -V 2>&1`;
+            print $bifnfh sprintf "perl full path: %s\n", $perl;
+            print $bifnfh sprintf "perl version: %s\n", `perl -V 2>&1`;
         }
 
         my $cpp = `which cpp 2>&1`;
         chomp $cpp;
         if ( $cpp =~ m{which:\sno} )
         {
-            print {$bifnfh} sprintf "cpp full path: No cpp in \$PATH\n";
+            print $bifnfh sprintf "cpp full path: No cpp in \$PATH\n";
         }
         else
         {
-            print {$bifnfh} sprintf "cpp full path: %s\n", $cpp;
-            print {$bifnfh} sprintf "cpp version: %s\n", `cpp --version 2>&1`;
+            print $bifnfh sprintf "cpp full path: %s\n", $cpp;
+            print $bifnfh sprintf "cpp version: %s\n", `cpp --version 2>&1`;
         }
 
         my $gcc = `which gcc 2>&1`;
         chomp $gcc;
         if ( $gcc =~ m{which:\sno} )
         {
-            print {$bifnfh} sprintf "gcc full path: No gcc in \$PATH\n";
+            print $bifnfh sprintf "gcc full path: No gcc in \$PATH\n";
         }
         else
         {
-            print {$bifnfh} sprintf "gcc full path: %s\n", $gcc;
-            print {$bifnfh} sprintf "gcc version: %s\n", `gcc --version 2>&1`;
+            print $bifnfh sprintf "gcc full path: %s\n", $gcc;
+            print $bifnfh sprintf "gcc version: %s\n", `gcc --version 2>&1`;
         }
 
         my $gpp = `which g++ 2>&1`;
         chomp $gpp;
         if ( $gpp =~ m{which:\sno} )
         {
-            print {$bifnfh} sprintf "g++ full path: No g++ in \$PATH\n";
+            print $bifnfh sprintf "g++ full path: No g++ in \$PATH\n";
         }
         else
         {
-            print {$bifnfh} sprintf "g++ full path: %s\n", $gpp;
-            print {$bifnfh} sprintf "g++ version: %s\n", `g++ --version 2>&1`;
+            print $bifnfh sprintf "g++ full path: %s\n", $gpp;
+            print $bifnfh sprintf "g++ version: %s\n", `g++ --version 2>&1`;
         }
 
         my $clang = `which clang 2>&1`;
         chomp $clang;
         if ( $clang =~ m{which:\sno} )
         {
-            print {$bifnfh} sprintf "clang full path: No clang in \$PATH\n";
+            print $bifnfh sprintf "clang full path: No clang in \$PATH\n";
         }
         else
         {
-            print {$bifnfh} sprintf "clang full path: %s\n", $clang;
-            print {$bifnfh} sprintf "clang version: %s\n", `clang --version 2>&1`;
+            print $bifnfh sprintf "clang full path: %s\n", $clang;
+            print $bifnfh sprintf "clang version: %s\n", `clang --version 2>&1`;
         }
 
-        print {$bifnfh} "\n####################################################################################################\n";
-        print {$bifnfh} "comments section of Bld file:\n";
-        print {$bifnfh} "$comment_section";
+        print $bifnfh "\n####################################################################################################\n";
+        print $bifnfh "comments section of Bld file:\n";
+        print $bifnfh "$comment_section";
 
-        print {$bifnfh} "\n####################################################################################################\n";
-        print {$bifnfh} "EVAL section expansion of \$bld, \$bldcmd and \$lib_dirs mandatory variables(\$O is object files):\n\n";
-        print {$bifnfh} "\$bld = $bld\n";
-        print {$bifnfh} "\$bldcmd = \"$bldcmd\"\n";
-        print {$bifnfh} "\$lib_dirs = \"$lib_dirs\"\n\n";
-        print {$bifnfh} "EVAL section expansion of \$opt_s and \$opt_r and \$opt_lib mandatory option variables:\n\n";
-        print {$bifnfh} "\$opt_s = \"$opt_s\"\n";
-        print {$bifnfh} "\$opt_r = \"$opt_r\"\n";
-        print {$bifnfh} "\$opt_lib = \"$opt_lib\"\n";
+        print $bifnfh "\n####################################################################################################\n";
+        print $bifnfh "EVAL section expansion of \$bld, \$bldcmd and \$lib_dirs mandatory variables(\$O is object files):\n\n";
+        print $bifnfh "\$bld = $bld\n";
+        print $bifnfh "\$bldcmd = \"$bldcmd\"\n";
+        print $bifnfh "\$lib_dirs = \"$lib_dirs\"\n\n";
+        print $bifnfh "EVAL section expansion of \$opt_s and \$opt_r and \$opt_lib mandatory option variables:\n\n";
+        print $bifnfh "\$opt_s = \"$opt_s\"\n";
+        print $bifnfh "\$opt_r = \"$opt_r\"\n";
+        print $bifnfh "\$opt_lib = \"$opt_lib\"\n";
         close $bifnfh;
     }
 
@@ -1283,7 +1308,8 @@ package BldRoutines
                $SigdataNew_ref,
            ) = @_;
 
-        my ( $tmp, $status, $error_msg, $O );
+        my ( $stdout, $stderr );
+        my ( $tmp, $O );
 
 
         # extract %Objects hash object file keys and concatenate onto $O
@@ -1297,16 +1323,27 @@ package BldRoutines
 
         $tmp =~ s{!!!}{\n}g;
 
-        # use $bld and %Objects to rebuild target
-        $status = system "$tmp";
+        # execute $bldcmd
+        $stdout = `{ $tmp } 2>bld.stderr`;
 
-        if ( $status != 0 )
+        if ( not -z "bld.stderr" )
         {
-            $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+            open my $stderrfh, "<", "bld.stderr";
+            $stderr = <$stderrfh>;
+            close $stderrfh;
 
-            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $status;
-            fatal($msg);
+            foreach my $err ( @stderr_err_strs )
+            {
+                if ( $stderr =~ m/$err/ )
+                {
+                    my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                    my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $stderr;
+                    fatal($msg);
+                }
+            }
         }
+        `rm bld.stderr`;
 
         $SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
 
@@ -1859,8 +1896,8 @@ package BldRoutines
 
             open my $bifnfh, ">>", $BIFN;
 
-            print {$bifnfh} "\n####################################################################################################\n";
-            print {$bifnfh} "$BFN file DIRS section specification lines with irrelevant white space compressed out:\n\n";
+            print $bifnfh "\n####################################################################################################\n";
+            print $bifnfh "$BFN file DIRS section specification lines with irrelevant white space compressed out:\n\n";
 
             foreach my $line ( @dirs )
             {
@@ -1868,9 +1905,9 @@ package BldRoutines
 
                 $tmp = $line;
                 $tmp =~ s{!!!}{\\n}g;
-                print {$bifnfh} "$tmp\n";
+                print $bifnfh "$tmp\n";
             }
-            print {$bifnfh} "\n";
+            print $bifnfh "\n";
             close $bifnfh;
         }
 
@@ -1882,8 +1919,8 @@ package BldRoutines
 
             open my $bifnfh, ">>", $BIFN;
 
-            print {$bifnfh} "\n####################################################################################################\n";
-            print {$bifnfh} "R recursively expanded and numbered DIRS section specification lines:\n\n";
+            print $bifnfh "\n####################################################################################################\n";
+            print $bifnfh "R recursively expanded and numbered DIRS section specification lines:\n\n";
 
             # log @dirs to $BIFN
             {
@@ -1899,7 +1936,7 @@ package BldRoutines
                     printf {$bifnfh} "%4d  %s\n", $count, $tmp;
                 }
             }
-            print {$bifnfh} "\n";
+            print $bifnfh "\n";
             close $bifnfh;
         }
 
@@ -1935,8 +1972,8 @@ package BldRoutines
             {
                 open my $bifnfh, ">>", $BIFN;
 
-                print {$bifnfh} "\n####################################################################################################\n";
-                print {$bifnfh} "a. DIRS section specification lines\n".
+                print $bifnfh "\n####################################################################################################\n";
+                print $bifnfh "a. DIRS section specification lines\n".
                           "    b. variable interpolated(except for \$s) specification line cmd field\n".
                           "        c. matching compilation unit source file(s)\n".
                           "            d. source file header dependencies:\n\n";
@@ -1944,7 +1981,7 @@ package BldRoutines
                 foreach my $line ( @bldcmds )
                 {
                     $line =~ s{!!!}{\\n}g;
-                    print {$bifnfh} "$line";
+                    print $bifnfh "$line";
                 }
                 close $bifnfh;
             }
@@ -2373,22 +2410,26 @@ package BldRoutines
             push @sigfn, sprintf "'%s' %s\n", $s, $SigdataNew_ref->{$s}[$SIG_SRC];
         }
 
+        unshift @bifn, "\n####################################################################################################\n".
+                       "List of all build - System headers(full path)\n".
+                       "                    User headers(relative path)\n".
+                       "                    System libraries(full path)\n".
+                       "                    User libraries(relative path)\n".
+                       "                    Source files(relative path)\n".
+                       "                    Build target(bld directory):\n\n";
+
+        # write $BIFN file source files section
         open my $bifnfh, ">>", $BIFN;
-        print {$bifnfh} "\n####################################################################################################\n";
-        print {$bifnfh} "List of all build - System headers(full path)\n".
-                        "                    User headers(relative path)\n".
-                        "                    System libraries(full path)\n".
-                        "                    User libraries(relative path)\n".
-                        "                    Source files(relative path)\n".
-                        "                    Build target(bld directory):\n\n";
 
         foreach my $line ( @bifn )
         {
-            print {$bifnfh} "$line";
+            print $bifnfh "$line";
         }
         close $bifnfh;
 
+        # replace $SIGFN file with new %SigdataNew entries
         open my $sigfn, ">", $SIGFN;
+
         foreach my $line ( @sigfn )
         {
             print $sigfn "$line";
@@ -2653,6 +2694,110 @@ package BldRoutines
 
 
     # 
+    # Usage      : bldchg( \%Sigdata, \%SigdataNew );
+    #
+    # Purpose    : open the bld.chg file for writing all changes - add/delete/change -
+    #            : for sources/headers/build cmds/libraries/derived files/target.
+    #            : append to the file.
+    #
+    # Parameters : \%Sigdata    - hash holding $SIGFN file signature data
+    #            : \%SigdataNew - hash holding bld calculated command, source, header, library and target file signature data
+    #
+    # Returns    : None
+    #
+    # Globals    : None
+    #
+    # Throws     : None
+    #
+    # Notes      : None
+    #
+    # See Also   : None
+    #
+    sub bldchg
+    {
+        my (
+               $Sigdata_ref,
+               $SigdataNew_ref,
+           ) = @_;
+
+        my ( @common ); # source files common to both Sigdata and SigdataNew
+        my ( @SigdataKeys ) = sort keys %{$Sigdata_ref}; # keys of %Sigdata
+        my ( @SigdataNewKeys ) = sort keys %{$SigdataNew_ref}; # keys of %SigdataNew
+
+
+        open my $bldchgfh, ">>", "bld.chg";
+        print $bldchgfh "####################################################\n";
+
+        my $date = localtime();
+        print $bldchgfh "$date\n\n";
+
+        # for files deleted from the build
+        foreach my $s ( @SigdataKeys )
+        {
+            if ( not $s ~~ %{$SigdataNew_ref} )
+            {
+                print $bldchgfh "${$Sigdata_ref}{$s}[$SIG_SRC]  Del: $s\n";
+            }
+        }
+
+        # for files added to the build
+        foreach my $s ( @SigdataNewKeys )
+        {
+            if ( not $s ~~ %{$Sigdata_ref} )
+            {
+                print $bldchgfh "${$SigdataNew_ref}{$s}[$SIG_SRC]  Add: $s\n";
+            }
+        }
+
+        # find source files common to both Sigdata and SigdataNew
+        @common = ();
+        foreach my $k ( @SigdataKeys )
+        {
+            push @common, $k if exists ${$SigdataNew_ref}{$k};
+        }
+
+        # find and report on all source that has changed
+        foreach my $c ( @common )
+        {
+            if ( exists ${$Sigdata_ref}{$c}[$SIG_SRC] and exists ${$SigdataNew_ref}{$c}[$SIG_SRC] )
+            {
+                if ( ${$Sigdata_ref}{$c}[$SIG_SRC] ne ${$SigdataNew_ref}{$c}[$SIG_SRC] )
+                {
+                    print $bldchgfh "new: ${$SigdataNew_ref}{$c}[$SIG_SRC]  old: ${$Sigdata_ref}{$c}[$SIG_SRC]  Src Chg: $c\n";
+                }
+            }
+        }
+
+        # find and report on all source build cmds that have changed
+        foreach my $c ( @common )
+        {
+            if ( exists ${$Sigdata_ref}{$c}[$SIG_CMD] and exists ${$SigdataNew_ref}{$c}[$SIG_CMD] )
+            {
+                if ( ${$Sigdata_ref}{$c}[$SIG_CMD] ne ${$SigdataNew_ref}{$c}[$SIG_CMD] )
+                {
+                    print $bldchgfh "new: ${$SigdataNew_ref}{$c}[$SIG_CMD]  old: ${$Sigdata_ref}{$c}[$SIG_CMD]  Cmd Chg: $c\n";
+                }
+            }
+        }
+
+        # find and report on the target that has changed
+        foreach my $c ( @common )
+        {
+            if ( exists ${$Sigdata_ref}{$c}[$SIG_TGT] and exists ${$SigdataNew_ref}{$c}[$SIG_TGT] )
+            {
+                if ( ${$Sigdata_ref}{$c}[$SIG_TGT] ne ${$SigdataNew_ref}{$c}[$SIG_TGT] )
+                {
+                    print $bldchgfh "new: ${$SigdataNew_ref}{$c}[$SIG_TGT]  old: ${$Sigdata_ref}{$c}[$SIG_TGT]  Tgt Chg: $c\n";
+                }
+            }
+        }
+
+        print $bldchgfh "\n\n";
+        close $bldchgfh;
+    }
+
+
+    # 
     # Usage      : $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
     #
     # Purpose    : evaluate the error return from the system() call perl builtin
@@ -2786,6 +2931,8 @@ package BldRoutines
         close $bffnfh;
 
         print "$output";
+
+        kill INT => $PID;
 
         exit;
     }

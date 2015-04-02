@@ -55,6 +55,7 @@ package BGC
                      $SIG_TGT
                      $HDR_DEP
                      $LIB_DEP
+                     @stderr_err_strs
                      $RGX_HDR_EXT
                      $RGX_SRC_EXT
                      $RGX_FILE_EXT
@@ -75,7 +76,7 @@ package BGC
     use diagnostics;
     use autodie;
 
-    $VERSION = "1.0.4";
+    $VERSION = "1.0.5";
 
     # file names
     $SIGFN = "Bld.sig";       # SIGnature File Name
@@ -140,6 +141,12 @@ package BGC
         $SIG_TGT = 2;     # constant subscript indexing the signature of the target file
         $HDR_DEP = 3;     # constant subscript indexing header file dependencies in the next level hash
         $LIB_DEP = 4;     # constant subscript indexing library file dependencies in the next level hash
+
+    # strings for matching against bld.stderr file created by `{ cmds } 2>bld.stderr`
+    @stderr_err_strs = (
+                           "error",
+                           "missing",
+                       );
 
     # regex related
         # match all header file extensions(without the period)

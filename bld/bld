@@ -56,7 +56,7 @@ use English;
 use Getopt::Long;
 use File::Find;
 use Data::Dumper;
-use Safe;
+#use Safe;
 
 # extract_multiple - for parsing the $BFN DIRS section
 # extract_bracketed - used by extract_multiple for finding '{}''s
@@ -107,6 +107,7 @@ use BldRoutines;
                 $opt_s,     # to use system header files in dependency checking("system" or "nosystem")
                 $opt_r,     # to inform about any files that will require re-building, but do not rebuild("rebuild" or "norebuild")
                 $opt_lib,   # to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
+                $opt_sig,   # 
 
         # booleans
         $rebuild_chgsrc, # boolean to indicate a source file has changed
@@ -292,14 +293,14 @@ use BldRoutines;
                 #          already exists will fatal().  if a source is not re-built then it will not be added to %Targets.  only re-built targets are added.
     );
 
-    # initially interrupts just fatal(); after the $BFN file has been processed and the $SIGFN has been read in, int_sig_handler()
-    # will handle them and first write out any partially accumulated new signatures to $SIGFN and then fatal().
+    # initially interrupts just Croak(); after the $BFN file has been processed and the $SIGFN has been read in,
+    # int_sig_handler() will handle them and first merge %Sigdata into %SigdataNew and fatal().
     local $SIG{INT} = sub {
                               my (
                                      $signame,
                                  ) = @_;
 
-                                 fatal("\nInterrupted with signal $signame");
+                                 Croak("\nInterrupted with signal $signame");
                           };
 
     {
@@ -353,6 +354,7 @@ use BldRoutines;
     GetOptions
     (
         "h" => \$opt_h,
+        "s" => \$opt_sig,
     ) or fatal("FATAL: GetOptions() failed(use bld -h).");
 
     if ( @ARGV > 0 )
@@ -484,12 +486,8 @@ use BldRoutines;
 
     # 
     # Usage      : ^C
-    #            : kill INT => $PID;
     #
     # Purpose    : interrupt handler, not called directly, but by the program receiving at INT signal.
-    #            : this may happen in two ways - a. a ^C is typed at the keyboard during program execution and
-    #            : b. during a call to the fatal() routine.  fatal() prints it's calling msg to the $BFFN file
-    #            : and then signals an INT to the program.
     #
     # Parameters : called with the SIG name of the interrupt
     #
@@ -511,11 +509,10 @@ use BldRoutines;
                $signame,
            ) = @_;
 
+        # if bld is interrupted then merge %SigdataNew and %Sigdata
         %SigdataNew = ( %SigdataNew, %Sigdata );
 
         sig_file_update( $bld, \%SigdataNew );
-
-        fatal("\nInterrupted with signal $signame");
     }
 
 
@@ -549,24 +546,37 @@ use BldRoutines;
 
                 if ( $cmd_var_sub ne $EMPTY )
                 {
-                    my ( $status, $error_msg );
+                    my ( $stdout, $stderr );
 
                     # convert '!!!' strings back to newlines for execution
                     $cmd_var_sub =~ s{!!!}{\n}g;
 
-                    # execute $cmd_var_sub's
-                    $status = system "$cmd_var_sub";
+                    # execute {cmds}
+                    $stdout = `{ $cmd_var_sub } 2>bld.stderr`;
 
-                    if ( $status != 0 )
+                    if ( not -z "bld.stderr" )
                     {
-                        $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                        open my $stderrfh, "<", "bld.stderr";
+                        $stderr = <$stderrfh>;
+                        close $stderrfh;
 
-                        my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $status;
-                        fatal($msg);
+                        foreach my $err ( @stderr_err_strs )
+                        {
+                            if ( $stderr =~ m/$err/ )
+                            {
+                                my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                                my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $stderr;
+                                fatal($msg);
+                            }
+                        }
                     }
+                    `rm bld.stderr`;
+
+                    print "{cmds}: $cmd_var_sub\n";
+                    print "stdout: $stdout\n";
                 }
 
-                print "{$cmd_var_sub}\n";
                 next;
             }
             when ( m{$RGX_VALID_DIRS_LINE} )
@@ -703,6 +713,12 @@ use BldRoutines;
     # ignore interrupts while $SIGFN is being written
     local $SIG{INT} = 'IGNORE';
 
+    # if $bld_sig true output to bld.chg any changes - add/delete/change/cmd changes
+    if ( $opt_sig )
+    {
+        bldchg( \%Sigdata, \%SigdataNew );
+    }
+
     # writes %SigdataNew signature data to $SIGFN and header/code file inventory to $BIFN
     sig_file_update( $bld, \%SigdataNew );
 
@@ -815,7 +831,7 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.4
+ bld version 1.0.5
 
 =head1 USAGE
 
@@ -847,13 +863,12 @@ bld [-h]
 
 =head1 DESCRIPTION
 
- bld(1.0.4) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.5) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
  SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
  and Bld.gv(bld global values) files.  See the bld.README file.  There are no cmd line arguments or
- options(except for -h) and no environment variables are used. A bld.rm program is provided to
- clean up the main bld directory.
+ options(except for -h).  A bld.rm program is provided to clean up the main bld directory.
 
  bld is based upon taking the SHA1 signature of anything that, when changed, would require a
  re-build of the executable/library.  It is not, like 'make', based in any way on dates.  This
@@ -1712,7 +1727,7 @@ bld [-h]
     modify this.
 
  8. When blocks of cmds({}) are executed by the perl system() function, error reporting is
-    per system() call.  If you are executing multile cmds and want more granular error
+    per system() call.  If you are executing multiple cmds and want more granular error
     reporting then break up the cmd block into multiple cmd blocks e.g {ls;pwd;} -> {ls;}
     {pwd;} or dir:regex:{ls;pwd;$CC -c $s;} -> {dir/ls} {dir/pwd} dir:regex:{$CC -c $s}.
 
@@ -1793,6 +1808,7 @@ bld [-h]
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
+     bld-1.0.5.tar.gz - 
 
      bld-1.0.4.tar.gz - entirely perldoc updates.  example projects - bld-1.0.4-git.tar.xz, bld-1.0.4-svn.tar.xz
                         and bld-1.0.4-systemd.tar.xz.
@@ -1801,11 +1817,6 @@ bld [-h]
                         git(git-2.3.0.tar.gz) and svn(subversion-1.8.11.tar.gz).  improved error reporting.  multiple
                         versions of git and svn are now built.  the naming convention for example project release
                         files has changed - bld-1.0.3-git.tar.xz, bld-1.0.3-svn.tar.xz and bld-1.0.3-systemd.tar.xz.
-
-     bld-1.0.2.tar.gz - added capability to set Bld file EVAL section variables for interpolation into DIRS section
-                        directory specifications.  improved fatal() output. updated git/svn/systemd builds to
-                        Fedora21.  doc improvements.  improved exports/imports of variables/functions between
-                        bld/BGC.pm/BldRoutines.pm.
 
      Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
      about the most recent releases.  This may change in future.

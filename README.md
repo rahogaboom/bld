@@ -2,7 +2,7 @@
 bld
 ===
 
-bld(1.0.4) is a simple flexible non-hierarchical perl program that builds a single C/C++/
+bld(1.0.5) is a simple flexible non-hierarchical perl program that builds a single C/C++/
 Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,
 unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for
 automatic header file dependency checking.  The operation of bld depends entirely on the
@@ -26,11 +26,11 @@ Current example projects:
     The following are examples of building complex multi-target projects.  They are
     provided with releases. Unpack them in the main bld directory in the same place as
     the bld.example and Bld.example directories:
-        bld-1.0.4-git.tar.gz -
+        bld-1.0.5-git.tar.gz -
             the git project http://git-scm.com/
-        bld-1.0.4-svn.tar.gz -
+        bld-1.0.5-svn.tar.gz -
             the subversion project http://subversion.apache.org/
-        bld-1.0.4-systemd.tar.gz -
+        bld-1.0.5-systemd.tar.gz -
             the systemd project http://www.freedesktop.org/wiki/Software/systemd/
 
  Dependencies:
@@ -55,4 +55,5 @@ Do './bld' to build the exec-c executable "Hello, world!" program.  This creates
     illustration of how to construct Bld files and the output that bld creates.
     This "Hello, world!" program has several stub do nothing routines that are just
     there to help illustrate various features of how to construct a Bld file.
+Examine the bld.info, bld.warn, bld.fatal, bld.chg, Bld.sig and Bld files.
 ```
