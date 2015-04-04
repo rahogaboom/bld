@@ -93,8 +93,7 @@ package BGC
              " unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for\n".
              " automatic header file dependency checking.  The operation of bld depends entirely on the\n".
              " construction of the Bld(bld specification) and Bld.gv(bld global values) files.  See the\n".
-             " bld.README file.  There are no cmd line arguments or options(except for -h(this msg)) or\n".
-             " \$HOME/.bldrc or ./.bldrc files and no environment variables are used.  Complex\n".
+             " bld.README file.  There are no cmd line arguments and no environment variables.  Complex\n".
              " multi-target projects are built with the use of:\n\n".
              "     Bld.<project>         - Bld files and target bld output files directory\n".
              "     bld.<project>         - project source directory\n".
@@ -146,6 +145,7 @@ package BGC
     @stderr_err_strs = (
                            "error",
                            "missing",
+                           "cannot find",
                        );
 
     # regex related

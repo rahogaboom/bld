@@ -10,6 +10,7 @@ Do './bld' to build the exec-c executable "Hello, world!" program.  This creates
     illustration of how to construct Bld files and the output that bld creates.
     This "Hello, world!" program has several stub do nothing routines that are just
     there to help illustrate various features of how to construct a Bld file.
+Examine the bld.info, bld.warn, bld.fatal, bld.chg(-s), Bld.sig and Bld files.
 
 ----------------------------------------------------------------------------------------------------
 Contact:

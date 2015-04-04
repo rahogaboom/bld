@@ -867,8 +867,8 @@ bld [-h]
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
  SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
- and Bld.gv(bld global values) files.  See the bld.README file.  There are no cmd line arguments or
- options(except for -h).  A bld.rm program is provided to clean up the main bld directory.
+ and Bld.gv(bld global values) files.  See the bld.README file.  There are no cmd line arguments.
+ A bld.rm program is provided to clean up the main bld directory.
 
  bld is based upon taking the SHA1 signature of anything that, when changed, would require a
  re-build of the executable/library.  It is not, like 'make', based in any way on dates.  This
@@ -1166,9 +1166,9 @@ bld [-h]
      unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
      is small relative to the expense of programmer time.  An investigation of some other make alternatives
      e.g. scons, cook - will disclose that they too are using signatures - maybe for exactly for the same reasons.
-  2. bld is REALLY simple to use.  There are no arguments, no options(except -h), no environment variables and
-     no rc files.  The entire bld is controlled from the Bld(and Bld.gv file) file.  Only a minimal knowledge
-     of perl is needed - variable definitions and simple regular expressions.
+  2. bld is REALLY simple to use.  There are no arguments and no environment variables.  The entire bld is
+     controlled from the Bld(and Bld.gv file) file.  Only a minimal knowledge of perl is needed - variable
+     definitions and simple regular expressions.
   3. Automatic dependency checking - GNU cpp is used to find the header file dependencies.  Optionally, header
      file checking may be done for user header files only or for simultaneously both system header and user
      header files.  All header file dependency information associated with each source is saved to the
@@ -1574,8 +1574,8 @@ bld [-h]
 
     1. Construct the Bld file - see below for a Bld file example and see the Bld.example
        directory for multiple examples.  A Bld.gv file is not needed for a single target.
-       Since there are no args or options to bld and no environment variables or rc files
-       are used, nothing else needs to be done.
+       Since there are no args to bld and no environment variables are used, nothing else
+       needs to be done.
 
     2. Execute './bld'.  This will rebuild the target and create/update the Bld.sig signature
        file.  The bld.info, bld.warn and bld.fatal files will be created.
@@ -1808,7 +1808,11 @@ bld [-h]
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
-     bld-1.0.5.tar.gz - 
+
+     bld-1.0.5.tar.gz - changes related to:
+                        a. change {cmds} block execution from 'system "";' to '$stdout = `{ cmds } 2>bld.stderr`;'
+                        b. add -s option to create bld.chg file with any file changes during a bld run
+                        c. 
 
      bld-1.0.4.tar.gz - entirely perldoc updates.  example projects - bld-1.0.4-git.tar.xz, bld-1.0.4-svn.tar.xz
                         and bld-1.0.4-systemd.tar.xz.

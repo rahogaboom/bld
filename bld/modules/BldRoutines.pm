@@ -288,16 +288,28 @@ package BldRoutines
             else
             {
                 my ( $stdout, $stderr );
-                my ( %before, %after, @difference );
+                my ( @difference );
                 my ( $dirfh );
+                my ( %files_before, %files_after );
+                my ( %stdfiles );
 
-                # create hash of files in the bld directory before "$cmd_var_sub" execution
+                %stdfiles = (
+                                "bld" => undef,
+                                "bld.rm" => undef,
+                                "Bld" => undef,
+                                "Bld.sig" => undef,
+                                "Bld.gv" => undef,
+                                "bld.info" => undef,
+                                "bld.warn" => undef,
+                                "bld.fatal" => undef,
+                                "bld.README" => undef,
+                                "bld.chg" => undef,
+                            );
+
+
+                # build hash of files before {cmds} executed - exclude %stdfiles and dot files
                 opendir $dirfh, ".";
-                while ( readdir $dirfh )
-                {
-                    $_ =~ s{\n}{};
-                    $before{"$_"} = undef;
-                }
+                %files_before = map { $_ => undef } grep { -f $_ and not exists $stdfiles{$_} and not $_ =~ /^\.+.*$/ } readdir $dirfh;
                 closedir $dirfh;
 
                 $cmd_var_sub =~ s{!!!}{\n}g;
@@ -327,21 +339,17 @@ package BldRoutines
                 print "{cmds}: $cmd_var_sub\n";
                 print "stdout: $stdout\n";
 
-                # create hash of files in the bld directory after "$cmd_var_sub" execution
+                # build hash of files after {cmds} executed - exclude %stdfiles and dot files
                 opendir $dirfh, ".";
-                while ( readdir $dirfh )
-                {
-                    $_ =~ s{\n}{};
-                    $after{"$_"} = undef;
-                }
+                %files_after = map { $_ => undef } grep { -f $_ and not exists $stdfiles{$_} and not $_ =~ /^\.+.*$/ } readdir $dirfh;
                 closedir $dirfh;
 
-                # create array of new files created by "$cmd_var_sub" execution
-                foreach my $f ( keys %after )
+                # find files created by {cmds}
+                foreach my $file ( keys %files_after )
                 {
-                    if ( not exists $before{$f} )
+                    if ( not exists $files_before{$file} )
                     {
-                        push @difference, $f;
+                        push @difference, $file;
                     }
                 }
 
@@ -356,14 +364,10 @@ package BldRoutines
 
                 # move all new files in the bld directory created by "$cmd_var_sub" execution
                 # to the directory of the $s source
-                while ( @difference )
+                foreach my $file ( @difference )
                 {
-                    my ( $newfile );
-
-                    $newfile = shift @difference;
-
                     # execute mv
-                    $stdout = `{ mv $newfile \'$srcpath\'; } 2>bld.stderr`;
+                    $stdout = `{ mv $file \'$srcpath\'; } 2>bld.stderr`;
 
                     if ( not -z "bld.stderr" )
                     {
