@@ -1,0 +1,237 @@
+
+# systemd version
+$SYSTEMDVER = "systemd-208";
+
+# compiler
+$CC = "gcc";
+
+# cc options
+$CCOPTS =
+"-g ".
+"-O2 ".
+"-fPIC ".
+"-DPIC ".
+"-std=gnu99 ".
+"-DHAVE_CONFIG_H ".
+"-include ./config.h ".
+"-DPKGSYSCONFDIR='\"/usr/etc/systemd\"' ".
+"-DSYSTEM_CONFIG_UNIT_PATH='\"/usr/etc/systemd/system\"' ".
+"-DSYSTEM_DATA_UNIT_PATH='\"/usr/lib/systemd/system\"' ".
+"-DSYSTEM_SYSVINIT_PATH='\"/etc/init.d\"' ".
+"-DSYSTEM_SYSVRCND_PATH='\"/etc/rc.d\"' ".
+"-DUSER_CONFIG_UNIT_PATH='\"/usr/etc/systemd/user\"' ".
+"-DUSER_DATA_UNIT_PATH='\"/usr/lib/systemd/user\"' ".
+"-DCATALOG_DATABASE='\"/usr/var/lib/systemd/catalog/database\"' ".
+"-DSYSTEMD_CGROUP_AGENT_PATH='\"/usr/lib/systemd/systemd-cgroups-agent\"' ".
+"-DSYSTEMD_BINARY_PATH='\"/usr/lib/systemd/systemd\"' ".
+"-DSYSTEMD_SHUTDOWN_BINARY_PATH='\"/usr/lib/systemd/systemd-shutdown\"' ".
+"-DSYSTEMD_SLEEP_BINARY_PATH='\"/usr/lib/systemd/systemd-sleep\"' ".
+"-DSYSTEMCTL_BINARY_PATH='\"/usr/bin/systemctl\"' ".
+"-DSYSTEMD_TTY_ASK_PASSWORD_AGENT_BINARY_PATH='\"/usr/bin/systemd-tty-ask-password-agent\"' ".
+"-DSYSTEMD_STDIO_BRIDGE_BINARY_PATH='\"/usr/bin/systemd-stdio-bridge\"' ".
+"-DROOTPREFIX='\"/usr\"' ".
+"-DRANDOM_SEED='\"/usr/var/lib/systemd/random-seed\"' ".
+"-DSYSTEMD_CRYPTSETUP_PATH='\"/usr/lib/systemd/systemd-cryptsetup\"' ".
+"-DSYSTEM_GENERATOR_PATH='\"/usr/lib/systemd/system-generators\"' ".
+"-DUSER_GENERATOR_PATH='\"/usr/lib/systemd/user-generators\"' ".
+"-DSYSTEM_SHUTDOWN_PATH='\"/usr/lib/systemd/system-shutdown\"' ".
+"-DSYSTEM_SLEEP_PATH='\"/usr/lib/systemd/system-sleep\"' ".
+"-DSYSTEMD_KBD_MODEL_MAP='\"/usr/share/systemd/kbd-model-map\"' ".
+"-DX_SERVER='\"/usr/bin/X\"' ".
+"-DUDEVLIBEXECDIR='\"/usr/lib/udev\"' ".
+"-DPOLKIT_AGENT_BINARY_PATH='\"/usr/bin/pkttyagent\"' ".
+"-DQUOTACHECK='\"/usr/sbin/quotacheck\"' ".
+"-DKEXEC='\"/usr/sbin/kexec\"' ".
+"-Wp,-D_FORTIFY_SOURCE=2 ".
+"-pipe ".
+"-Wall ".
+"-Wextra ".
+"-Wno-inline ".
+"-Wundef ".
+"-Wformat=2 ".
+"-Wformat-security ".
+"-Wformat-nonliteral ".
+"-Wlogical-op ".
+"-Wsign-compare ".
+"-Wmissing-include-dirs ".
+"-Wold-style-definition ".
+"-Wpointer-arith ".
+"-Winit-self ".
+"-Wdeclaration-after-statement ".
+"-Wfloat-equal ".
+"-Wmissing-prototypes ".
+"-Wstrict-prototypes ".
+"-Wredundant-decls ".
+"-Wmissing-declarations ".
+"-Wmissing-noreturn ".
+"-Wshadow ".
+"-Wendif-labels ".
+"-Wcast-align ".
+"-Wstrict-aliasing=2 ".
+"-Wwrite-strings ".
+"-Wno-long-long ".
+"-Wno-overlength-strings ".
+"-Wno-unused-parameter ".
+"-Wno-missing-field-initializers ".
+"-Wno-unused-result ".
+"-Werror=overflow ".
+"-ffast-math ".
+"-fno-common ".
+"-fdiagnostics-show-option ".
+"-fdiagnostics-color ".
+"-fno-strict-aliasing ".
+"-fvisibility=hidden ".
+"-ffunction-sections ".
+"-fdata-sections ".
+"-fstack-protector ".
+"--param=ssp-buffer-size=4 ";
+
+# include file options
+$INCDIRS =
+"-I bld.systemd/$SYSTEMDVER ".
+"-I bld.systemd/$SYSTEMDVER/src ".
+"-I bld.systemd/$SYSTEMDVER/src/shared ".
+"-I bld.systemd/$SYSTEMDVER/src/login ".
+"-I bld.systemd/$SYSTEMDVER/src/journal ".
+"-I bld.systemd/$SYSTEMDVER/src/systemd ".
+"-I bld.systemd/$SYSTEMDVER/src/core ".
+"-I bld.systemd/$SYSTEMDVER/src/libudev ".
+"-I bld.systemd/$SYSTEMDVER/src/udev ".
+"-I bld.systemd/$SYSTEMDVER/src/libsystemd-bus ".
+"-I /usr/lib64/dbus-1.0/include ".
+"-I /usr/include/dbus-1.0 ".
+"-I /usr/include/glib-2.0 ".
+"-I /usr/lib64/glib-2.0/include ";
+
+# linker options for dynamic libraries
+$LIBSLINKOPTSDYNAMIC =
+"-g ".
+"-O2 ".
+"-fPIC ".
+"-DPIC ".
+"-std=gnu99 ".
+"-pipe ".
+"-ffast-math ".
+"-fno-common ".
+"-fdiagnostics-show-option ".
+"-fdiagnostics-color ".
+"-fno-strict-aliasing ".
+"-fvisibility=hidden ".
+"-ffunction-sections ".
+"-fdata-sections ".
+"-fstack-protector ".
+"--param=ssp-buffer-size=4 ".
+"-fvisibility=hidden ".
+"-Wall ".
+"-Wextra ".
+"-Wno-inline ".
+"-Wundef ".
+"-Wformat=2 ".
+"-Wformat-security ".
+"-Wformat-nonliteral ".
+"-Wlogical-op ".
+"-Wsign-compare ".
+"-Wmissing-include-dirs ".
+"-Wold-style-definition ".
+"-Wpointer-arith ".
+"-Winit-self ".
+"-Wdeclaration-after-statement ".
+"-Wfloat-equal ".
+"-Wmissing-prototypes ".
+"-Wstrict-prototypes ".
+"-Wredundant-decls ".
+"-Wmissing-declarations ".
+"-Wmissing-noreturn ".
+"-Wshadow ".
+"-Wendif-labels ".
+"-Wcast-align ".
+"-Wstrict-aliasing=2 ".
+"-Wwrite-strings ".
+"-Wno-long-long ".
+"-Wno-overlength-strings ".
+"-Wno-unused-parameter ".
+"-Wno-missing-field-initializers ".
+"-Wno-unused-result ".
+"-Werror=overflow ".
+"-Wl,--as-needed ".
+"-Wl,--no-undefined ".
+"-Wl,--gc-sections ".
+"-Wl,-z,relro ".
+"-Wl,-z,now ".
+"-Wl,--version-script=bld.systemd/$SYSTEMDVER/src/libsystemd-daemon/libsystemd-daemon.sym ";
+
+if ( $CC eq "clang" )
+{
+    $LIBSLINKOPTSDYNAMIC .= "-rpath /usr/lib ";
+}
+
+# linker options for executables
+$LIBSLINKOPTS = 
+"-g ".
+"-O2 ".
+"-std=gnu99 ".
+"-pipe ".
+"-Wall ".
+"-Wextra ".
+"-Wno-inline ".
+"-Wundef ".
+"-Wformat=2 ".
+"-Wformat-security ".
+"-Wformat-nonliteral ".
+"-Wlogical-op ".
+"-Wsign-compare ".
+"-Wmissing-include-dirs ".
+"-Wold-style-definition ".
+"-Wpointer-arith ".
+"-Winit-self ".
+"-Wdeclaration-after-statement ".
+"-Wfloat-equal ".
+"-Wmissing-prototypes ".
+"-Wstrict-prototypes ".
+"-Wredundant-decls ".
+"-Wmissing-declarations ".
+"-Wmissing-noreturn ".
+"-Wshadow ".
+"-Wendif-labels ".
+"-Wcast-align ".
+"-Wstrict-aliasing=2 ".
+"-Wwrite-strings ".
+"-Wno-long-long ".
+"-Wno-overlength-strings ".
+"-Wno-unused-parameter ".
+"-Wno-missing-field-initializers ".
+"-Wno-unused-result ".
+"-Werror=overflow ".
+"-ffast-math ".
+"-fno-common ".
+"-fdiagnostics-show-option ".
+"-fdiagnostics-color ".
+"-fno-strict-aliasing ".
+"-fvisibility=hidden ".
+"-ffunction-sections ".
+"-fdata-sections ".
+"-fstack-protector ".
+"--param=ssp-buffer-size=4 ".
+"-Wl,--as-needed ".
+"-Wl,--no-undefined ".
+"-Wl,--gc-sections ".
+"-Wl,-z ".
+"-Wl,relro ".
+"-Wl,-z ".
+"-Wl,now ".
+"-L ~/git/bld/bld/Bld.systemd/$SYSTEMDVER ";
+
+# mandatory defined variables
+
+    # space separated list of directories to search for libraries
+    $lib_dirs = "";
+
+    # use system header files in dependency checking("system" or "nosystem")
+    $opt_s = "nosystem";
+
+    # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
+    $opt_r = "rebuild";
+
+    # do dependency checking on libraries("libcheck", "nolibcheck", "warnlibcheck" or "fatallibcheck")
+    $opt_lib = "libcheck";
+
