@@ -287,7 +287,7 @@ package BldRoutines
             }
             else
             {
-                my ( $stdout, $stderr );
+                my ( $std_out_err );
                 my ( @difference );
                 my ( $dirfh );
                 my ( %files_before, %files_after );
@@ -315,29 +315,21 @@ package BldRoutines
                 $cmd_var_sub =~ s{!!!}{\n}g;
 
                 # execute {cmds}
-                $stdout = `{ $cmd_var_sub } 2>bld.stderr`;
+                $std_out_err = `{ $cmd_var_sub } 2>&1`;
 
-                if ( not -z "bld.stderr" )
+                foreach my $err ( @stderr_err_strs )
                 {
-                    open my $stderrfh, "<", "bld.stderr";
-                    $stderr = <$stderrfh>;
-                    close $stderrfh;
-
-                    foreach my $err ( @stderr_err_strs )
+                    if ( $std_out_err =~ m/$err/ )
                     {
-                        if ( $stderr =~ m/$err/ )
-                        {
-                            my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                        my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-                            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $stderr;
-                            fatal($msg);
-                        }
+                        my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $std_out_err;
+                        fatal($msg);
                     }
                 }
-                `rm bld.stderr`;
 
                 print "{cmds}: $cmd_var_sub\n";
-                print "stdout: $stdout\n";
+                print "std-out/err: $std_out_err\n";
 
                 # build hash of files after {cmds} executed - exclude %stdfiles and dot files
                 opendir $dirfh, ".";
@@ -367,26 +359,18 @@ package BldRoutines
                 foreach my $file ( @difference )
                 {
                     # execute mv
-                    $stdout = `{ mv $file \'$srcpath\'; } 2>bld.stderr`;
+                    $std_out_err = `{ mv $file \'$srcpath\'; } 2>&1`;
 
-                    if ( not -z "bld.stderr" )
+                    foreach my $err ( @stderr_err_strs )
                     {
-                        open my $stderrfh, "<", "bld.stderr";
-                        $stderr = <$stderrfh>;
-                        close $stderrfh;
-
-                        foreach my $err ( @stderr_err_strs )
+                        if ( $std_out_err =~ m/$err/ )
                         {
-                            if ( $stderr =~ m/$err/ )
-                            {
-                                my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                            my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-                                my $msg = sprintf "FATAL: Error msg: %s\n\"mv %s %s\" fail status: %s", $error_msg, $newfile, $srcpath, $stderr;
-                                fatal($msg);
-                            }
+                            my $msg = sprintf "FATAL: Error msg: %s\n\"mv %s %s\" fail status: %s", $error_msg, $newfile, $srcpath, $std_out_err;
+                            fatal($msg);
                         }
                     }
-                    `rm bld.stderr`;
                 }
             }
 
@@ -1312,7 +1296,7 @@ package BldRoutines
                $SigdataNew_ref,
            ) = @_;
 
-        my ( $stdout, $stderr );
+        my ( $std_out_err );
         my ( $tmp, $O );
 
 
@@ -1328,26 +1312,18 @@ package BldRoutines
         $tmp =~ s{!!!}{\n}g;
 
         # execute $bldcmd
-        $stdout = `{ $tmp } 2>bld.stderr`;
+        $std_out_err = `{ $tmp } 2>&1`;
 
-        if ( not -z "bld.stderr" )
+        foreach my $err ( @stderr_err_strs )
         {
-            open my $stderrfh, "<", "bld.stderr";
-            $stderr = <$stderrfh>;
-            close $stderrfh;
-
-            foreach my $err ( @stderr_err_strs )
+            if ( $std_out_err =~ m/$err/ )
             {
-                if ( $stderr =~ m/$err/ )
-                {
-                    my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-                    my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $stderr;
-                    fatal($msg);
-                }
+                my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $std_out_err;
+                fatal($msg);
             }
         }
-        `rm bld.stderr`;
 
         $SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
 

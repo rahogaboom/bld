@@ -55,6 +55,7 @@ use autodie;
 use English;
 use Getopt::Long;
 use File::Find;
+use Carp;
 use Data::Dumper;
 #use Safe;
 
@@ -546,35 +547,28 @@ use BldRoutines;
 
                 if ( $cmd_var_sub ne $EMPTY )
                 {
-                    my ( $stdout, $stderr );
+                    my ( $std_out_err );
 
                     # convert '!!!' strings back to newlines for execution
                     $cmd_var_sub =~ s{!!!}{\n}g;
 
                     # execute {cmds}
-                    $stdout = `{ $cmd_var_sub } 2>bld.stderr`;
+                    $std_out_err = `{ $cmd_var_sub } 2>&1`;
 
-                    if ( not -z "bld.stderr" )
+                    foreach my $err ( @stderr_err_strs )
                     {
-                        open my $stderrfh, "<", "bld.stderr";
-                        $stderr = <$stderrfh>;
-                        close $stderrfh;
-
-                        foreach my $err ( @stderr_err_strs )
+                        if ( $std_out_err =~ m/$err/ )
                         {
-                            if ( $stderr =~ m/$err/ )
-                            {
-                                my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+                            my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-                                my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $stderr;
-                                fatal($msg);
-                            }
+                            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $std_out_err;
+                            fatal($msg);
                         }
                     }
-                    `rm bld.stderr`;
 
                     print "{cmds}: $cmd_var_sub\n";
-                    print "stdout: $stdout\n";
+                    print "std-out/err: $std_out_err\n";
+
                 }
 
                 next;
@@ -1810,7 +1804,7 @@ bld [-h]
  https://github.com/rahogaboom/bld
 
      bld-1.0.5.tar.gz - changes related to:
-                        a. change {cmds} block execution from 'system "";' to '$stdout = `{ cmds } 2>bld.stderr`;'
+                        a. change {cmds} block execution from 'system "cmds";' to '`{ cmds } 2>&1`;'
                         b. add -s option to create bld.chg file with any file changes during a bld run
                         c. 
 

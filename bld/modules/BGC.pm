@@ -143,9 +143,9 @@ package BGC
 
     # strings for matching against bld.stderr file created by `{ cmds } 2>bld.stderr`
     @stderr_err_strs = (
-                           "error",
-                           "missing",
-                           "cannot find",
+                           " error ",
+                           " missing ",
+                           " cannot find ",
                        );
 
     # regex related
