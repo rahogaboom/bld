@@ -1679,51 +1679,65 @@ bld [-h]
 
 =head1 NOTES
 
- 1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
-    have the same root name as the source.  a subsequent Bld file {} block can rename and move
-    the .o files.
+  1. bld assumes that a source will build a derived file e.g. .o files in the same directory and
+     have the same root name as the source.  a subsequent Bld file {} block can rename and move
+     the .o files.
 
- 2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
-    into the same project directory before distribution for installation.  installation can
-    then rename and distribute targets in any way desired.
+  2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
+     into the same project directory before distribution for installation.  installation can
+     then rename and distribute targets in any way desired.
 
- 3. Some projects(rarely) violate either or both of these target naming or object file
-    naming/location requirements, but reconstructing these projects with bld should be
-    relatively easy e.g. systemd.
+  3. Some projects(rarely) violate either or both of these target naming or object file
+     naming/location requirements, but reconstructing these projects with bld should be
+     relatively easy e.g. systemd.
 
- 4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
-    source directory.
+  4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
+     source directory.
 
- 5. A bld run may be ^C interrupted.  When a normal uninterrupted run is completed the
-    Bld.sig file is rewritten using only those files that were included in the build.
-    Thus, if files were added or deleted this would reflect in the new Bld.sig file.  If a
-    run is interrupted, all files read in from the original Bld.sig file and any new files
-    already built are written out to the Bld.sig file.  This ensures that new files already
-    built and old files not yet examined will not be re-built.  This may result in some
-    entries in the Bld.sig file that no longer exist, but this will be corrected at the end
-    of the next normally completed run.
+  5. A bld run may be ^C interrupted.  When a normal uninterrupted run is completed the
+     Bld.sig file is rewritten using only those files that were included in the build.
+     Thus, if files were added or deleted this would reflect in the new Bld.sig file.  If a
+     run is interrupted, all files read in from the original Bld.sig file and any new files
+     already built are written out to the Bld.sig file.  This ensures that new files already
+     built and old files not yet examined will not be re-built.  This may result in some
+     entries in the Bld.sig file that no longer exist, but this will be corrected at the end
+     of the next normally completed run.
 
- 6. The Bld.sig signature file is automatically created and updated.  It contains one line
-    for each source, one line for each header file, optionally one line for each library and
-    one line for the executable.  The header file lines and the executable line have two
-    fields: the file name and its signature.  The source lines have four fields: the file
-    name, the signatures of the source file, the command use to build the source, and the
-    object file.  The user can modify this file to force the re-build of files by altering
-    the signature or even by deleting a line, however, any modification to a source or header
-    file, or build command string will do the same thing.  Removing the Bld.sig file will
-    re-build the entire target.
+  6. The Bld.sig signature file is automatically created and updated.  It contains one line
+     for each source, one line for each header file, optionally one line for each library and
+     one line for the executable.  The header file lines and the executable line have two
+     fields: the file name and its signature.  The source lines have four fields: the file
+     name, the signatures of the source file, the command use to build the source, and the
+     object file.  The user can modify this file to force the re-build of files by altering
+     the signature or even by deleting a line, however, any modification to a source or header
+     file, or build command string will do the same thing.  Removing the Bld.sig file will
+     re-build the entire target.
 
- 7. A non C or C++ source will be re-built if its build command has been changed or the
-    source file itself has been changed.  The re-built output will be put back in the
-    directory where the source came from. The assumption is that it will be a file that will
-    then act a source for subsequent build steps e.g. a lex or yacc that will produce a C
-    file as output which will then later need to be compiled.  Bld file cmd({}) blocks can
-    modify this.
+  7. A non C or C++ source will be re-built if its build command has been changed or the
+     source file itself has been changed.  The re-built output will be put back in the
+     directory where the source came from. The assumption is that it will be a file that will
+     then act a source for subsequent build steps e.g. a lex or yacc that will produce a C
+     file as output which will then later need to be compiled.  Bld file cmd({}) blocks can
+     modify this.
 
- 8. When blocks of cmds({}) are executed by the perl system() function, error reporting is
-    per system() call.  If you are executing multiple cmds and want more granular error
-    reporting then break up the cmd block into multiple cmd blocks e.g {ls;pwd;} -> {ls;}
-    {pwd;} or dir:regex:{ls;pwd;$CC -c $s;} -> {dir/ls} {dir/pwd} dir:regex:{$CC -c $s}.
+  8. When blocks of cmds({}) are executed by the perl `{ cmds } 2>&1`; operator, error
+     reporting is per ``; call.  If you are executing multiple cmds and want more granular
+     error reporting then break up the cmd block into multiple cmd blocks e.g {ls;pwd;} ->
+     {ls;} {pwd;} or dir:regex:{ls;pwd;$CC -c $s;} -> {dir/ls;} {dir/pwd;} dir:regex:
+     {$CC -c $s;}.
+
+  9. All cmds must end with a ';'.  If you miss this then you'll see msgs like - "sh: -c:
+     line 1: syntax error: unexpected end of file".  This includes the compiles and the
+     $bldcmd string.
+
+ 10. If you interrupt a bld(^C) you might get an object file left in the bld directory.
+     The next time bld is run this will not be recognized as a new file and mv'ed to the
+     source file directory.  Just remove these before a new bld run.
+
+ 11. { cmds } are executed within `{ cmds } 2>&1`; and the return stdout/stderr matched
+     against strings stored in the @stderr_err_strs array.  Any actual error return not
+     matched by one of these strings will be missed.  New strings can be added to
+     @stderr_err_strs in the BGC.pm module.
 
 =head1 CALL TREE
 
