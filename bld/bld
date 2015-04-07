@@ -108,7 +108,7 @@ use BldRoutines;
                 $opt_s,     # to use system header files in dependency checking("system" or "nosystem")
                 $opt_r,     # to inform about any files that will require re-building, but do not rebuild("rebuild" or "norebuild")
                 $opt_lib,   # to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
-                $opt_sig,   # 
+                $opt_chg,   # to create a bld.chg file that lists all changed files in the bld and their old/new signatures
 
         # booleans
         $rebuild_chgsrc, # boolean to indicate a source file has changed
@@ -355,7 +355,7 @@ use BldRoutines;
     GetOptions
     (
         "h" => \$opt_h,
-        "s" => \$opt_sig,
+        "c" => \$opt_chg,
     ) or fatal("FATAL: GetOptions() failed(use bld -h).");
 
     if ( @ARGV > 0 )
@@ -708,7 +708,7 @@ use BldRoutines;
     local $SIG{INT} = 'IGNORE';
 
     # if $bld_sig true output to bld.chg any changes - add/delete/change/cmd changes
-    if ( $opt_sig )
+    if ( $opt_chg )
     {
         bldchg( \%Sigdata, \%SigdataNew );
     }
@@ -829,8 +829,10 @@ __END__
 
 =head1 USAGE
 
- usage: bld [-h]
-     -h          - this message.(exit)
+ usage: bld [-hc]
+     -h - this message.(exit)
+     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and their old/new signatures
+          that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
 
 =head1 ARGUMENTS
 
@@ -838,10 +840,11 @@ __END__
 
 =head1 OPTIONS
 
-bld [-h]
+ bld [-hc]
 
--h
-        help message(exit)
+ -h - help message(exit)
+ -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and their old/new signatures
+      that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
 
 =head1 ENVIRONMENT VARIABLES
 
@@ -1209,7 +1212,9 @@ bld [-h]
      checking integration and formulation of Makefile strategies, automatic Makefile generation with Autotools -
      these all dominate the programmer time and expense of 'make'.  bld only requires basic perl variables(in
      the Bld file EVAL section) and '[R] dir:regex:{cmds}' line specifications(in the Bld file DIRS section).
- 13. 'make' and it's difficulties:
+ 13. The -c option will create, at the end of a bld run, a bld.chg file with all files and their old/new signatures
+     that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
+ 14. 'make' and it's difficulties:
          http://www.scons.org/wiki/FromMakeToScons
              a detailed critique of make and some alternatives(Adrian Neagu)
          http://freecode.com/articles/what-is-wrong-with-make
@@ -1819,8 +1824,9 @@ bld [-h]
 
      bld-1.0.5.tar.gz - changes related to:
                         a. change {cmds} block execution from 'system "cmds";' to '`{ cmds } 2>&1`;'
-                        b. add -s option to create bld.chg file with any file changes during a bld run
-                        c. 
+                        b. add -c option to create bld.chg file with any file changes during a bld run
+                        c. add $ENV{HOME}/.bldrc and .bldrc files
+                        d. doc updates
 
      bld-1.0.4.tar.gz - entirely perldoc updates.  example projects - bld-1.0.4-git.tar.xz, bld-1.0.4-svn.tar.xz
                         and bld-1.0.4-systemd.tar.xz.

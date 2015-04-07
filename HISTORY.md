@@ -1,5 +1,9 @@
 
- bld-1.0.5.tar.gz - 
+ bld-1.0.5.tar.gz - changes related to:
+                    a. change {cmds} block execution from 'system "cmds";' to '`{ cmds } 2>&1`;'
+                    b. add -c option to create bld.chg file with any file changes during a bld run
+                    c. add $ENV{HOME}/.bldrc and .bldrc files
+                    d. doc updates
 
  bld-1.0.4.tar.gz - entirely perldoc updates.  example projects - bld-1.0.4-git.tar.gz, bld-1.0.4-svn.tar.gz
                     and bld-1.0.4-systemd.tar.gz.

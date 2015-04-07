@@ -6,9 +6,8 @@ bld(1.0.5) is a simple flexible non-hierarchical perl program that builds a sing
 Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,
 unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for
 automatic header file dependency checking.  The operation of bld depends entirely on the
-construction of the Bld(bld specification) and Bld.gv(bld global values) files.  See the
-bld.README file.  There are no cmd line arguments and no environment variables.  Complex
-multi-target projects are built with the use of:
+construction of the Bld(bld specification) and Bld.gv(bld global values) files.  There
+are no cmd line arguments.  Complex multi-target projects are built with the use of:
 
     Bld.<project>         - Bld files and target bld output files directory
     bld.<project>         - project source directory
@@ -54,5 +53,5 @@ Do './bld' to build the exec-c executable "Hello, world!" program.  This creates
     gives an illustration of how to construct Bld files and the output that bld
     creates.  This "Hello, world!" program has several stub do nothing routines that
     are just there to help illustrate various features of how to construct a Bld file.
-Examine the bld.info, bld.warn, bld.fatal, bld.chg(-s), Bld.sig, Bld(and Bld.gv) files.
+Examine the bld.info, bld.warn, bld.fatal, bld.chg(-c), Bld.sig, Bld(and Bld.gv) files.
 ```
