@@ -2710,7 +2710,7 @@ package BldRoutines
 
 
         open my $bldchgfh, ">>", "bld.chg";
-        print $bldchgfh "####################################################\n";
+        print $bldchgfh "##################################################\n";
 
         my $date = localtime();
         print $bldchgfh "$date\n\n";

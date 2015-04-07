@@ -82,6 +82,7 @@ my
     $BIFN,
     $BWFN,
     $BFFN,
+    $CHGFN,
 );
 
 BEGIN
@@ -105,6 +106,7 @@ BEGIN
     $BIFN      = "bld.info";
     $BWFN      = "bld.warn";
     $BFFN      = "bld.fatal";
+    $CHGFN     = "bld.chg";
 }
 
 GetOptions

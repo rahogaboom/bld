@@ -73,6 +73,7 @@ foreach my $file ( @ls )
            not $file =~ m{^bld\.README$} and # not the bld.README file
            not $file =~ m{^bld\*$} and       # not the bld file
            not $file =~ m{^bld.rm\*$} and    # not the bld.rm file
+           not $file =~ m{^bld.chg$} and     # not the bld.chg file
            not $file =~ m{^Bld.gv$} and      # not the Bld.gv file
            not $file =~ m{^Bld$} and         # not the Bld file
            not $file =~ m{^\.bldrc$}         # not the .bldrc file
