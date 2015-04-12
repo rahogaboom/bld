@@ -566,8 +566,8 @@ use BldRoutines;
                         }
                     }
 
-                    print "{cmds}: $cmd_var_sub\n";
-                    print "std-out/err: $std_out_err\n";
+                    print STDERR "{cmds}: $cmd_var_sub\n";
+                    print STDERR "std-out/err: $std_out_err\n";
 
                 }
 
@@ -664,7 +664,7 @@ use BldRoutines;
         if ( $opt_r eq "norebuild" )
         {
             # print executable file name that would be re-built, but do not re-build
-            print "---WILL--- be re-built: $bld\n";
+            print STDERR "---WILL--- be re-built: $bld\n";
         }
         else
         {
@@ -676,11 +676,11 @@ use BldRoutines;
         if ( $opt_r eq "norebuild" )
         {
             # print executable file name that will not be re-built
-            print "$bld will NOT be re-built.\n";
+            print STDERR "$bld will NOT be re-built.\n";
         }
         else
         {
-            print "$bld is up to date.\n";
+            print STDERR "$bld is up to date.\n";
         }
     }
 
@@ -1544,6 +1544,7 @@ __END__
  bld.info   - information about the bld 
  bld.warn   - warnings from the bld 
  bld.fatal  - the fatal msg that ended the bld 
+ bld.chg    - all files and their old/new signatures that have been added/deleted/changed
 
  ~/bld directories:
  Bld.<project>/<version> - has all files controlling <project> <version>s blds and bld target output files

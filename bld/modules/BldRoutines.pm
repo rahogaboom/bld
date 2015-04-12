@@ -283,7 +283,7 @@ package BldRoutines
             # print source file names that will be re-built, but do not rebuild
             if ( $opt_r eq "norebuild" )
             {
-                print "---WILL--- be re-built: $s\n";
+                print STDERR "---WILL--- be re-built: $s\n";
             }
             else
             {
@@ -328,8 +328,8 @@ package BldRoutines
                     }
                 }
 
-                print "{cmds}: $cmd_var_sub\n";
-                print "std-out/err: $std_out_err\n";
+                print STDERR "{cmds}: $cmd_var_sub\n";
+                print STDERR "std-out/err: $std_out_err\n";
 
                 # build hash of files after {cmds} executed - exclude %stdfiles and dot files
                 opendir $dirfh, ".";
@@ -405,11 +405,11 @@ package BldRoutines
             # print source file names that will not be re-built
             if ( $opt_r eq "norebuild" )
             {
-                print "$s will NOT be re-built.\n";
+                print STDERR "$s will NOT be re-built.\n";
             }
             else
             {
-                print "$s is up to date.\n";
+                print STDERR "$s is up to date.\n";
             }
 
             # since the $cmd_var_sub has built successfully add the tmp data stored in the local
@@ -1360,8 +1360,8 @@ package BldRoutines
             }
         }
 
-        print "$tmp\n";
-        print "$bld re-built.\n";
+        print STDERR "$tmp\n";
+        print STDERR "$bld re-built.\n";
     }
 
 
@@ -2495,7 +2495,7 @@ package BldRoutines
             }
             $cpperror .= "END\n\n";
 
-            print "$cpperror\n";
+            print STDERR "$cpperror\n";
 
             my $msg = sprintf "FATAL: %s", $cpperror;
             fatal($msg);
@@ -2914,7 +2914,7 @@ package BldRoutines
         printf {$bffnfh} "$output";
         close $bffnfh;
 
-        print "$output";
+        print STDERR "$output";
 
         kill INT => $PID;
 
@@ -2941,10 +2941,10 @@ package BldRoutines
     #
     sub opt_help
     {
-        print "usage: bld [-h]\n";
-        print "    -h          - this message.(exit)\n";
+        print STDERR "usage: bld [-h]\n";
+        print STDERR "    -h          - this message.(exit)\n";
 
-        print "$USAGE";
+        print STDERR "$USAGE";
 
         exit;
     }
