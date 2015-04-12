@@ -27,6 +27,6 @@ $CC = "gcc";
 
 DIRS
 
-bld.example/example/daa/c : ^daa\.c$      : { $CC -c $s; }
-bld.example/example/daa/c : ^daa_test\.c$ : { $CC -c $s; }
+bld.example/example/daa/c : ^daa\.c$       : { $CC -c $s; }
+bld.example/example/daa/c : ^daac_test\.c$ : { $CC -c $s; }
 

@@ -1,15 +1,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <malloc.h>
 #include <string.h>
 
 #include "daa.h"
 
-/*
- * test code for daa(), daav(), and das().  all the tests are completely
- * independent, that is, any test may be eliminated or moved elsewhere and
- * run independently.
- */
 
     void
 test1(
@@ -19,13 +15,13 @@ test1(
 {
     int i, j, k, l;
 
-    for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+    for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
     {
-        for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+        for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
         {
-            for (k=st[2] ; k<st[2]+int(d[2]) ; k++)
+            for (k=st[2] ; k<st[2]+(int)d[2] ; k++)
             {
-                for (l=st[3] ; l<st[3]+int(d[3]) ; l++)
+                for (l=st[3] ; l<st[3]+(int)d[3] ; l++)
                 {
                     array[i][j][k][l] = i + j + k + l;
                 }
@@ -33,8 +29,6 @@ test1(
         }
     }
 }
-
-
 
 #define DAA  0
 #define DAAV  1
@@ -44,9 +38,6 @@ main()
 {
     int test;
 
-    static FILE *fp;
-
-    fp = fopen("daa_test.results", "w");
 
 
     /* to test daa() set test to DAA; to test daav() set test to DAAV */
@@ -66,7 +57,7 @@ main()
         int st[4] = {-1, -5, 10, 0};
         double ****array;
 
-        fprintf(fp, "\nTEST 1\n");
+        fprintf(stderr, "\nTEST 1\n");
 
         asize = das(sizeof(double), 4, d, &err_code);
 
@@ -85,31 +76,31 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             test1(d, st, array);
 
-            fprintf(fp, "sizeof(double) = %ld\n", sizeof(double));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(double) = %ld\n", sizeof(double));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    for (k=st[2] ; k<st[2]+int(d[2]) ; k++)
+                    for (k=st[2] ; k<st[2]+(int)d[2] ; k++)
                     {
-                        for (l=st[3] ; l<st[3]+int(d[3]) ; l++)
+                        for (l=st[3] ; l<st[3]+(int)d[3] ; l++)
                         {
-                            fprintf(fp,
+                            fprintf(stderr,
                                 "array[%2d][%2d][%2d][%2d] = %5.1f\n"
                                 , i, j, k, l, array[i][j][k][l]);
                         }
                     }
                 }
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -129,7 +120,7 @@ main()
         double init = 123.;
         double ****array;
 
-        fprintf(fp, "\nTEST 2\n");
+        fprintf(stderr, "\nTEST 2\n");
 
         asize = das(sizeof(double), 4, d, &err_code);
 
@@ -148,31 +139,31 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             test1(d, st, array);
 
-            fprintf(fp, "sizeof(double) = %ld\n", sizeof(double));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(double) = %ld\n", sizeof(double));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    for (k=st[2] ; k<st[2]+int(d[2]) ; k++)
+                    for (k=st[2] ; k<st[2]+(int)d[2] ; k++)
                     {
-                        for (l=st[3] ; l<st[3]+int(d[3]) ; l++)
+                        for (l=st[3] ; l<st[3]+(int)d[3] ; l++)
                         {
-                            fprintf(fp,
+                            fprintf(stderr,
                                 "array[%2d][%2d][%2d][%2d] = %5.1f\n"
                                 , i, j, k, l, array[i][j][k][l]);
                         }
                     }
                 }
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -191,7 +182,7 @@ main()
         double init = 10.10;
         double *array;
 
-        fprintf(fp, "\nTEST 3\n");
+        fprintf(stderr, "\nTEST 3\n");
 
         asize = das(sizeof(double), 1, d, &err_code);
 
@@ -210,20 +201,20 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             array[10] = 4.5;
 
-            fprintf(fp, "sizeof(double) = %ld\n", sizeof(double));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(double) = %ld\n", sizeof(double));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                fprintf(fp, "array[%2d] = %e\n", i, array[i]);
+                fprintf(stderr, "array[%2d] = %e\n", i, array[i]);
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -249,7 +240,7 @@ main()
         double init = 0;
         double **********array;
 
-        fprintf(fp, "\nTEST 4\n");
+        fprintf(stderr, "\nTEST 4\n");
 
         asize = das(sizeof(double), 10, d, &err_code);
 
@@ -268,31 +259,31 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 ,daa_errs[err_code]);
         }
         else
         {
             data = 0.;
-            for (i0=st[0] ; i0<st[0]+int(d[0]) ; i0++)
+            for (i0=st[0] ; i0<st[0]+(int)d[0] ; i0++)
             {
-	       for (i1=st[1] ; i1<st[1]+int(d[1]) ; i1++)
+	       for (i1=st[1] ; i1<st[1]+(int)d[1] ; i1++)
 	       {
-		  for (i2=st[2] ; i2<st[2]+int(d[2]) ; i2++)
+		  for (i2=st[2] ; i2<st[2]+(int)d[2] ; i2++)
 		  {
-		     for (i3=st[3] ; i3<st[3]+int(d[3]) ; i3++)
+		     for (i3=st[3] ; i3<st[3]+(int)d[3] ; i3++)
 		     {
-			for (i4=st[4] ; i4<st[4]+int(d[4]) ; i4++)
+			for (i4=st[4] ; i4<st[4]+(int)d[4] ; i4++)
 			{
-			   for (i5=st[5] ; i5<st[5]+int(d[5]) ; i5++)
+			   for (i5=st[5] ; i5<st[5]+(int)d[5] ; i5++)
 			   {
-			      for (i6=st[6] ; i6<st[6]+int(d[6]) ; i6++)
+			      for (i6=st[6] ; i6<st[6]+(int)d[6] ; i6++)
 			      {
-				 for (i7=st[7] ; i7<st[7]+int(d[7]) ; i7++)
+				 for (i7=st[7] ; i7<st[7]+(int)d[7] ; i7++)
 				 {
-				     for (i8=st[8] ; i8<st[8]+int(d[8]) ; i8++)
+				     for (i8=st[8] ; i8<st[8]+(int)d[8] ; i8++)
 				     {
-					for (i9=st[9] ; i9<st[9]+int(d[9]) ; i9++)
+					for (i9=st[9] ; i9<st[9]+(int)d[9] ; i9++)
 					{
 					    array[i0][i1][i2][i3][i4]
                                                  [i5][i6][i7][i8][i9] = ++data;
@@ -307,13 +298,13 @@ main()
 	       }
             }
 
-            fprintf(fp, "sizeof(double) = %ld\n", sizeof(double));
-            fprintf(fp, "array size = %d\n", asize);
-            fprintf(fp, "array[-4][-3][-2][-1][0][1][2][3][4][5] = %e\n"
+            fprintf(stderr, "sizeof(double) = %ld\n", sizeof(double));
+            fprintf(stderr, "array size = %d\n", asize);
+            fprintf(stderr, "array[-4][-3][-2][-1][0][1][2][3][4][5] = %e\n"
                 , array[-4][-3][-2][-1][0][1][2][3][4][5]);
-            fprintf(fp, "array[-2][-1][-1][2][4][4][5][6][7][8] = %e\n"
+            fprintf(stderr, "array[-2][-1][-1][2][4][4][5][6][7][8] = %e\n"
                 , array[-2][-1][-1][2][4][4][5][6][7][8]);
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -334,7 +325,7 @@ main()
             int l;
         } *array, s_init = {1.25, 5};
 
-        fprintf(fp, "\nTEST 5\n");
+        fprintf(stderr, "\nTEST 5\n");
 
         asize = das(sizeof(struct s), 1, d, &err_code);
 
@@ -353,7 +344,7 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
@@ -363,14 +354,14 @@ main()
             array[10].l = 4;
             array[10].d = 4.5;
 
-            fprintf(fp, "sizeof(struct s) = %ld\n", sizeof(struct s));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(struct s) = %ld\n", sizeof(struct s));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                fprintf(fp, "array[%2d].d = %f\n", i, array[i].d);
-                fprintf(fp, "array[%2d].l = %2d\n", i, array[i].l);
+                fprintf(stderr, "array[%2d].d = %f\n", i, array[i].d);
+                fprintf(stderr, "array[%2d].l = %2d\n", i, array[i].l);
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -391,7 +382,7 @@ main()
             int l;
         } **array, s_init = {1, 5};
 
-        fprintf(fp, "\nTEST 6\n");
+        fprintf(stderr, "\nTEST 6\n");
 
         asize = das(sizeof(struct s), 2, d, &err_code);
 
@@ -410,7 +401,7 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
@@ -420,18 +411,18 @@ main()
             array[4][4].l = 4;
             array[4][4].d = 4.5;
 
-            fprintf(fp, "sizeof(struct s) = %ld\n", sizeof(struct s));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(struct s) = %ld\n", sizeof(struct s));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    fprintf(fp,
+                    fprintf(stderr,
                         "array[%2d][%2d].l = %2d array[%2d][%2d].d = %f\n",
                         i, j, array[i][j].l, i, j, array[i][j].d);
                 }
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -453,7 +444,7 @@ main()
             double d;
         } ***array, s_init = {0, 1, 10};
 
-        fprintf(fp, "\nTEST 7\n");
+        fprintf(stderr, "\nTEST 7\n");
 
         asize = das(sizeof(struct s), 3, d, &err_code);
 
@@ -472,7 +463,7 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
@@ -481,15 +472,15 @@ main()
             array[1][4][5].l = 15;
             array[1][4][5].d = 7.5;
 
-            fprintf(fp, "sizeof(struct s) = %ld\n", sizeof(struct s));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(struct s) = %ld\n", sizeof(struct s));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    for (k=st[2] ; k<st[2]+int(d[2]) ; k++)
+                    for (k=st[2] ; k<st[2]+(int)d[2] ; k++)
                     {
-                        fprintf(fp, "array[%d][%d][%d].c = %2d"
+                        fprintf(stderr, "array[%d][%d][%d].c = %2d"
                                         " array[%d][%d][%d].l = %2d"
                                         " array[%d][%d][%d].d = %e\n",
                             i, j, k, array[i][j][k].c,
@@ -498,7 +489,7 @@ main()
                     }
                 }
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -519,7 +510,7 @@ main()
             char c;
         } ***array, s_init = {1, 10, 0};
 
-        fprintf(fp, "\nTEST 8\n");
+        fprintf(stderr, "\nTEST 8\n");
 
         asize = das(sizeof(struct s), 3, d, &err_code);
 
@@ -538,7 +529,7 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
@@ -547,17 +538,17 @@ main()
             array[-1][0][1].d = 7.5;
             array[-1][0][1].c = 2;
 
-            fprintf(fp, "sizeof(struct s) = %ld\n", sizeof(struct s));
-            fprintf(fp, "array size = %d\n", asize);
-            fprintf(fp, "array[-1][0][0].l = %d"
+            fprintf(stderr, "sizeof(struct s) = %ld\n", sizeof(struct s));
+            fprintf(stderr, "array size = %d\n", asize);
+            fprintf(stderr, "array[-1][0][0].l = %d"
                             " array[-1][0][0].d = %e"
                             " array[-1][0][0].c = %d\n",
                array[-1][0][0].l, array[-1][0][0].d, array[-1][0][0].c);
-            fprintf(fp, "array[-1][0][1].l = %d"
+            fprintf(stderr, "array[-1][0][1].l = %d"
                             " array[-1][0][1].d = %e"
                             " array[-1][0][1].c = %d\n",
                array[-1][0][1].l, array[-1][0][1].d, array[-1][0][1].c);
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -576,7 +567,7 @@ main()
         int init = 12;
         int *array;
 
-        fprintf(fp, "\nTEST 9\n");
+        fprintf(stderr, "\nTEST 9\n");
 
         asize = das(sizeof(int), 1, d, &err_code);
 
@@ -595,20 +586,20 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             array[10] = 4;
 
-            fprintf(fp, "sizeof(int) = %ld\n", sizeof(int));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0]; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(int) = %ld\n", sizeof(int));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0]; i<st[0]+(int)d[0] ; i++)
             {
-                fprintf(fp, "array[%2d] = %d\n", i, array[i]);
+                fprintf(stderr, "array[%2d] = %d\n", i, array[i]);
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -628,7 +619,7 @@ main()
         int init = 0;
         int **array;
 
-        fprintf(fp, "\nTEST 10\n");
+        fprintf(stderr, "\nTEST 10\n");
 
         asize = das(sizeof(int), 2, d, &err_code);
 
@@ -647,31 +638,31 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             data = 1;
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
                     array[i][j] = data++;
                 }    
             }
 
-            fprintf(fp, "sizeof(int) = %ld\n", sizeof(int));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(int) = %ld\n", sizeof(int));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    fprintf(fp, "array[%3d][%3d] = %d\n"
+                    fprintf(stderr, "array[%3d][%3d] = %d\n"
                         , i, j, array[i][j]);
                 }    
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -691,7 +682,7 @@ main()
         int init = 2;
         int ***array;
 
-        fprintf(fp, "\nTEST 11\n");
+        fprintf(stderr, "\nTEST 11\n");
 
         asize = das(sizeof(int), 3, d, &err_code);
 
@@ -710,37 +701,37 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             data = 0;
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    for (k=st[2] ; k<st[2]+int(d[2]) ; k++)
+                    for (k=st[2] ; k<st[2]+(int)d[2] ; k++)
                     {
                         array[i][j][k] = data++;
                     }
                 }    
             }
 
-            fprintf(fp, "sizeof(int) = %ld\n", sizeof(int));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(int) = %ld\n", sizeof(int));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    for (k=st[2] ; k<st[2]+int(d[2]) ; k++)
+                    for (k=st[2] ; k<st[2]+(int)d[2] ; k++)
                     {
-                        fprintf(fp, "array[%3d][%3d][%3d] = %d\n"
+                        fprintf(stderr, "array[%3d][%3d][%3d] = %d\n"
                             , i, j, k, array[i][j][k]);
                     }
                 }    
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -760,7 +751,7 @@ main()
             double d;
         } ***array, s_init = {5};
 
-        fprintf(fp, "\nTEST 12\n");
+        fprintf(stderr, "\nTEST 12\n");
 
         asize = das(sizeof(union s), 3, d, &err_code);
 
@@ -779,22 +770,22 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
-            fprintf(fp, "sizeof(union s) = %ld\n", sizeof(union s));
-            fprintf(fp, "array size = %d\n", asize);
+            fprintf(stderr, "sizeof(union s) = %ld\n", sizeof(union s));
+            fprintf(stderr, "array size = %d\n", asize);
 
-            fprintf(fp, "array[1][4][4].l = %d\n", array[1][4][4].l);
+            fprintf(stderr, "array[1][4][4].l = %d\n", array[1][4][4].l);
 
             array[1][4][5].l = 7;
-            fprintf(fp, "array[1][4][5].l = %d\n", array[1][4][5].l);
+            fprintf(stderr, "array[1][4][5].l = %d\n", array[1][4][5].l);
 
             array[1][4][5].d = 7.5;
-            fprintf(fp, "array[1][4][5].d = %e\n", array[1][4][5].d);
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "array[1][4][5].d = %e\n", array[1][4][5].d);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -811,7 +802,7 @@ main()
         int st[3] = {0, 0, 0};
         enum e {a,b,c} ***array, e_init = {c};
 
-        fprintf(fp, "\nTEST 13\n");
+        fprintf(stderr, "\nTEST 13\n");
 
         asize = das(sizeof(enum e), 3, d, &err_code);
 
@@ -830,22 +821,22 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
-            fprintf(fp, "sizeof(enum e) = %ld\n",sizeof(enum e));
-            fprintf(fp, "array size = %d\n", asize);
+            fprintf(stderr, "sizeof(enum e) = %ld\n",sizeof(enum e));
+            fprintf(stderr, "array size = %d\n", asize);
 
-            fprintf(fp, "array[1][4][4] = %d\n", array[1][4][4]);
+            fprintf(stderr, "array[1][4][4] = %d\n", array[1][4][4]);
 
             array[1][4][5] = a;
-            fprintf(fp, "array[1][4][5] = %d\n", array[1][4][5]);
+            fprintf(stderr, "array[1][4][5] = %d\n", array[1][4][5]);
 
             array[1][4][5] = b;
-            fprintf(fp, "array[1][4][5] = %d\n", array[1][4][5]);
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "array[1][4][5] = %d\n", array[1][4][5]);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -864,7 +855,7 @@ main()
         short init = 11;
         short **array;
 
-        fprintf(fp, "\nTEST 14\n");
+        fprintf(stderr, "\nTEST 14\n");
 
         asize = das(sizeof(short), 2, d, &err_code);
 
@@ -883,24 +874,24 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             array[5][3] = 4;
 
-            fprintf(fp, "sizeof(short) = %ld\n", sizeof(short));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "sizeof(short) = %ld\n", sizeof(short));
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1]; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1]; j<st[1]+(int)d[1] ; j++)
                 {
-                    fprintf(fp, "array[%2d][%2d] = %d\n"
+                    fprintf(stderr, "array[%2d][%2d] = %d\n"
                         , i, j, array[i][j]);
                 }
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -919,7 +910,7 @@ main()
         unsigned short init = 13;
         unsigned short **array;
 
-        fprintf(fp, "\nTEST 15\n");
+        fprintf(stderr, "\nTEST 15\n");
 
         asize = das(sizeof(unsigned short), 2, d, &err_code);
 
@@ -938,25 +929,25 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
         {
             array[3][5] = 5;
 
-            fprintf(fp, "sizeof(unsigned short) = %ld\n"
+            fprintf(stderr, "sizeof(unsigned short) = %ld\n"
                 , sizeof(unsigned short));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0] ; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0] ; i<st[0]+(int)d[0] ; i++)
             {
-                for (j=st[1] ; j<st[1]+int(d[1]) ; j++)
+                for (j=st[1] ; j<st[1]+(int)d[1] ; j++)
                 {
-                    fprintf(fp, "array[%2d][%2d] = %d\n"
+                    fprintf(stderr, "array[%2d][%2d] = %d\n"
                         , i, j, array[i][j]);
                 }
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }
@@ -985,7 +976,7 @@ main()
 
 
 
-        fprintf(fp, "\nTEST 16\n");
+        fprintf(stderr, "\nTEST 16\n");
 
         asize = das(sizeof(STRING_FOUR_MEGS), 1, d, &err_code);
 
@@ -1004,7 +995,7 @@ main()
 
         if (array == NULL)
         {
-            fprintf(fp, "daa(v): error on dynamic allocation. %s\n"
+            fprintf(stderr, "daa(v): error on dynamic allocation. %s\n"
                 , daa_errs[err_code]);
         }
         else
@@ -1017,14 +1008,14 @@ main()
             strcpy((char *)&array[1], "XXXXBXXXXX");
             strcpy((char *)&array[2], "XXXXXXXXXC");
 
-            fprintf(fp, "sizeof(STRING_FOUR_MEGS) = %ld\n"
+            fprintf(stderr, "sizeof(STRING_FOUR_MEGS) = %ld\n"
                 , sizeof(STRING_FOUR_MEGS));
-            fprintf(fp, "array size = %d\n", asize);
-            for (i=st[0]; i<st[0]+int(d[0]) ; i++)
+            fprintf(stderr, "array size = %d\n", asize);
+            for (i=st[0]; i<st[0]+(int)d[0] ; i++)
             {
-                fprintf(fp, "array[%2d] = %s\n", i, (unsigned char *)&array[i]);
+                fprintf(stderr, "array[%2d] = %s\n", i, (unsigned char *)&array[i]);
             }
-            fprintf(fp, "err_code = %d\n", err_code);
+            fprintf(stderr, "err_code = %d\n", err_code);
             free(free_ptr);
         }
     }

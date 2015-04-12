@@ -3,7 +3,7 @@
  * File: daa.c
  *
  *     Based on Dec. 2000 Embedded Systems Design article "Flexible Dynamic
- *     Array Allocation" by Richard A. Hogaboom
+ *     Array Allocation" by Richard A Hogaboom
  *
  * Description:
  *     these dynamic array allocators - daa() and daav() - are designed
@@ -43,20 +43,10 @@
  */
 
 /*
- *=================================================================*
- *                                                                 *
- *   (c) Copyright, 2001 Massachusetts Institute of Technology.    *
- *       This material may be reproduced by or for the             *
- *       U.S. Government pursuant to the copyright license         *
- *       under the clause at 252.227-7013 (June, 1995).            *
- *                                                                 *
- *=================================================================*
- */
-
-/*
  * Notes:
  *     1. the dimensional limit of the allocated arrays is set by MAX_DIM;
  *        increase or decrease this to adjust the maximum array dimension.
+ *
  *     2. alignment of the data area is the alignment of the first argument
  *        sizeof(), while the alignment of the pointer area is sizeof(char *).
  *        the data comes first, and the assumption here is that the valloc()
@@ -67,29 +57,8 @@
  *        to be aligned on a sizeof(char *) boundary.  the beginning of the
  *        pointer area is tested for alignment, and its alignment adjusted if
  *        necessary.
- *     3. this code has been tested(all daac_test.c tests) with the  Gnu
- *        gcc 4.1.0 compiler.  use the following script to build static and
- *        dynamic libraries and the executable.
  *
- *           #!/bin/bash
- *
- *           set -v
- *
- *           export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
- *
- *           rm libdaac.a
- *           gcc -c -fpic -g -ansi -pedantic -Wall -o daac.o daa.c
- *           ar rcv libdaac.a daac.o
- *           ar ts libdaac.a
- *
- *           rm libdaac.so.1.0.1
- *           gcc -shared -Wl,-soname,libdaac.so.1 -o libdaac.so.1.0.1 daac.o -lc
- *           ln -sf libdaac.so.1.0.1 libdaac.so.1
- *           ln -sf libdaac.so.1.0.1 libdaac.so
- *
- *           gcc -g -ansi -pedantic -Wall -o daac_test daac_test.c -L. -ldaac -lm
- *
- *     4. for an excellent reference on this type of array access see Numerical
+ *     3. for an excellent reference on this type of array access see Numerical
  *        Recipes in C, Press, Flannery, Teukolsky, and Vettering, Cambridge
  *        University Press, 1992, pg. 20.
  */
@@ -113,7 +82,7 @@
 /* global constants */
 
 /* maximum number of array dimensions */
-#define MAX_DIM 10
+#define MAX_DIM 256
 
 /* error msg indices */
 const unsigned int ERRS_INV_DIMS = 0;
@@ -134,7 +103,7 @@ const unsigned int ERRS_FAIL_ALLOC = 3;
  */
 
 /* error msgs */
-char *daa_errs[] =
+const char *daa_errs[] =
 {
     "daa: invalid number of dimensions - must be > 0 and <= MAX_DIM.",
     "daa: invalid request size - must be > 0.",
