@@ -55,7 +55,9 @@ use autodie;
 use English;
 use Getopt::Long;
 use File::Find;
-use Carp;
+use Carp qw(
+               croak
+           );
 use Data::Dumper;
 #use Safe;
 
@@ -294,14 +296,14 @@ use BldRoutines;
                 #          already exists will fatal().  if a source is not re-built then it will not be added to %Targets.  only re-built targets are added.
     );
 
-    # initially interrupts just Croak(); after the $BFN file has been processed and the $SIGFN has been read in,
+    # initially, interrupts just croak() after the $BFN file has been processed and the $SIGFN has been read in,
     # int_sig_handler() will handle them and first merge %Sigdata into %SigdataNew and fatal().
     local $SIG{INT} = sub {
                               my (
                                      $signame,
                                  ) = @_;
 
-                                 Croak("\nInterrupted with signal $signame");
+                                 croak("\nInterrupted with signal $signame");
                           };
 
     {
@@ -825,7 +827,7 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.5
+ bld version 1.0.6
 
 =head1 USAGE
 
@@ -860,7 +862,7 @@ __END__
 
 =head1 DESCRIPTION
 
- bld(1.0.5) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.6) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
  SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
@@ -1823,6 +1825,11 @@ __END__
 
  https://github.com/rahogaboom/bld
 
+     bld-1.0.6.tar.gz - changes related to:
+                        a. fixes for two gcc warnings in the example code(rdx and daa)
+                        b. use 'print STDERR' for all prints - more immediate output
+                        c. doc updates
+
      bld-1.0.5.tar.gz - changes related to:
                         a. change {cmds} block execution from 'system "cmds";' to '`{ cmds } 2>&1`;'
                         b. add -c option to create bld.chg file with any file changes during a bld run
@@ -1831,11 +1838,6 @@ __END__
 
      bld-1.0.4.tar.gz - entirely perldoc updates.  example projects - bld-1.0.4-git.tar.xz, bld-1.0.4-svn.tar.xz
                         and bld-1.0.4-systemd.tar.xz.
-
-     bld-1.0.3.tar.gz - moved four more routines from bld to BldRoutines.pm.  added new project version builds for
-                        git(git-2.3.0.tar.gz) and svn(subversion-1.8.11.tar.gz).  improved error reporting.  multiple
-                        versions of git and svn are now built.  the naming convention for example project release
-                        files has changed - bld-1.0.3-git.tar.xz, bld-1.0.3-svn.tar.xz and bld-1.0.3-systemd.tar.xz.
 
      Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
      about the most recent releases.  This may change in future.

@@ -76,7 +76,7 @@ package BGC
     use diagnostics;
     use autodie;
 
-    $VERSION = "1.0.5";
+    $VERSION = "1.0.6";
 
     # file names
     $SIGFN = "Bld.sig";       # SIGnature File Name

@@ -2,7 +2,7 @@
 bld
 ===
 
-bld(1.0.5) is a simple flexible non-hierarchical perl program that builds a single C/C++/
+bld(1.0.6) is a simple flexible non-hierarchical perl program that builds a single C/C++/
 Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,
 unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for
 automatic header file dependency checking.  The operation of bld depends entirely on the
@@ -24,11 +24,11 @@ Current example projects:
     The following are examples of building complex multi-target projects.  They are
     provided with releases. Unpack them in the main bld directory in the same place as
     the bld.example and Bld.example directories:
-        bld-1.0.5-git.tar.gz -
+        bld-1.0.6-git.tar.gz -
             the git project http://git-scm.com/
-        bld-1.0.5-svn.tar.gz -
+        bld-1.0.6-svn.tar.gz -
             the subversion project http://subversion.apache.org/
-        bld-1.0.5-systemd.tar.gz -
+        bld-1.0.6-systemd.tar.gz -
             the systemd project http://www.freedesktop.org/wiki/Software/systemd/
 
  Dependencies:
