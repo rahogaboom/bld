@@ -15,11 +15,12 @@ main:
 	.cfi_def_cfa_register 6
 	movl	$.LC0, %edi
 	call	puts
+	movl	$0, %eax
 	popq	%rbp
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
 .LFE0:
 	.size	main, .-main
-	.ident	"GCC: (GNU) 4.9.2 20150212 (Red Hat 4.9.2-6)"
+	.ident	"GCC: (GNU) 6.1.1 20160621 (Red Hat 6.1.1-3)"
 	.section	.note.GNU-stack,"",@progbits

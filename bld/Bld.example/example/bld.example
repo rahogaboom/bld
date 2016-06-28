@@ -102,7 +102,7 @@ BEGIN
     $TARGETSFN = "bld.$project.targets";
     $BFN       = "Bld";
     $SIGFN     = "Bld.sig";
-    $BGVFN     = "Bld.gv";
+    $BGVFN     = "Bld";
     $BIFN      = "bld.info";
     $BWFN      = "bld.warn";
     $BFFN      = "bld.fatal";
@@ -141,7 +141,7 @@ foreach my $target ( @TargetsFile )
     # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
     if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
     {
-        print "bld.$project.rm: Invalid target line: \'$target\' in $TARGETSFN file.\n";
+        print "bld.$project: Invalid target line: \'$target\' in $TARGETSFN file.\n";
         exit 1;
     }
 
@@ -171,19 +171,19 @@ else
     # if a cmd line specified target is not valid, exit
     if ( @notValidTargetsCmdLine )
     {
-        print "bld.$project.rm: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
+        print "bld.$project: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
         exit 1;
     }
 }
 
 # copy bld global variables
-if ( -e "$BGVFN.$project" )
+if ( -e "$BGVFN.$project.gv" )
 {
-    `cp $BGVFN.$project ../../$BGVFN;`;
+    `cp $BGVFN.$project.gv ../../$BGVFN.gv;`;
 }
 else
 {
-    `rm -f ../../$BGVFN;`;
+    `rm -f ../../$BGVFN.gv;`;
 }
 
 # bld each of the cmd line targets

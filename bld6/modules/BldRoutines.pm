@@ -686,7 +686,7 @@ package BldRoutines
             my $basename_size = scalar @basename;
             foreach my $basename ( @basename )
             {
-                my @path = sort keys $s{$basename};
+                my @path = sort keys %{$s{$basename}};
                 my $path_size = scalar @path;
                 if ( $path_size > 1 )
                 {
@@ -694,7 +694,7 @@ package BldRoutines
                     foreach my $path ( @path )
                     {
                         $warning_msg .= "$path\n";
-                        my @dirs_line = sort keys $s{$basename}{$path};
+                        my @dirs_line = sort keys %{$s{$basename}{$path}};
                         my $dirs_line_size = scalar @dirs_line;
                         foreach my $dirs_line ( @dirs_line )
                         {
@@ -704,7 +704,7 @@ package BldRoutines
                 }
                 foreach my $path ( @path )
                 {
-                    my @dirs_line = sort keys $s{$basename}{$path};
+                    my @dirs_line = sort keys %{$s{$basename}{$path}};
                     my $dirs_line_size = scalar @dirs_line;
                     if ( $dirs_line_size > 1 )
                     {
@@ -925,7 +925,8 @@ package BldRoutines
         else
         {
             print $bifnfh sprintf "perl full path: %s\n", $perl;
-            print $bifnfh sprintf "perl version: %s\n", `perl -V 2>&1`;
+            my $tmp = `perl -V 2>&1`;
+            print $bifnfh sprintf "perl version: %s\n", $tmp;
         }
 
         my $cpp = `which cpp 2>&1`;
@@ -937,7 +938,8 @@ package BldRoutines
         else
         {
             print $bifnfh sprintf "cpp full path: %s\n", $cpp;
-            print $bifnfh sprintf "cpp version: %s\n", `cpp --version 2>&1`;
+            my $tmp = `cpp --version 2>&1`;
+            print $bifnfh sprintf "cpp version: %s\n", $tmp;
         }
 
         my $gcc = `which gcc 2>&1`;
@@ -949,7 +951,8 @@ package BldRoutines
         else
         {
             print $bifnfh sprintf "gcc full path: %s\n", $gcc;
-            print $bifnfh sprintf "gcc version: %s\n", `gcc --version 2>&1`;
+            my $tmp = `gcc --version 2>&1`;
+            print $bifnfh sprintf "gcc version: %s\n", $tmp;
         }
 
         my $gpp = `which g++ 2>&1`;
@@ -961,7 +964,8 @@ package BldRoutines
         else
         {
             print $bifnfh sprintf "g++ full path: %s\n", $gpp;
-            print $bifnfh sprintf "g++ version: %s\n", `g++ --version 2>&1`;
+            my $tmp = `g++ --version 2>&1`;
+            print $bifnfh sprintf "g++ version: %s\n", $tmp;
         }
 
         my $clang = `which clang 2>&1`;
@@ -973,7 +977,8 @@ package BldRoutines
         else
         {
             print $bifnfh sprintf "clang full path: %s\n", $clang;
-            print $bifnfh sprintf "clang version: %s\n", `clang --version 2>&1`;
+            my $tmp = `clang --version 2>&1`;
+            print $bifnfh sprintf "clang version: %s\n", $tmp;
         }
 
         print $bifnfh "\n####################################################################################################\n";
@@ -1641,7 +1646,7 @@ package BldRoutines
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
         {
-            foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+            foreach my $tgtfile ( keys %{${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'}} )
             {
                 if ( $tgtfile ~~ @Sources )
                 {
@@ -1653,7 +1658,7 @@ package BldRoutines
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
         {
-            foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+            foreach my $tgtext ( keys %{${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'}} )
             {
                 my ( $tmp );
 
@@ -1757,7 +1762,7 @@ package BldRoutines
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
         {
-            foreach my $tgtfile ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'} )
+            foreach my $tgtfile ( keys %{${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'file'}} )
             {
                 if ( $tgtfile ~~ @{$difference_ref} )
                 {
@@ -1768,7 +1773,7 @@ package BldRoutines
 
         if ( exists ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
         {
-            foreach my $tgtext ( keys ${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'} )
+            foreach my $tgtext ( keys %{${$Depend_ref}{$hdr}{$buildopt}{$srcext}{'ext'}} )
             {
                 my ( $tmp );
 

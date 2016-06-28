@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/home/hogaboom/perl5/perlbrew/perls/perl-5.24.0/bin/perl
 
 
 # LICENSE and COPYRIGHT and (DISCLAIMER OF) WARRANTY
@@ -43,7 +43,7 @@
 #
 
 # use modern perl
-use 5.018.4;
+use 5.24.0;
 
 #
 # standard modules

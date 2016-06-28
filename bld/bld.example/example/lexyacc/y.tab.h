@@ -1,5 +1,0 @@
-#define NUMBER 257
-#define TOKHEAT 258
-#define STATE 259
-#define TOKTARGET 260
-#define TOKTEMPERATURE 261

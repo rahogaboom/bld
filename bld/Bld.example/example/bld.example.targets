@@ -15,13 +15,7 @@ daa-c
 exec-cpp
 
 #
-exec-objc
-
-#
 helloworld-c
-
-#
-lexyacc-c
 
 #
 libbfix.so
@@ -30,16 +24,7 @@ libbfix.so
 libdaa.so
 
 #
-librdx.a
-
-#
-librdx.so
-
-#
-rdx-c
-
-#
-rdx-cpp
+MKRdxPat_test
 
 #
 exec-c
