@@ -1,4 +1,12 @@
 
+ bld-1.0.7.tar.gz - changes related to:
+                    a. upgrade to perl 5.24.0
+                    b. remove systemd as an example.  ./configure is complicated by many
+                       dependencies.
+                    c. update license to Boost
+                    d. remove Obj C and yacc/lex examples.  requires dependencies.  I
+                       wanted the examples to run with only gcc/g++/clang more or less.
+
  bld-1.0.6.tar.gz - changes related to:
                     a. fixes for two gcc warnings in the example code(rdx and daa)
                     b. use 'print STDERR' for all prints - more immediate output

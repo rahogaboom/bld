@@ -1,37 +1,5 @@
 #!/home/hogaboom/perl5/perlbrew/perls/perl-5.24.0/bin/perl
 
-
-# LICENSE and COPYRIGHT and (DISCLAIMER OF) WARRANTY
-
-# Copyright (c) 1998-2015, Richard A Hogaboom - richard.hogaboom@gmail.com
-# All rights reserved.
-
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-
-# * Redistributions of source code must retain the above copyright notice, this
-#   list of conditions and the following disclaimer.
-
-# * Redistributions in binary form must reproduce the above copyright notice,
-#   this list of conditions and the following disclaimer in the documentation
-#   and/or other materials provided with the distribution.
-
-# * Neither the name of the {organization} nor the names of its
-#   contributors may be used to endorse or promote products derived from
-#   this software without specific prior written permission.
-
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. :-)
-
-
 #
 # bld - a simple flexible non-hierarchical program that uses SHA1 signatures
 #       to build a single target(executable or library(static or shared)).
@@ -827,7 +795,7 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.6
+ bld version 1.0.7
 
 =head1 USAGE
 
@@ -862,7 +830,7 @@ __END__
 
 =head1 DESCRIPTION
 
- bld(1.0.6) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.7) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
  SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
@@ -886,7 +854,6 @@ __END__
 
      git     - the git project http://git-scm.com/
      svn     - the subversion project http://subversion.apache.org/
-     systemd - the systemd project http://www.freedesktop.org/wiki/Software/systemd/
      example - misc examples intended to show how to create Bld and Bld.gv files
 
  To understand the bld'ing of a single target the following should be understood:
@@ -1251,30 +1218,17 @@ __END__
     Required for test:
         gcc(1)/g++(1) (http://gcc.gnu.org/)
         clang(1) (http://llvm.org/)
-        yacc(1)/flex(1)
 
-    Some variation might be required on(for git, svn, systemd test):
-        yum install gcc.x86_64
-        yum install gcc-c++.x86_64
-        yum install gcc-objc.x86_64
-        yum install gcc-objc++.x86_64
-        yum install libobjc.x86_64
-        yum install gnustep-base.x86_64
-        yum install gnustep-base-devel.x86_64
-        yum install clang
-        yum install byacc
-        yum install flex
-        yum install zlib-devel.x86_64
-        yum install libxdiff.x86_64
-        yum install apr.x86_64
-        yum install apr-util.x86_64
-        yum install apr-util-devel.x86_64
-        yum install sqlite-devel.x86_64
-        yum install intltool
-        yum install libcap-devel
-        yum install gtk-doc
-        yum install lzma.x86_64
-        yum install libmount-devel.x86_64
+    Some variation might be required on(for git, svn test):
+        dnf install gcc.x86_64
+        dnf install gcc-c++.x86_64
+        dnf install clang.x86_64
+        dnf install zlib.x86_64
+        dnf install zlib-devel.x86_64
+        dnf install apr.x86_64
+        dnf install apr-devel.x86_64
+        dnf install apr-util-devel.x86_64
+        dnf install sqlite-devel.x86_64
 
     If ./configure generates the following msg about missing requirements:
 
@@ -1285,7 +1239,7 @@ __END__
         Consider adjusting the PKG_CONFIG_PATH environment variable if you
         installed software in a non-standard prefix."
 
-    Do: yum install "pkgconfig(foo)"
+    Do: dnf install "pkgconfig(foo)"
 
     Also check: http://who-t.blogspot.com/2014/05/configure-fails-with-no-package-foo.html
 
@@ -1294,20 +1248,20 @@ __END__
 
 =head1 PROJECT STATE
 
- 1. The git, svn and systemd projects need work.  I ran ./configure before each bld.  I used
+ 1. The git and svn projects need work.  I ran ./configure before each bld.  I used
     no options.  How options affect the generated code and thus the Bld files is important.
     Anyone willing to investigate configure options and how these options affect the Bld files
     is welcome.
 
  2. The bld.<project>.install scripts all need to be done.  These scripts need to build the
-    the packages that 'yum install <package>' would install or possibly packages tailored to
+    the packages that 'dnf install <package>' would install or possibly packages tailored to
     other systems.  I'd prefer to partner with someone knowledgeable about the installation
-    of git, svn and systemd.
+    of git and svn.
 
  3. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
 
- 4. The git, svn and systemd projects will all be creating new versions eventually.  Anyone
-    that would like to add bld.<project>/<version> and Bld.<project>/<version> directories
+ 4. The git and svn projects will all be creating new versions eventually.  Anyone that
+    would like to add bld.<project>/<version> and Bld.<project>/<version> directories
     with the new versions is welcome.
 
  5. I need someone with substantial experience building the linux kernel to advise me or
@@ -1318,16 +1272,7 @@ __END__
 
 =head1 QUICK START
 
- 1. Bld'ing the systemd project - http://www.freedesktop.org/wiki/Software/systemd/
-    a. cd Bld.systemd/systemd-208 # puts you into the systemd(systemd-208) project directory
-    b. ./bld.systemd --all        # bld's all of the systemd targets and bld target output files -
-                                        the bld.info.systemd.<target>,
-                                        the bld.warn.systemd.<target>,
-                                        the bld.fatal.systemd.<target>,
-                                        files
-    c. ./bld.systemd.rm --all     # cleans up everything
-
- 2. Bld'ing the svn project - https://subversion.apache.org/
+ 1. Bld'ing the svn project - https://subversion.apache.org/
     a. cd Bld.svn/subversion-1.8.11 # puts you into the svn(subversion-1.8.11) project directory
     b. ./bld.svn --all              # bld's all of the svn targets and bld target output files -
                                           the bld.info.svn.<target>,
@@ -1336,7 +1281,7 @@ __END__
                                           files
     c. ./bld.svn.rm --all           # cleans up everything
 
- 3. Bld'ing the git project - http://www.git-scm.com/
+ 2. Bld'ing the git project - http://www.git-scm.com/
     a. cd Bld.git/git-2.3.0 # puts you into the git(git-2.3.0) project directory
     b. ./bld.git --all      # bld's all of the git targets and bld target output files -
                                   the bld.info.git.<target>,
@@ -1345,7 +1290,7 @@ __END__
                                   files
     c. ./bld.git.rm --all   # cleans up everything
 
- 4. Bld'ing any single target
+ 3. Bld'ing any single target
     a. cd bld       # the main bld directory - cd here when you unpack the bld.tar.xz file
     b. Install the source code in a sub-directory of the bld directory
     c. Create a Bld file - the Bld file entirely controls the target bld - see example below
@@ -1587,16 +1532,16 @@ __END__
 =head1 BUILDING MULTI-TARGET PROJECTS
     (a target is an executable or library(static or shared))
 
-    1. Pick a name for the project e.g. git, svn, systemd.
+    1. Pick a name for the project e.g. git, svn.
 
     2. In the main bld directory(the location of the bld script) create a bld.<project>
        directory.  Create another directory, bld.<project>/<version>, that describes the
-       version of the code it will hold e.g. systemd-208.  Any number of these version
+       version of the code it will hold e.g. git-2.3.0.  Any number of these version
        directories may be created to maintain different versions of the code.  Unpack the
-       source code in the version directory e.g. bld.systemd/systemd-208/<systemd-208 src code>.
+       source code in the version directory e.g. bld.git/git-2.3.0/<git-2.3.0 src code>.
 
     3. Create a Bld.<project> directory.  Create another directory, Bld.<project>/<version>,
-       that describes the version of the code it will maintain e.g. systemd-208.  There
+       that describes the version of the code it will maintain e.g. git-2.3.0.  There
        should be one version directory for each version of the code being maintained.
        These directories will hold:
            a. all of the Bld.<project>.<target> and Bld.gv.<project> files that control the
@@ -1634,7 +1579,7 @@ __END__
            $bld="accelerometer";
 
            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
-           $bldcmd = "$CC $LIBSLINKOPTS -o \$bld \$O -LBld.systemd/systemd-208 -ludev -lsystemd-shared -ludev-core -lm -lrt -ldl";
+           $bldcmd = "$CC $LIBSLINKOPTS -o \$bld \$O -LBld.git/git-2.3.0 -ludev -lm -lrt -ldl";
 
        The definition of these variables may be spread between the Bld.<project>.<target> and the imported Bld.gv.<project> files.
        See the Bld FILE FORMAT section below for detailed instructions on Bld file construction.
@@ -1650,13 +1595,14 @@ __END__
            # the start.
 
            # 
-           libsystemd-shared.a
+           libxdiff.a
 
            # 
-           libsystemd-login.so
+           libgit.a
 
            # 
-           systemd-cgls
+           test-date
+           
 
            ...
 
@@ -1697,7 +1643,7 @@ __END__
 
   3. Some projects(rarely) violate either or both of these target naming or object file
      naming/location requirements, but reconstructing these projects with bld should be
-     relatively easy e.g. systemd.
+     relatively easy.
 
   4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
      source directory.
@@ -1825,6 +1771,14 @@ __END__
 
  https://github.com/rahogaboom/bld
 
+     bld-1.0.7.tar.gz - changes related to:
+                        a. upgrade to perl 5.24.0
+                        b. remove systemd as an example.  ./configure is complicated by many
+                           dependencies.
+                        c. update license to Boost
+                        d. remove Obj C and yacc/lex examples.  requires dependencies.  I
+                           wanted the examples to run with only gcc/g++/clang more or less.
+
      bld-1.0.6.tar.gz - changes related to:
                         a. fixes for two gcc warnings in the example code(rdx and daa)
                         b. use 'print STDERR' for all prints - more immediate output
@@ -1849,31 +1803,32 @@ __END__
 
 =head1 LICENSE and COPYRIGHT and (DISCLAIMER OF) WARRANTY
 
-Copyright (c) 1998-2014, Richard A Hogaboom - richard.hogaboom@gmail.com
-All rights reserved.
+          Copyright Richard Allen Hogaboom 1997 - 2016.
+ Distributed under the Boost Software License, Version 1.0.
+    (See accompanying file LICENSE_1_0.txt or copy at
+          http://www.boost.org/LICENSE_1_0.txt)
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+ Boost Software License - Version 1.0 - August 17th, 2003
 
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
+ Permission is hereby granted, free of charge, to any person or organization
+ obtaining a copy of the software and accompanying documentation covered by
+ this license (the "Software") to use, reproduce, display, distribute,
+ execute, and transmit the Software, and to prepare derivative works of the
+ Software, and to permit third-parties to whom the Software is furnished to
+ do so, all subject to the following:
 
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
+ The copyright notices in the Software and this entire statement, including
+ the above license grant, this restriction and the following disclaimer,
+ must be included in all copies of the Software, in whole or in part, and
+ all derivative works of the Software, unless such copies or derivative
+ works are solely in the form of machine-executable object code generated by
+ a source language processor.
 
-* Neither the name of the {organization} nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. :-)
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+ SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+ FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
+ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ DEALINGS IN THE SOFTWARE.
 
