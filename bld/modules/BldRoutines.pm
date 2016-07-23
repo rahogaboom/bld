@@ -837,13 +837,13 @@ package BldRoutines
 
             if ( not @evalextra == 0 )
             {
-                my $msg = sprintf "WARNING: EVAL defined variable(s) not used in DIRS cmds: " . "%s" x @evalextra, @evalextra;
+                my $msg = sprintf "WARNING: EVAL defined variable(s) not used in DIRS cmds: " . "%s " x @evalextra, @evalextra;
                 warning($msg);
             }
 
             if ( not @dirsextra == 0 )
             {
-                my $msg = sprintf "FATAL: Extra unused variable(s), " . "%s" x @dirsextra . ", in DIRS section - see %s.", @dirsextra, $BWFN;
+                my $msg = sprintf "FATAL: Extra unused variable(s), " . "%s " x @dirsextra . ", in DIRS section - see %s.", @dirsextra, $BWFN;
                 fatal($msg);
             }
         }
@@ -1204,12 +1204,12 @@ package BldRoutines
                 $rebuild = "true";
                 if ( $opt_lib eq "warnlibcheck" )
                 {
-                    my $msg = sprintf "WARNING: Libraries removed: " . "%s" x @libs_removed, @libs_removed;
+                    my $msg = sprintf "WARNING: Libraries removed: " . "%s " x @libs_removed, @libs_removed;
                     warning($msg);
                 }
                 if ( $opt_lib eq "fatallibcheck" )
                 {
-                    my $msg = sprintf "FATAL Libraries removed: " . "%s" x @libs_removed, @libs_removed;
+                    my $msg = sprintf "FATAL Libraries removed: " . "%s " x @libs_removed, @libs_removed;
                     fatal($msg);
                 }
             }
@@ -1672,7 +1672,7 @@ package BldRoutines
         # check for multiple target files in the $srcpath directory.  if more than one target file do fatal().
         if ( @tgtfiles > 1 )
         {
-            my $msg = sprintf "FATAL: More than one target file for %s in %s: " . "%s" x @tgtfiles, $srcfile, $srcpath, @tgtfiles;
+            my $msg = sprintf "FATAL: More than one target file for %s in %s: " . "%s " x @tgtfiles, $srcfile, $srcpath, @tgtfiles;
             fatal($msg);
         }
 
@@ -1785,14 +1785,14 @@ package BldRoutines
 
         if ( @tgtfiles == 0 )
         {
-            my $msg = sprintf "FATAL: No target file for %s in %s: " . "%s" x @tgtfiles, $srcfile, $srcpath, @tgtfiles;
+            my $msg = sprintf "FATAL: No target file for %s in %s: " . "%s " x @tgtfiles, $srcfile, $srcpath, @tgtfiles;
             fatal($msg);
         }
 
         # check for multiple target files created by $cmd_var_sub.  if more than one target file created do fatal().
         if ( @tgtfiles > 1 )
         {
-            my $msg = sprintf "FATAL: More than one target file for %s in %s: " . "%s" x @tgtfiles, $srcfile, $srcpath, @tgtfiles;
+            my $msg = sprintf "FATAL: More than one target file for %s in %s: " . "%s " x @tgtfiles, $srcfile, $srcpath, @tgtfiles;
             fatal($msg);
         }
 

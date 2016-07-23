@@ -27,7 +27,6 @@ use Carp qw(
                croak
            );
 use Data::Dumper;
-#use Safe;
 
 # extract_multiple - for parsing the $BFN DIRS section
 # extract_bracketed - used by extract_multiple for finding '{}''s
