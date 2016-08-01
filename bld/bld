@@ -794,14 +794,15 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.7
+ bld version 1.0.8
 
 =head1 USAGE
 
  usage: bld [-hc]
      -h - this message.(exit)
-     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and their old/new signatures
-          that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
+     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
+          their old/new signatures that have been added/deleted/changed.  Successive runs will
+          append to this file with a time stamp.
 
 =head1 ARGUMENTS
 
@@ -812,8 +813,9 @@ __END__
  bld [-hc]
 
  -h - help message(exit)
- -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and their old/new signatures
-      that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
+ -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
+      their old/new signatures that have been added/deleted/changed.  Successive runs will
+      append to this file with a time stamp.
 
 =head1 ENVIRONMENT VARIABLES
 
@@ -829,7 +831,7 @@ __END__
 
 =head1 DESCRIPTION
 
- bld(1.0.7) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.8) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
  SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
@@ -844,18 +846,28 @@ __END__
  to pick up and build source, however, the specification for this is still in the Bld file at
  the top of the source tree.
 
- Complex multi-target projects are built with the use of a Bld.<project> (Bld files and target
- bld output files) directory, bld.<project>(project source) directory, bld.<project>(target
- construction) script, bld.<project>.rm(target and bld.<info|warn|fatal>.<target> file removal)
- script, Bld.<project>.gv(project global values) file, bld.<project>.install(target and file
- install) script and bld.<project>.README(project specific documentation) file.  Current example
- projects:
+ Complex multi-target projects are built with the use of(in the main bld directory):
+     Bld.<project>/<version>    # directory - bld instructions for all project targets
+         bld.<project>              # script - bld all or specific targets
+         bld.<project>.rm           # script - target and bld.<info|warn|fatal>.<target> file removal
+         Bld.<project>.gv           # file - project global values
+         bld.<project>.install      # script - target and file install
+         bld.<project>.README       # file - project documentation
+         <target>                   # directory - holds all the files and scripts for the bld of a target
+             Bld.<project>.<target>        # file - instructions to bld a target
+             Bld.<project>.<target>.script.<script name>  # script - script(s) to be run during target bld
+             bld.sig.<project>.<target>    # file - signatures(SHA1) of all source, headers, objects, cmds and target of the target bld
+             bld.info.<project>.<target>   # file - information about the bld
+             bld.warn.<project>.<target>   # file - warnings from the bld
+             bld.fatal.<project>.<target>  # file - any fatal msg that ended the bld
+     bld.<project>/<version>    # directory - a source code version of the project
+
+ Current example projects:
 
      git     - the git project http://git-scm.com/
-     svn     - the subversion project http://subversion.apache.org/
      example - misc examples intended to show how to create Bld and Bld.gv files
 
- To understand the bld'ing of a single target the following should be understood:
+ The bld'ing of a single target requires the following:
 
      ~/bld directory files:
      bld        - the bld perl script
@@ -867,7 +879,7 @@ __END__
      Bld.sig    - the signature(SHA1) file created from the Bld file
      bld.info   - information about the bld 
      bld.warn   - warnings from the bld 
-     bld.fatal  - the fatal msg that ended the bld 
+     bld.fatal  - any fatal msg that ended the bld 
 
  The Bld file(and Bld.gv) controls the entire target bld.  The Bld file is divided into three
  sections - Comments, EVAL and DIRS:
@@ -1026,7 +1038,7 @@ __END__
          $opt_lib = "fatallibcheck";
 
 
- To understand the building of complex multi-target projects the following directories and files should be understood:
+ The building of complex multi-target projects requires the following directories and files:
 
      ~/bld directories:
      Bld.<project>/<version> - has all files controlling <project> <version>s blds and bld target output files
@@ -1043,13 +1055,16 @@ __END__
      bld.<project>.targets         - list of all <project> targets
      bld.<project>.README          - <project> README
      bld.<project>.install         - <project> install script
+     Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
+
+     ~/bld/Bld.<project>/<version>/<target> files:
      bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
      Bld.<project>.<target>        - the Bld file for each <project> <target>
-     Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
      Bld.sig.<project>.<target>    - the signature(SHA1) file for each <project> <target>
      bld.info.<project>.<target>   - the bld.info file for each <project> <target>
      bld.warn.<project>.<target>   - the bld.warn file for each <project> <target>
      bld.fatal.<project>.<target>  - the bld.fatal file for each <project> <target>
+     <target>                      - the target file
 
  The previous description material focused on the construction of a single target.  This requires only
  the use of the bld program and Bld file.  To bld complex multi-target projects requires use of some
@@ -1062,7 +1077,8 @@ __END__
          of target re-blds or full project re-blds are initiated from here.
 
      bld.git/git-2.3.0
-         The git-2.3.0.tar.gz file is unzipped here and ./configure is run against the git project source code.
+         The git-2.3.0.tar.gz file is unzipped here 'make configure' and/or ./configure is run against the
+         git project source code.
 
      aux
          Template scripts for use in the Bld.git/git-2.3.0 directory.  The bld.<project> script is copied
@@ -1204,7 +1220,7 @@ __END__
 
 =head1 DEPENDENCIES
 
-    I use Fedora for development on an x86_64 architecture.  Yum is the package installation tool.
+    I use Fedora for development on an x86_64 architecture.  Dnf is the package installation tool.
 
     Required for execution:
         experimental.pm(3pm) - for smartmatch and switch features
@@ -1218,16 +1234,12 @@ __END__
         gcc(1)/g++(1) (http://gcc.gnu.org/)
         clang(1) (http://llvm.org/)
 
-    Some variation might be required on(for git, svn test):
+    Some variation might be required on(for git test):
         dnf install gcc.x86_64
         dnf install gcc-c++.x86_64
         dnf install clang.x86_64
         dnf install zlib.x86_64
         dnf install zlib-devel.x86_64
-        dnf install apr.x86_64
-        dnf install apr-devel.x86_64
-        dnf install apr-util-devel.x86_64
-        dnf install sqlite-devel.x86_64
 
     If ./configure generates the following msg about missing requirements:
 
@@ -1245,42 +1257,9 @@ __END__
     If the downloaded project code does not have a configure script then check for a configure.ac
     file and run 'autoconf' with no arguments or options.  This will generate a configure script.
 
-=head1 PROJECT STATE
-
- 1. The git and svn projects need work.  I ran ./configure before each bld.  I used
-    no options.  How options affect the generated code and thus the Bld files is important.
-    Anyone willing to investigate configure options and how these options affect the Bld files
-    is welcome.
-
- 2. The bld.<project>.install scripts all need to be done.  These scripts need to build the
-    the packages that 'dnf install <package>' would install or possibly packages tailored to
-    other systems.  I'd prefer to partner with someone knowledgeable about the installation
-    of git and svn.
-
- 3. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
-
- 4. The git and svn projects will all be creating new versions eventually.  Anyone that
-    would like to add bld.<project>/<version> and Bld.<project>/<version> directories
-    with the new versions is welcome.
-
- 5. I need someone with substantial experience building the linux kernel to advise me or
-    partner with me on the construction of 4.0 or later.
-
- 6. If you successfully bld a new project and wish to contribute the bld, please do so.  I'm 
-    interested in how others construct/organize/document/debug projects and their Bld files.
-
 =head1 QUICK START
 
- 1. Bld'ing the svn project - https://subversion.apache.org/
-    a. cd Bld.svn/subversion-1.8.11 # puts you into the svn(subversion-1.8.11) project directory
-    b. ./bld.svn --all              # bld's all of the svn targets and bld target output files -
-                                          the bld.info.svn.<target>,
-                                          the bld.warn.svn.<target>,
-                                          the bld.fatal.svn.<target>,
-                                          files
-    c. ./bld.svn.rm --all           # cleans up everything
-
- 2. Bld'ing the git project - http://www.git-scm.com/
+ 1. Bld'ing the git project - http://www.git-scm.com/
     a. cd Bld.git/git-2.3.0 # puts you into the git(git-2.3.0) project directory
     b. ./bld.git --all      # bld's all of the git targets and bld target output files -
                                   the bld.info.git.<target>,
@@ -1289,7 +1268,7 @@ __END__
                                   files
     c. ./bld.git.rm --all   # cleans up everything
 
- 3. Bld'ing any single target
+ 2. Bld'ing any single target
     a. cd bld       # the main bld directory - cd here when you unpack the bld.tar.xz file
     b. Install the source code in a sub-directory of the bld directory
     c. Create a Bld file - the Bld file entirely controls the target bld - see example below
@@ -1531,7 +1510,7 @@ __END__
 =head1 BUILDING MULTI-TARGET PROJECTS
     (a target is an executable or library(static or shared))
 
-    1. Pick a name for the project e.g. git, svn.
+    1. Pick a name for the project e.g. git, svn, systemd.
 
     2. In the main bld directory(the location of the bld script) create a bld.<project>
        directory.  Create another directory, bld.<project>/<version>, that describes the
@@ -1542,21 +1521,38 @@ __END__
     3. Create a Bld.<project> directory.  Create another directory, Bld.<project>/<version>,
        that describes the version of the code it will maintain e.g. git-2.3.0.  There
        should be one version directory for each version of the code being maintained.
-       These directories will hold:
-           a. all of the Bld.<project>.<target> and Bld.gv.<project> files that control the
-              construction of each project target
+       The version directory will hold the following files:
+           bld.<project>
+           bld.<project>.install
+           bld.<project>.README
+           bld.<project>.rm
+           bld.<project>.targets
+           Bld.gv.<project>
+
+       Any additional files for project development may be located here and will not be
+       removed by bld.<project>.rm.
+
+    4. Create in the Bld.<project>/<version> directory a directory for each target e.g.
+       Bld.git/git-2.3.0/git.
+       These target directories will hold:
+           a. all of the Bld.<project>.<target> files that control the construction of
+              each project target(along with Bld.gv.<project>)
            b. all of the target bld output files:
                   bld.info.<project>.<target>(information describing the bld)
                   bld.warn.<project>.<target>(bld warning msgs)
                   bld.fatal.<project>.<target>(bld fatal msgs)
-           c. the bld scripts and script control files
-           d. all of the targets
+           c. the script control files, bld.<project>.script.<script> - scripts called
+              by the Bld.<project>.<target> files
+           d. the targets
 
-    4. Create a Bld.<project>.<target> file for each project target.  These control the bld
-       for each and only that target.  If there are variables that may be defined globally
-       over the entire project then set them in the Bld.gv.<project>(one per project) file.  
-       The Bld.gv.<project> file will be included in each Bld.<project>.<target> file before
-       it is evaluated.  All Bld.<project>.<target> files require six variables to be defined.
+       Any additional subdirectories for project development may be located here and will
+       not be removed by bld.<project>.rm.
+
+    5. Create a Bld.<project>.<target> file for each project target.  These control the bld
+       for each target.  If there are variables that may be defined globally over the entire
+       project then set them in the Bld.gv.<project>(one per project) file.  The
+       Bld.gv.<project> file will be included in each Bld.<project>.<target> file before it
+       is evaluated.  All Bld.<project>.<target> files require six variables to be defined.
        These are:
 
        e.g.
@@ -1580,55 +1576,96 @@ __END__
            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
            $bldcmd = "$CC $LIBSLINKOPTS -o \$bld \$O -LBld.git/git-2.3.0 -ludev -lm -lrt -ldl";
 
-       The definition of these variables may be spread between the Bld.<project>.<target> and the imported Bld.gv.<project> files.
-       See the Bld FILE FORMAT section below for detailed instructions on Bld file construction.
+       The definition of these variables may be spread between the Bld.<project>.<target> and the imported Bld.gv.<project>
+       files.  See the Bld FILE FORMAT section below for detailed instructions on Bld file construction.
 
 
-    5. Create a bld.<project>.targets file with all of the project target names, one to a line.
+    6. Create a bld.<project>.targets file with all of the project target names, one to a line.
        e.g.
 
            # each line is a valid target argument to bld.<project> e.g. './bld.<project> target'
            # and will build one(that named) library or executable.  the order of target bld's
            # is important.  if 'bld.<project> --all' is used to bld all targets then dependencies
-           # must be built first, that is, libraries that executables depend on must be built at
-           # the start.
+           # must be built first, that is, libraries then executables.
 
-           # 
            libxdiff.a
-
-           # 
            libgit.a
-
-           # 
            test-date
-           
-
            ...
 
        The order is important; if an executable depends on a library then build the library first.
 
-    6. Copy the 'bld.<project>' and 'bld.<project>.rm' files from the aux directory to the source code
-       directory and rename them for that particular project.  These scripts use the <project> part
-       of the script name for building output files.
+    7. Copy the 'aux/bld.<project>' and 'aux/bld.<project>.rm' files from the aux directory to the
+       source code directory and rename them for that particular project.  These scripts use the
+       <project> part of the script name for building output files.
 
-    7. Run the ./bld.<project> script with the --all option or one or more target names from the bld.<project>.targets file.
-       This will bld all targets or the selected targets.  The:
+    8. Run the ./bld.<project> script with the --all option or one or more target names from the
+       bld.<project>.targets file.  This will bld all targets or the selected targets.  The:
 
        bld.info.<project>.<target>(information describing the bld)
        bld.warn.<project>.<target>(bld warning msgs)
        bld.fatal.<project>.<target>(bld fatal msgs)
 
-       files will be created.  Examine these for the results of each target bld.  All of the  bld.fatal.<project>.<target>
-       files should be empty if everything bld's OK.
+       files will be created.  Examine these for the results of each target bld.  All of the
+       bld.fatal.<project>.<target> files should be empty if everything bld's OK.
 
-    9. Run './bld.<project> --all' again to rebuild.  If everything built successfully the first time then this run
-       will indicate that everything is up to date.
+    9. Run './bld.<project> --all' again to rebuild.  If everything built successfully the first
+       time then this run will indicate that everything is up to date.
 
-    8. Use './bld.<project>.rm [--all] [target, target, ...]' to clean up.
+    10. Use './bld.<project>.rm [--all] [target, target, ...]' to clean up.
 
-    9. Use './bld.<project>.install' as root to install the project.
+    11. Use './bld.<project>.install' as root to install the project.
 
-    10. Examine the ./bld.<project>.README for project specific information.
+    12. Examine the ./bld.<project>.README for project specific information.
+
+    13. As an example, an edited run of 'tree Bld.git/git-2.9.2' after a './bld.git --all':
+        Bld.git/git-2.9.2/
+        ├── bld.git
+        ├── bld.git.install
+        ├── bld.git.README
+        ├── bld.git.rm
+        ├── bld.git.targets
+        ├── Bld.gv.git
+        ├── git
+        │   ├── bld.fatal.git.git
+        │   ├── Bld.git.git
+        │   ├── bld.git.git.script.sc1
+        │   ├── bld.info.git.git
+        │   ├── Bld.sig.git.git
+        │   ├── bld.warn.git.git
+        │   └── git
+        ├── git-credential-cache
+        │   ├── bld.fatal.git.git-credential-cache
+        │   ├── Bld.git.git-credential-cache
+        │   ├── bld.info.git.git-credential-cache
+        │   ├── Bld.sig.git.git-credential-cache
+        │   ├── bld.warn.git.git-credential-cache
+        │   └── git-credential-cache
+        ├── libgit.a
+        │   ├── bld.fatal.git.libgit.a
+        │   ├── Bld.git.libgit.a
+        │   ├── bld.info.git.libgit.a
+        │   ├── Bld.sig.git.libgit.a
+        │   ├── bld.warn.git.libgit.a
+        │   └── libgit.a
+        ├── libvcs-svn.a
+        │   ├── bld.fatal.git.libvcs-svn.a
+        │   ├── Bld.git.libvcs-svn.a
+        │   ├── bld.info.git.libvcs-svn.a
+        │   ├── Bld.sig.git.libvcs-svn.a
+        │   ├── bld.warn.git.libvcs-svn.a
+        │   └── libvcs-svn.a
+        ├── test-chmtime
+        │   ├── bld.fatal.git.test-chmtime
+        │   ├── Bld.git.test-chmtime
+        │   ├── bld.info.git.test-chmtime
+        │   ├── Bld.sig.git.test-chmtime
+        │   ├── bld.warn.git.test-chmtime
+        │   └── test-chmtime
+
+        .
+        .
+        .
 
 =head1 NOTES
 
@@ -1691,6 +1728,25 @@ __END__
      against strings stored in the @stderr_err_strs array.  Any actual error return not
      matched by one of these strings will be missed.  New strings can be added to
      @stderr_err_strs in the BGC.pm module.
+
+ 12. The git project needs work.  I ran ./configure before each bld.  I used no options.
+     How options affect the generated code and thus the Bld files is important.  Anyone
+     willing to investigate configure options and how these options affect the Bld files
+     is welcome.
+
+ 13. The bld.git.install scripts all need to be done.  These scripts need to build the
+     packages that 'dnf install <package>' would install or possibly packages tailored
+     to other systems.  I'd prefer to partner with someone knowledgeable about the
+     installation of git.
+
+ 14. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
+
+ 15. I need someone with substantial experience building the linux kernel to advise me or
+     partner with me on the construction of a 4.X kernel.
+
+ 16. If you successfully bld a new project and wish to contribute the bld, please do so.
+     I'm interested in how others construct/organize/document/debug projects and their
+     Bld files.
 
 =head1 CALL TREE
 
@@ -1769,6 +1825,16 @@ __END__
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
+
+     bld-1.0.8.tar.gz - changes related to:
+                        a. remove svn as an example.  this allows greater focus on multiple versions
+                           of git as the single example of a complex project build.  added git
+                           version 2.9.2.
+                        b. modify bld.<project> and bld.<project>.rm to work with all target files
+                           under the same target named directory.  this unclutters the project
+                           directory to hold only target directories and the project build
+                           configuration and build executables.
+                        c. minor code changes.
 
      bld-1.0.7.tar.gz - changes related to:
                         a. upgrade to perl 5.24.0

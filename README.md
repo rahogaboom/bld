@@ -3,7 +3,7 @@
 bld
 ===
 
-bld(1.0.7) is a simple flexible non-hierarchical perl program that builds a single C/C++/
+bld(1.0.8) is a simple flexible non-hierarchical perl program that builds a single C/C++/
 Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,
 unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for
 automatic header file dependency checking.  The operation of bld depends entirely on the
@@ -22,26 +22,24 @@ Current example projects:
 
     Bld.example - several examples intended to show how to create Bld and Bld.gv files
 
-    The following are examples of building complex multi-target projects.  They are
-    provided with releases. Unpack them in the main bld directory in the same place as
+    The following is an example of building a complex multi-target project.  It is
+    provided with releases. Unpack it in the main bld directory in the same place as
     the bld.example and Bld.example directories:
-        bld-1.0.7-git.tar.gz -
+        bld-1.0.8-git.tar.gz -
             the git project http://git-scm.com/
-        bld-1.0.7-svn.tar.gz -
-            the subversion project http://subversion.apache.org/
 
- Dependencies:
-     Required for execution:
-         experimental.pm(3pm) - for smartmatch and switch features
-         cpp(1) - gnu cpp cmd is required for dependency determination
-         ldd(1) - used for library dependency determination
+Dependencies:
+    Required for execution:
+        experimental.pm(3pm) - for smartmatch and switch features
+        cpp(1) - gnu cpp cmd is required for dependency determination
+        ldd(1) - used for library dependency determination
 
-         Do: cpan install cpanm
-             cpanm experimental.pm
+        Do: cpan install cpanm
+            cpanm experimental.pm
 
-     Required for test:
-         gcc(1)/g++(1) (http://gcc.gnu.org/)
-         clang(1) (http://llvm.org/)
+    Required for test:
+        gcc(1)/g++(1) (http://gcc.gnu.org/)
+        clang(1) (http://llvm.org/)
 
 cd bld
 Do './bld -h' for the usage msg.

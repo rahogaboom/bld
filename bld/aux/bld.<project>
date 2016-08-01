@@ -1,9 +1,7 @@
 #!/usr/bin/perl
 
 #
-# perform cmd line arg specified library/executable builds:
-#     e.g. './bld.$project credential-store lib.a' - bld the 'credential-store' executable and the 'lib.a' library
-#     e.g. './bld.$project --all' - bld all valid targets if option is '--all'(no args allowed)
+# bld the entire project or specific targets.  do 'perldoc bld.<project>'.
 #
 
 # standard modules
@@ -109,7 +107,7 @@ foreach my $target ( @TargetsFile )
     # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
     if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
     {
-        print "bld.$project.rm: Invalid target line: \'$target\' in $TARGETSFN file.\n";
+        print "bld.$project: Invalid target line: \'$target\' in $TARGETSFN file.\n";
         exit 1;
     }
 
@@ -139,7 +137,7 @@ else
     # if a cmd line specified target is not valid, exit
     if ( @notValidTargetsCmdLine )
     {
-        print "bld.$project.rm: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
+        print "bld.$project: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
         exit 1;
     }
 }
@@ -160,36 +158,36 @@ foreach my $target ( @ValidTargetsCmdLine )
     print "#####################################\n";
     print "'bld'ing $target\n";
 
-    if ( -e "$BFN.$project.$target" )
+    if ( -e "$target/$BFN.$project.$target" )
     {
-        `cp $BFN.$project.$target ../../$BFN;`;
+        `cp "$target/$BFN.$project.$target" ../../$BFN;`;
     }
     else
     {
-        print "bld.$project: Missing $BFN.$project.$target file.\n";
+        print "bld.$project: Missing $target/$BFN.$project.$target file.\n";
         exit 1;
     }
 
     `rm -f ../../$SIGFN;`;
 
-    if ( -e "$SIGFN.$project.$target" )
+    if ( -e "$target/$SIGFN.$project.$target" )
     {
-        `cp $SIGFN.$project.$target ../../$SIGFN;`;
+        `cp "$target/$SIGFN.$project.$target" ../../$SIGFN;`;
     }
 
     print `
               cd ../..;
               ./bld;
               cd - >/dev/null; # the >/dev/null gets rid of a path print
-              cp ../../$SIGFN $SIGFN.$project.$target;
-              cp ../../$BIFN $BIFN.$project.$target;
-              cp ../../$BWFN $BWFN.$project.$target;
-              cp ../../$BFFN $BFFN.$project.$target;
+              cp ../../$SIGFN "$target/$SIGFN.$project.$target";
+              cp ../../$BIFN "$target/$BIFN.$project.$target";
+              cp ../../$BWFN "$target/$BWFN.$project.$target";
+              cp ../../$BFFN "$target/$BFFN.$project.$target";
           `;
 
     if ( -e "../../$target" )
     {
-        `cp ../../$target .;`;
+        `cp ../../$target "$target/$target";`;
     }
 }
 
@@ -201,17 +199,22 @@ __END__
 
  bld.<project>
 
-=head1 VERSION
-
- bld.<project>
-
 =head1 USAGE
 
  usage: bld.<project> <[--all] | [target] [target] ...>
-     --all    - bld all targets in the bld.<project>.targets file.
+     --all    - bld all targets in the bld.<project>.targets file.  each
+                target will have a target directory named for the target.  the
+                Bld.$project.$target file and bld.$project.$target.script.*
+                file(s) which describe what is to be built for the target are
+                in these directories.
                 mutually exclusive of specifying any cmd line targets.
      [target] - bld a target specified in the bld.<project>.targets file.
                 mutually exclusive of specifying --all.
+
+     the main build directory(Bld.<project>/<version>) may store scripts not
+     related to any particular target and any other project files.  all target
+     directories may contain subdirectories with specific target related
+     infomation.  these will not be affected by bld.<project>.rm.
 
 =head1 REQUIRED ARGUMENTS
 
@@ -223,13 +226,22 @@ __END__
 
 =head1 DESCRIPTION
 
- bld.<project> is used for bld'ing the project targets; all of which are specified in the bld.<project>.targets file.
- For each target specified three files will be built:
+ bld.<project> is used for bld'ing the project targets; all of which are specified
+     in the bld.<project>.targets file.  each target will have a target directory
+     named for the target.  the Bld.$project.$target file and bld.$project.$target.script.*
+     file(s) which describe what is to be built for the target are in these directories.
+     the order of target bld's is important.  if './bld.<project> --all' is used to bld
+     all targets then dependencies must be built first, that is, libraries then executables.
+ In addition to the target, three additional files will be built:
      bld.warn.<project>.<target>
      bld.info.<project>.<target>
      bld.fatal.<project>.<target>
+ These will be put in the target directory.
 
-These correspond to the standard bld.warn, bld.info and bld.fatal files - only with the .<project>.<target> appended.
+ These correspond to the standard bld.warn, bld.info and bld.fatal files -
+ only with the .<project>.<target> appended.
+
+ It makes no sense to run this program in any other directory than Bld.<project>/<version>.
 
 =head1 CONFIGURATION AND ENVIRONMENT
 
@@ -237,11 +249,16 @@ These correspond to the standard bld.warn, bld.info and bld.fatal files - only w
 
 =head1 FILES
 
- bld.<project>.targets - all of the project targets are specified, one to a line.
+ bld.<project>.targets - all of the project targets - one to a line.
 
 =head1 DEPENDENCIES
 
  None
+
+=head1 EXAMPLES
+
+ './bld.$project credential-store lib.a' - bld the 'credential-store' executable and the 'lib.a' library
+ './bld.$project --all' - bld all valid targets if option is '--all'(no args allowed)
 
 =head1 SEE ALSO
 
@@ -251,6 +268,7 @@ These correspond to the standard bld.warn, bld.info and bld.fatal files - only w
  bld.<project>.rm
  bld.<project>.targets
  bld.<project>.script.*
+ Bld.<project>.<target>
 
 =head1 AUTHOR
 

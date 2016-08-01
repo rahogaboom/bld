@@ -1320,15 +1320,12 @@ package BldRoutines
         # execute $bldcmd
         $std_out_err = `{ $tmp } 2>&1`;
 
-        foreach my $err ( @stderr_err_strs )
+        if ( not -e $bld )
         {
-            if ( $std_out_err =~ m/$err/ )
-            {
-                my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+            my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-                my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $std_out_err;
-                fatal($msg);
-            }
+            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $std_out_err;
+            fatal($msg);
         }
 
         $SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );

@@ -1,4 +1,14 @@
 
+ bld-1.0.8.tar.gz - changes related to:
+                    a. remove svn as an example.  this allows greater focus on multiple versions
+                       of git as the single example of a complex project build.  added git
+                       version 2.9.2.
+                    b. modify bld.<project> and bld.<project>.rm to work with all target files
+                       under the same target named directory.  this unclutters the project
+                       directory to hold only target directories and the project build
+                       configuration and build executables.
+                    c. minor code changes.
+
  bld-1.0.7.tar.gz - changes related to:
                     a. upgrade to perl 5.24.0
                     b. remove systemd as an example.  ./configure is complicated by many

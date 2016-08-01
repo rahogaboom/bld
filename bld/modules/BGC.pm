@@ -136,7 +136,7 @@ package BGC
         $HDR_DEP = 3;     # constant subscript indexing header file dependencies in the next level hash
         $LIB_DEP = 4;     # constant subscript indexing library file dependencies in the next level hash
 
-    # strings for matching against bld.stderr file created by `{ cmds } 2>bld.stderr`
+    # strings for matching against `{ cmds } 2>&1` return
     @stderr_err_strs = (
                            " error ",
                            " missing ",

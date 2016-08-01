@@ -1,9 +1,7 @@
 #!/usr/bin/perl
 
 #
-# remove cmd line arg specified library/executable bld related files:
-#     e.g. './bld.$project.rm credential-store lib.a' - remove the 'credential-store' and 'lib.a' files and bld.<warn|info|fatal>.<credential-store|lib.a> files
-#     e.g. './bld.$project.rm --all' - remove all files not in selected subsets e.g. bld.$project, bld.$project.rm etc.  see 'ls -aF' below.
+# clean the entire project build directory or specific target directories.  do 'perldoc bld.<project>.rm'.
 #
 
 # standard modules
@@ -20,23 +18,14 @@ use Carp qw(
 
 my
 (
-    $opt_all,
-
-    # the bld.$project.targets file
-    @TargetsFile,
-
-    # hash(set to undef) and array of all possible valid targets from bld.$project.targets file
-    %ValidTargets,
-    @ValidTargets,
-
-    # valid targets specified on the cmd line
-    @ValidTargetsCmdLine,
-
-    # any not valid targets specified on the cmd line
-    @notValidTargetsCmdLine,
-
     # the project name
     $project,
+
+    # true if all directories are to be cleaned
+    $opt_all,
+
+    # target directories to clean
+    @targets,
 
     # regexs
     $RGX_BLANK_LINE,
@@ -45,12 +34,7 @@ my
 
     # file names
     $TARGETSFN,
-    $SIGFN,
     $BFN,
-    $BGVFN,
-    $BIFN,
-    $BWFN,
-    $BFFN,
 );
 
 BEGIN
@@ -68,12 +52,7 @@ BEGIN
     $RGX_VALID_TARGET_CHARS = qr{ [A-Za-z0-9-_.] }x;
 
     $TARGETSFN = "bld.$project.targets";
-    $SIGFN     = "Bld.sig";
     $BFN       = "Bld";
-    $BGVFN     = "Bld.gv";
-    $BIFN      = "bld.info";
-    $BWFN      = "bld.warn";
-    $BFFN      = "bld.fatal";
 }
 
 GetOptions
@@ -90,63 +69,58 @@ else
     croak("One or more arguments required if --all option not specified.") if @ARGV <= 0;
 }
 
-# each not blank or not a comment line is a valid target argument to bld.$project e.g. './bld.$project $target'
-# and will build one(that named) library or executable
-if ( not -e $TARGETSFN )
-{
-    croak("$TARGETSFN cannot be opened.");
-}
-open my $fh, "<", $TARGETSFN;
-@TargetsFile = <$fh>;
-close $fh;
-chomp @TargetsFile;
-
-foreach my $target ( @TargetsFile )
-{
-    # ignore if comment or blank line
-    next if ( $target =~ $RGX_COMMENT_LINE or $target =~ $RGX_BLANK_LINE );
-
-    # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
-    if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
-    {
-        print "bld.$project.rm: Invalid target line: \'$target\' in $TARGETSFN file.\n";
-        exit 1;
-    }
-
-    push @ValidTargets, $target;
-    $ValidTargets{$target} = undef;
-}
-
 if ( $opt_all )
 {
-    # remove all files that are not in specific subsets of bld related files
-
-    my ( @ls );
-
-    # the -aF options will list executables with a '*' at the end
-    @ls = `ls -aF`;
-    foreach my $file ( @ls )
-    {
-        chomp($file);
-        if (
-               not $file =~ m{^\./$|^\.\./$} and               # . and .. directories
-               not $file =~ m{^bld\.$project\*$} and           # the bld.$project file
-               not $file =~ m{^bld\.$project\.targets$} and    # the bld.$project.targets file
-               not $file =~ m{^bld\.$project\.script.*\*$} and # the bld.$project.script.* file(s)
-               not $file =~ m{^bld\.$project\.README$} and     # the bld.$project.README file
-               not $file =~ m{^bld\.$project\.install\*$} and  # the bld.$project.install file
-               not $file =~ m{^bld\.$project\.rm\*$} and       # the bld.$project.rm file
-               not $file =~ m{^$BGVFN\.$project$} and          # the Bld.gv.$project file
-               not $file =~ m{^$BFN\.$project\..*$}            # the Bld.$project.* file(s)
-           )
-        {
-            `rm -f $file`;
-        }
-    }
+    # all subdirectories should be target directories - clean them -
+    # ignore bld.<$project>.targets file
+    @targets = `ls -d */`;
+    chop(@targets); # last space
+    chop(@targets); # last /
 }
 else
 {
-    # remove only files that end with specific valid target names
+    # clean only cmd line specified target directories
+
+    my
+    (
+        # the bld.$project.targets file
+        @TargetsFile,
+
+        # hash(set to undef) of all possible valid targets from bld.$project.targets file
+        %ValidTargets,
+
+        # valid targets specified on the cmd line
+        @ValidTargetsCmdLine,
+
+        # any not valid targets specified on the cmd line
+        @notValidTargetsCmdLine,
+    );
+
+    # each not blank or not a comment line is a valid target argument to bld.$project e.g. './bld.$project $target'
+    # and will build one(that named) library or executable
+    if ( not -e $TARGETSFN )
+    {
+        croak("$TARGETSFN cannot be opened.");
+    }
+    open my $fh, "<", $TARGETSFN;
+    @TargetsFile = <$fh>;
+    close $fh;
+    chomp @TargetsFile;
+
+    foreach my $target ( @TargetsFile )
+    {
+        # ignore if comment or blank line
+        next if ( $target =~ $RGX_COMMENT_LINE or $target =~ $RGX_BLANK_LINE );
+
+        # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
+        if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
+        {
+            print "bld.$project.rm: Invalid target line: \'$target\' in $TARGETSFN file.\n";
+            exit 1;
+        }
+
+        $ValidTargets{$target} = undef;
+    }
 
     # add valid cmd line targets to @ValidTargetsCmdLine and not valid cmd line targets to @notValidTargetsCmdLine
     foreach my $arg ( @ARGV )
@@ -168,15 +142,28 @@ else
         exit 1;
     }
 
-    # remove $target and bld.<warn|info|fatal>.$target files
-    foreach my $target ( @ValidTargetsCmdLine )
+    @targets = @ValidTargetsCmdLine;
+}
+
+foreach my $target ( @targets )
+{
+    chdir $target;
+    my @files = `ls`;
+    foreach my $file ( @files )
     {
-        `rm -f $SIGFN.$project.$target`;
-        `rm -f $BIFN.$project.$target`;
-        `rm -f $BWFN.$project.$target`;
-        `rm -f $BFFN.$project.$target`;
-        `rm -f $target`;
+        chomp $file;
+        if ( -f $file )
+        {
+            if (
+                   not $file =~ m{^bld\.$project\.$target\.script\..*$} and # the bld.$project.$target.script.* file(s)
+                   not $file =~ m{^$BFN\.$project\.$target$}                # the Bld.$project.$target file
+               )
+            {
+                `rm -f $file`;
+            }
+        }
     }
+    chdir "..";
 }
 
 1;
@@ -187,30 +174,24 @@ __END__
 
  bld.<project>.rm
 
-=head1 VERSION
-
- bld.<project>.rm
-
 =head1 USAGE
 
  usage: bld.<project>.rm <[--all] | [target] [target] ...>
-     --all    - remove all files not matching:
-                bld.<project>
-                bld.<project>.targets
-                bld.<project>.script.*
-                bld.<project>.README
-                bld.<project>.install
-                bld.<project>.rm
-                Bld.gv.<project>
-                Bld.<project>.*
-                mutually exclusive of specifying any cmd line targets.
-     [target] - remove all files matching:
-                Bld.sig.<project>.<target>
-                bld.warn.<project>.<target>
-                bld.info.<project>.<target>
-                bld.fatal.<project>.<target>
-                <target>
+     --all    - remove in all directories all files not matching:
+                bld.$project.$target.script.* file(s)
+                Bld.$project.$target file
+                mutually exclusive of specifying any cmd line [target]s.
+                do not remove any subdirectories in a target file directory.
+     [target] - remove in cmd line specified directories all files not matching:
+                bld.$project.$target.script.* file(s)
+                Bld.$project.$target file
                 mutually exclusive of specifying --all.
+                do not remove any subdirectories in a target file directory.
+
+     the main build directory(Bld.<project>/<version>) may store scripts not
+     related to any particular target and any other project files.  all target
+     directories may contain subdirectories with specific target related
+     infomation.  these will not be affected by bld.<project>.rm.
 
 =head1 REQUIRED ARGUMENTS
 
@@ -218,12 +199,14 @@ __END__
 
 =head1 OPTIONS
 
- --all - remove all files not matching:
+ --all   remove in all directories all files not matching:
          see above usage msg
 
 =head1 DESCRIPTION
 
  bld.<project>.rm is used for removing project files.  see above usage msg.
+
+ It makes no sense to run this program in any other directory than Bld.<project>/<version>.
 
 =head1 CONFIGURATION AND ENVIRONMENT
 
@@ -237,6 +220,11 @@ __END__
 
  None
 
+=head1 EXAMPLES
+
+ './bld.<project>.rm target [target] ..'
+ './bld.<project>.rm --all'
+
 =head1 SEE ALSO
 
  Bld.gv.<project>
@@ -245,6 +233,7 @@ __END__
  bld.<project>.install
  bld.<project>.targets
  bld.<project>.script.*
+ Bld.<project>.<target>
 
 =head1 AUTHOR
 
