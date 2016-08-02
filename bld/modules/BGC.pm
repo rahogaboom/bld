@@ -73,7 +73,7 @@ package BGC
     use diagnostics;
     use autodie;
 
-    $VERSION = "1.0.7";
+    $VERSION = "1.0.8";
 
     # file names
     $SIGFN = "Bld.sig";       # SIGnature File Name
@@ -85,46 +85,14 @@ package BGC
 
     # usage msg
     $USAGE = "\n".
-             " bld($BGC::VERSION) is a simple flexible non-hierarchical perl program that builds a single C/C++/\n".
-             " Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,\n".
-             " unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for\n".
-             " automatic header file dependency checking.  The operation of bld depends entirely on the\n".
-             " construction of the Bld(bld specification) and Bld.gv(bld global values) files.  See the\n".
-             " bld.README file.  There are no cmd line arguments and no environment variables.  Complex\n".
-             " multi-target projects are built with the use of:\n\n".
-             "     Bld.<project>         - Bld files and target bld output files directory\n".
-             "     bld.<project>         - project source directory\n".
-             "     bld.<project>         - target construction script\n".
-             "     bld.<project>.rm      - target and bld.<info|warn|fatal>.<target> file removal script\n".
-             "     Bld.<project>.gv      - project global values file\n".
-             "     bld.<project>.install - target and file install script\n".
-             "     bld.<project>.README  - project specific documentation file\n\n".
-             " Current example projects:\n\n".
-             "     Bld.example - several examples intended to show how to create Bld and Bld.gv files\n\n".
-             "     The following are examples of bld'ing complex multi-target projects.  They are\n".
-             "     provided with releases. Unpack them in the main bld directory in the same place as\n".
-             "     the bld.example and Bld.example directories:\n".
-             "         bld-$BGC::VERSION-git.tar.xz -\n".
-             "             the git project http://git-scm.com/\n".
-             "         bld-$BGC::VERSION-svn.tar.xz -\n".
-             "             the subversion project http://subversion.apache.org/\n".
-             " Dependencies:\n".
-             "     Required for execution:\n".
-             "         experimental.pm(3pm) - for smartmatch and switch features\n".
-             "         cpp(1) - gnu cpp cmd is required for dependency determination\n".
-             "         ldd(1) - used for library dependency determination\n".
-             "     Required for test:\n".
-             "         gcc(1)/g++(1) (http://gcc.gnu.org/)\n".
-             "         clang(1) (http://llvm.org/)\n\n".
-             " cd bld\n".
-             " Read bld.README.\n".
-             " Do './bld -h' for the usage msg.\n".
-             " Do 'perldoc bld' for the full man page.\n".
-             " Do './bld' to build the exec-c executable \"Hello, world!\" program.  This creates the\n".
-             "     bld.info, bld.warn and Bld.sig files which along with the Bld file gives an\n".
-             "     illustration of how to construct Bld files and the output that bld creates.\n".
-             "     This \"Hello, world!\" program has several stub do nothing routines that are just\n".
-             "     there to help illustrate various features of how to construct a Bld file.\n\n";
+             "bld [-hc]\n".
+             "\n".
+             "    Version = $VERSION\n".
+             "    -h - help message(exit)\n".
+             "    -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and\n".
+             "         their old/new signatures that have been added/deleted/changed.  Successive runs will\n".
+             "         append to this file with a time stamp.\n\n".
+             "    Do 'perldoc bld' for the full doc\n\n";
 
     # signature related
         # the following are constants used to index the second subscript of the %Sigdata($Sigdata{}[])

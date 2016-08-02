@@ -2940,10 +2940,7 @@ package BldRoutines
     #
     sub opt_help
     {
-        print STDERR "usage: bld [-h]\n";
-        print STDERR "    -h          - this message.(exit)\n";
-
-        print STDERR "$USAGE";
+        print STDERR "usage: $USAGE";
 
         exit;
     }

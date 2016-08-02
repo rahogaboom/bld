@@ -799,7 +799,7 @@ __END__
 =head1 USAGE
 
  usage: bld [-hc]
-     -h - this message.(exit)
+     -h - help message(exit)
      -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
           their old/new signatures that have been added/deleted/changed.  Successive runs will
           append to this file with a time stamp.
@@ -810,12 +810,10 @@ __END__
 
 =head1 OPTIONS
 
- bld [-hc]
-
- -h - help message(exit)
- -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
-      their old/new signatures that have been added/deleted/changed.  Successive runs will
-      append to this file with a time stamp.
+     -h - help message(exit)
+     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
+          their old/new signatures that have been added/deleted/changed.  Successive runs will
+          append to this file with a time stamp.
 
 =head1 ENVIRONMENT VARIABLES
 
@@ -846,15 +844,32 @@ __END__
  to pick up and build source, however, the specification for this is still in the Bld file at
  the top of the source tree.
 
+ The bld'ing of a single target requires the following:
+
+     ~/bld directory files:
+     bld         # script - the bld perl script
+     bld.rm      # script - script to clean the bld directory
+     bld.README  # file - for first point of contact quick start
+     Bld         # file - the bld file which controls bld and the construction of a target
+     Bld.gv      # file - the file of global values imported into the Bld file
+                          (unusually used only for multi-target builds)
+     Bld.sig     # file - the signature(SHA1) file created from the Bld file
+     bld.info    # file - information about the bld 
+     bld.warn    # file - warnings from the bld 
+     bld.fatal   # file - any fatal msg that ended the bld 
+
  Complex multi-target projects are built with the use of(in the main bld directory):
+     aux/bld.<project>     # file - template copied to Bld.<project>/<version> directories to bld multi-target projects
+     aux/bld.<project>.rm  # file - template copied to Bld.<project>/<version> directories to clean multi-target projects
      Bld.<project>/<version>    # directory - bld instructions for all project targets
          bld.<project>              # script - bld all or specific targets
          bld.<project>.rm           # script - target and bld.<info|warn|fatal>.<target> file removal
          Bld.<project>.gv           # file - project global values
          bld.<project>.install      # script - target and file install
          bld.<project>.README       # file - project documentation
+         bld.<project>.targets      # file - list of all <project> targets
          <target>                   # directory - holds all the files and scripts for the bld of a target
-             Bld.<project>.<target>        # file - instructions to bld a target
+             Bld.<project>.<target>        # file - the bld file which controls bld and the construction of a target
              Bld.<project>.<target>.script.<script name>  # script - script(s) to be run during target bld
              bld.sig.<project>.<target>    # file - signatures(SHA1) of all source, headers, objects, cmds and target of the target bld
              bld.info.<project>.<target>   # file - information about the bld
@@ -867,19 +882,7 @@ __END__
      git     - the git project http://git-scm.com/
      example - misc examples intended to show how to create Bld and Bld.gv files
 
- The bld'ing of a single target requires the following:
-
-     ~/bld directory files:
-     bld        - the bld perl script
-     bld.rm     - script to clean the bld directory
-     bld.README - for first point of contact quick start
-     Bld        - the bld file which controls bld and the construction of a target
-     Bld.gv     - the file of global values imported into the Bld file
-                      (unusually used only for multi-target builds)
-     Bld.sig    - the signature(SHA1) file created from the Bld file
-     bld.info   - information about the bld 
-     bld.warn   - warnings from the bld 
-     bld.fatal  - any fatal msg that ended the bld 
+=head1 Bld FILE FORMAT
 
  The Bld file(and Bld.gv) controls the entire target bld.  The Bld file is divided into three
  sections - Comments, EVAL and DIRS:
@@ -1036,35 +1039,6 @@ __END__
 
          # do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
          $opt_lib = "fatallibcheck";
-
-
- The building of complex multi-target projects requires the following directories and files:
-
-     ~/bld directories:
-     Bld.<project>/<version> - has all files controlling <project> <version>s blds and bld target output files
-     bld.<project>/<version> - source code for <project> <version>s
-     aux                     - template scripts directory for <project> blds
-
-     ~/bld/aux files:
-     aux/bld.<project>       - template copied to Bld.<project>/<version> directories to bld multi-target projects
-     aux/bld.<project>.rm    - template copied to Bld.<project>/<version> directories to clean multi-target projects
-
-     ~/bld/Bld.<project>/<version> files:
-     bld.<project>                 - for initiating single target, multi-target or all target blds of a <project>
-     bld.<project>.rm              - for initiating single target, multi-target or all target clean of a <project>
-     bld.<project>.targets         - list of all <project> targets
-     bld.<project>.README          - <project> README
-     bld.<project>.install         - <project> install script
-     Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
-
-     ~/bld/Bld.<project>/<version>/<target> files:
-     bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
-     Bld.<project>.<target>        - the Bld file for each <project> <target>
-     Bld.sig.<project>.<target>    - the signature(SHA1) file for each <project> <target>
-     bld.info.<project>.<target>   - the bld.info file for each <project> <target>
-     bld.warn.<project>.<target>   - the bld.warn file for each <project> <target>
-     bld.fatal.<project>.<target>  - the bld.fatal file for each <project> <target>
-     <target>                      - the target file
 
  The previous description material focused on the construction of a single target.  This requires only
  the use of the bld program and Bld file.  To bld complex multi-target projects requires use of some
@@ -1619,6 +1593,7 @@ __END__
     12. Examine the ./bld.<project>.README for project specific information.
 
     13. As an example, an edited run of 'tree Bld.git/git-2.9.2' after a './bld.git --all':
+
         Bld.git/git-2.9.2/
         ├── bld.git
         ├── bld.git.install
