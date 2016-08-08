@@ -1,13 +1,7 @@
 #!/home/hogaboom/perl5/perlbrew/perls/perl-5.24.0/bin/perl
 
 #
-# bld - a simple flexible non-hierarchical program that uses SHA1 signatures
-#       to build a single target(executable or library(static or shared)).
-#       Complex multi-target projects may be built with the help of the
-#       bld.<project> and bld.<project>.rm scripts and uses standard <project>
-#       directory structures for the placement of code and Bld files. see
-#       bld.README.  do "bld -h" for command help or "perldoc bld" for the
-#       full man page
+# bld - do "perldoc bld" for the full doc - see bld.README.  do "bld -h" for command help
 #
 
 # use modern perl
@@ -836,15 +830,11 @@ __END__
  and Bld.gv(bld global values) files.  See the bld.README file.  There are no cmd line arguments.
  A bld.rm program is provided to clean up the main bld directory.
 
- bld is based upon taking the SHA1 signature of anything that, when changed, would require a
- re-build of the executable/library.  It is not, like 'make', based in any way on dates.  This
- means that source or header files may be moved about, and if the files do not change then
- nothing needs to, or will, be re-built.  bld is not hierarchical; all of the information to
- re-build the executable is contained in the Bld(and Bld.gv) file.  Bld can descend recursively
- to pick up and build source, however, the specification for this is still in the Bld file at
- the top of the source tree.
+ Source or header files may be moved about, and if the files do not change then nothing needs to,
+ or will, be re-built.  bld is not hierarchical.  bld can descend recursively to pick up and build
+ source, however, the specification for this is still in the Bld file at the top of the source tree.
 
- The bld'ing of a single target requires the following:
+ The bld'ing of a single target uses the following:
 
      ~/bld directory files:
      bld         # script - the bld perl script
@@ -869,7 +859,7 @@ __END__
          bld.<project>.README       # file - project documentation
          bld.<project>.targets      # file - list of all <project> targets
          <target>                   # directory - holds all the files and scripts for the bld of a target
-             Bld.<project>.<target>        # file - the bld file which controls bld and the construction of a target
+             Bld.<project>.<target>        # file - the Bld file which controls bld and the construction of a target
              Bld.<project>.<target>.script.<script name>  # script - script(s) to be run during target bld
              bld.sig.<project>.<target>    # file - signatures(SHA1) of all source, headers, objects, cmds and target of the target bld
              bld.info.<project>.<target>   # file - information about the bld
@@ -881,6 +871,136 @@ __END__
 
      git     - the git project http://git-scm.com/
      example - misc examples intended to show how to create Bld and Bld.gv files
+
+=head1 FEATURES AND ADVANTAGES
+
+  1. Everything is done with SHA1 signatures.  No dates are used anywhere.  Signatures are a property of the
+     file and not meta data from the system used for the build.  Any time issues, whether related to local
+     clocks, networked host clocks or files touched by command activities are eliminated.  Modern signature
+     algorithms are strongly randomized even for small file changes - for the 160 bit SHA1 hash collisions are
+     unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
+     is small relative to the expense of programmer time.  An investigation of some other make alternatives
+     e.g. scons, cook - will disclose that they too are using signatures - for exactly for the same reasons.
+  2. bld is REALLY simple to use.  There are no arguments and no environment variables.  The entire bld is
+     controlled from the Bld(and Bld.gv file) file.  Only a minimal knowledge of perl is needed - variable
+     definitions and simple regular expressions.
+  3. Automatic dependency checking - GNU cpp is used to find the header file dependencies.  Optionally,
+     header file checking may be done for user header files only or for simultaneously both system header
+     and user header files.  All header file dependency information associated with each source is saved
+     to the bld.info file.
+  4. There are no built in dependency rules.  The Bld file DIRS section specifications give what is to be
+     built from what and the Bld file EVAL section gives how to assemble all the components for the target.
+  5. bld is not hierarchical.  A single Bld file controls the construction of a single target(a target is an
+     executable or library(static or shared)).  Complex multi-target projects use one Bld.gv(global values)
+     file and many Bld files - one to a target.  The source directory structure goes under
+     bld.<project>/<version> and each target Bld file(Bld.<project>.<target>) encapsulates all the build
+     information for all the source directories under bld.<project>/<version>.  All the built targets and
+     build information files go into the Bld.<project>/<version>/<target> directory.  See "'make' and it's
+     difficulties:" below for reasons why recursive make causes problems.
+  6. Each source file will have three signatures associated with it - one for the source file, one for the
+     corresponding object file and one for the cmds use to re-build the source.  A change in any of these will
+     result in a re-build.  A change in the target signature will result in a re-build.  Optionally, the
+     signatures of dynamic libraries may be tracked.  If a library signature changes the bld may warn or stop
+     the re-build.  If dynamic libraries are added or deleted from the bld this can ignore/warn/fatal.
+  7. If any files in the bld have the same signature this is warned about e.g. two header or source files of
+     the same or different names.
+  8. Complex multi-target projects are built with a standard directory setup and a standard set of scripts -
+     see RC CONFIGURATION FILES and DESCRIPTION sections above.
+  9. Security - since the signatures of everything(source, objects, libraries, executable) are checked it is
+     more difficult to insinuate an exploit into a source, object, library or executable during the build process.
+ 10. The capture of the full build process in the bld.info, bld.warn and bld.fatal files allows easy access to
+     and saving of this information.  For multi-target projects with the target names appended to these files
+     it allows quick investigation of the build process of many interrelated targets at the same time.
+ 11. Perl - since bld is all perl and since all warnings and fatals have the source line number associated with
+     them, it is very easy to locate in the source code the exact location of an error and examine the context
+     about which the error occurred and routine that the error was produced in.
+ 12. Time - programmer time; learning about, maintaining/debugging Makefiles and Makefile hierarchies, dependency
+     checking integration and formulation of Makefile strategies, automatic Makefile generation with Autotools -
+     these all dominate the programmer time and expense of 'make'.  bld only requires basic perl variables(in
+     the Bld file EVAL section) and '[R] dir:regex:{cmds}' line specifications(in the Bld file DIRS section).
+ 13. The -c option will create, at the end of a bld run, a bld.chg file with all files and their old/new
+     signatures that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
+ 14. 'make' and it's difficulties:
+         http://www.scons.org/wiki/FromMakeToScons
+             a detailed critique of make and some alternatives(Adrian Neagu)
+         http://freecode.com/articles/what-is-wrong-with-make
+             What is Wrong with Make?(Adrian Neagu)
+         http://www.scons.org/architecture/
+             a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
+         ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
+             a brief critique of make and how GNU automake from the GNU Build System contributes
+         http://aegis.sourceforge.net/auug97.pdf
+             an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
+         http://www.conifersystems.com/whitepapers/gnu-make/
+             an in depth critique of make
+         http://www.conifersystems.com/whitepapers/gnu-make/
+             What's Wrong With GNU make?
+         http://www.leosimons.com/2006/bettermake/what-is-a-better-make.html
+             What is a better make?
+         http://www.leosimons.com/2006/a-better-make.html
+             Building a better (make|ant|maven|...)
+
+=head1 DEPENDENCIES
+
+    I use Fedora for development on an x86_64 architecture.  Dnf is the package installation tool.
+
+    Required for execution:
+        experimental.pm(3pm) - for smartmatch and switch features
+        cpp(1) - gnu cpp cmd is required for dependency determination
+        ldd(1) - used for library dependency determination
+
+        Do: cpan install cpanm
+            cpanm experimental.pm
+
+    Required for test:
+        gcc(1)/g++(1) (http://gcc.gnu.org/)
+        clang(1) (http://llvm.org/)
+
+    Some variation might be required on(for git test):
+        dnf install gcc.x86_64
+        dnf install gcc-c++.x86_64
+        dnf install clang.x86_64
+        dnf install zlib.x86_64
+        dnf install zlib-devel.x86_64
+
+    If ./configure generates the following msg about missing requirements:
+
+        "configure: error: Package requirements (foo) were not met:
+
+        No package 'foo' found
+
+        Consider adjusting the PKG_CONFIG_PATH environment variable if you
+        installed software in a non-standard prefix."
+
+    Do: dnf install "pkgconfig(foo)"
+
+    Also check: http://who-t.blogspot.com/2014/05/configure-fails-with-no-package-foo.html
+
+    If the downloaded project code does not have a configure script then check for a configure.ac
+    file and run 'autoconf' with no arguments or options.  This will generate a configure script.
+
+=head1 QUICK START
+
+ 1. Bld'ing the git project - http://www.git-scm.com/
+    a. cd Bld.git/git-2.3.0 # puts you into the git(git-2.3.0) project directory
+    b. ./bld.git --all      # bld's all of the git targets and bld target output files -
+                                  the bld.info.git.<target>,
+                                  the bld.warn.git.<target>,
+                                  the bld.fatal.git.<target>,
+                                  files
+    c. ./bld.git.rm --all   # cleans up everything
+
+ 2. Bld'ing any single target
+    a. cd bld       # the main bld directory - cd here when you unpack the bld.tar.xz file
+    b. Install the source code in a sub-directory of the bld directory
+    c. Create a Bld file - the Bld file entirely controls the target bld - see example below
+    d. ./bld -h     # the bld usage msg
+    e. ./bld        # do the bld
+    f. ./bld.rm     # clean up
+    g. vi Bld.sig   # examine the bld signature file
+    h. vi bld.info  # detailed info about the stages of the bld
+    i. vi bld.warn  # warning msgs from the bld
+    j. vi bld.fatal # fatal msgs that terminated the bld - should be empty if bld is successful
 
 =head1 Bld FILE FORMAT
 
@@ -1112,187 +1232,7 @@ __END__
 
      See BUILDING MULTI-TARGET PROJECTS below for the detail steps in building complex multi-target projects.
 
-=head1 FEATURES AND ADVANTAGES
-
-  1. Everything is done with SHA1 signatures.  No dates are used anywhere.  Signatures are a property of the
-     file and not meta data from the system used for the build.  Any time issues, whether related to local
-     clocks, networked host clocks or files touched by command activities are eliminated.  Modern signature
-     algorithms are strongly randomized even for small file changes - for the 160 bit SHA1 hash collisions are
-     unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
-     is small relative to the expense of programmer time.  An investigation of some other make alternatives
-     e.g. scons, cook - will disclose that they too are using signatures - maybe for exactly for the same reasons.
-  2. bld is REALLY simple to use.  There are no arguments and no environment variables.  The entire bld is
-     controlled from the Bld(and Bld.gv file) file.  Only a minimal knowledge of perl is needed - variable
-     definitions and simple regular expressions.
-  3. Automatic dependency checking - GNU cpp is used to find the header file dependencies.  Optionally, header
-     file checking may be done for user header files only or for simultaneously both system header and user
-     header files.  All header file dependency information associated with each source is saved to the
-     bld.info file.
-  4. There are no built in dependency rules.  The Bld file DIRS section specifications give what is to be
-     built from what and the Bld file EVAL section gives how to assemble all the components for the target.
-  5. bld is not hierarchical.  A single Bld file controls the construction of a single target(a target is an
-     executable or library(static or shared)).  Complex multi-target projects use one Bld.gv(global values)
-     file and many Bld files - one to a target.  The source directory structure goes under bld.<project>/<version>
-     and each target Bld file(Bld.<project>.<target>) encapsulates all the build information for all the
-     source directories under bld.<project>/<version>.  All the built targets and build information files go
-     into the Bld.<project>/<version> directory.  See "'make' and it's difficulties:" below for reasons why
-     recursive make causes problems.
-  6. Each source file will have three signatures associated with it - one for the source file, one for the
-     corresponding object file and one for the cmds use to re-build the source.  A change in any of these will
-     result in a re-build.  A change in the target signature will result in a re-build.  Optionally, the
-     signatures of dynamic libraries may be tracked.  If a library signature changes the bld may warn or stop
-     the re-build.  If dynamic libraries are added or deleted from the bld this can ignore/warn/fatal.
-  7. If any files in the bld have the same signature this is warned about e.g. two header or source files of
-     the same or different names.
-  8. Complex multi-target projects are built with a standard directory setup and a standard set of scripts -
-     Directories:
-         Bld.<project>/<version>       - has all files controlling <project> <version>s blds and bld target output files
-         bld.<project>/<version>       - source code for <project> <version>s
-
-     Files:
-         bld.<project>                 - for initiating single target, multi-target or all target blds of a <project>
-         bld.<project>.rm              - for initiating single target, multi-target or all target clean of a <project>
-         bld.<project>.targets         - list of all <project> targets
-         bld.<project>.README          - <project> README
-         bld.<project>.install         - <project> install script
-         bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
-         Bld.<project>.<target>        - the Bld file for each <project> <target>
-         Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
-  9. Security - since the signatures of everything(source, objects, libraries, executable) are checked it is
-     more difficult to insinuate an exploit into a source, object, library or executable during the build process.
- 10. The capture of the full build process in the bld.info, bld.warn and bld.fatal files allows easy access to
-     and saving of this information.  For multi-target projects with the target names appended to these files
-     it allows quick investigation of the build process of many interrelated targets at the same time.
- 11. Perl - since bld is all perl and since all warnings and fatals have the source line number associated with
-     them, it is very easy to locate in the source code the exact location of an error and examine the context
-     about which the error occurred and routine that the error was produced in.
- 12. Time - programmer time; learning about, maintaining/debugging Makefiles and Makefile hierarchies, dependency
-     checking integration and formulation of Makefile strategies, automatic Makefile generation with Autotools -
-     these all dominate the programmer time and expense of 'make'.  bld only requires basic perl variables(in
-     the Bld file EVAL section) and '[R] dir:regex:{cmds}' line specifications(in the Bld file DIRS section).
- 13. The -c option will create, at the end of a bld run, a bld.chg file with all files and their old/new signatures
-     that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
- 14. 'make' and it's difficulties:
-         http://www.scons.org/wiki/FromMakeToScons
-             a detailed critique of make and some alternatives(Adrian Neagu)
-         http://freecode.com/articles/what-is-wrong-with-make
-             What is Wrong with Make?(Adrian Neagu)
-         http://www.scons.org/architecture/
-             a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
-         ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
-             a brief critique of make and how GNU automake from the GNU Build System contributes
-         http://aegis.sourceforge.net/auug97.pdf
-             an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
-         http://www.conifersystems.com/whitepapers/gnu-make/
-             an in depth critique of make
-         http://www.conifersystems.com/whitepapers/gnu-make/
-             What's Wrong With GNU make?
-         http://www.leosimons.com/2006/bettermake/what-is-a-better-make.html
-             What is a better make?
-         http://www.leosimons.com/2006/a-better-make.html
-             Building a better (make|ant|maven|...)
-
-=head1 DEPENDENCIES
-
-    I use Fedora for development on an x86_64 architecture.  Dnf is the package installation tool.
-
-    Required for execution:
-        experimental.pm(3pm) - for smartmatch and switch features
-        cpp(1) - gnu cpp cmd is required for dependency determination
-        ldd(1) - used for library dependency determination
-
-        Do: cpan install cpanm
-            cpanm experimental.pm
-
-    Required for test:
-        gcc(1)/g++(1) (http://gcc.gnu.org/)
-        clang(1) (http://llvm.org/)
-
-    Some variation might be required on(for git test):
-        dnf install gcc.x86_64
-        dnf install gcc-c++.x86_64
-        dnf install clang.x86_64
-        dnf install zlib.x86_64
-        dnf install zlib-devel.x86_64
-
-    If ./configure generates the following msg about missing requirements:
-
-        "configure: error: Package requirements (foo) were not met:
-
-        No package 'foo' found
-
-        Consider adjusting the PKG_CONFIG_PATH environment variable if you
-        installed software in a non-standard prefix."
-
-    Do: dnf install "pkgconfig(foo)"
-
-    Also check: http://who-t.blogspot.com/2014/05/configure-fails-with-no-package-foo.html
-
-    If the downloaded project code does not have a configure script then check for a configure.ac
-    file and run 'autoconf' with no arguments or options.  This will generate a configure script.
-
-=head1 QUICK START
-
- 1. Bld'ing the git project - http://www.git-scm.com/
-    a. cd Bld.git/git-2.3.0 # puts you into the git(git-2.3.0) project directory
-    b. ./bld.git --all      # bld's all of the git targets and bld target output files -
-                                  the bld.info.git.<target>,
-                                  the bld.warn.git.<target>,
-                                  the bld.fatal.git.<target>,
-                                  files
-    c. ./bld.git.rm --all   # cleans up everything
-
- 2. Bld'ing any single target
-    a. cd bld       # the main bld directory - cd here when you unpack the bld.tar.xz file
-    b. Install the source code in a sub-directory of the bld directory
-    c. Create a Bld file - the Bld file entirely controls the target bld - see example below
-    d. ./bld -h     # the bld usage msg
-    e. ./bld        # do the bld
-    f. ./bld.rm     # clean up
-    g. vi Bld.sig   # examine the bld signature file
-    h. vi bld.info  # detailed info about the stages of the bld
-    i. vi bld.warn  # warning msgs from the bld
-    j. vi bld.fatal # fatal msgs that terminated the bld - should be empty if bld is successful
-
-=head1 Bld FILE FORMAT AND EXAMPLES
-
- A more detailed description of the Bld(and Bld.gv) files initially presented in the DESCRIPTION section
- above is presented here.
-
- 1. A comments section
-
- 2. An EVAL(starts a line) section - this is perl code that is eval'ed in bld.  Six variables are required.  These are:
-    e.g.
-
-        EVAL
-        # mandatory defined variables
-
-            # the target to build e.g. executable, libx.a, libx.so
-            $bld="exec-c";
-
-            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
-            $bldcmd = "$CC -lm -o \$bld \$O";
-
-            # space separated list of directories to search for libraries
-            $lib_dirs = "example/lib /usr/lib /lib /usr/local/lib";
-
-            # use system header files in dependency checking("system" or "nosystem")
-            $opt_s = "system";
-
-            # inform about any files that will require re-building, but do not rebuild("rebuild" or "norebuild")
-            $opt_r = "rebuild";
-
-            # do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
-            $opt_lib = "fatallibcheck";
-
-        Any other simple perl variables can be defined in the EVAL section and used in the DIRS section.  Environment
-        variables may be set.
-
- 3. A DIRS(starts a line) section - this section will have either {cmds} cmd blocks or '[R] dir:regex:{cmds}' specifications.
-    The {cmds} blocks are just a group of shell cmds, always executed.  A dir specification is a source directory relative
-    to the bld directory.  The regex specification is a perl regular expression that will pick up one or more of the
-    source files in dir.  The {cmds} specification describes how to build the selected source files.  Any number of
-    cmds, ';' separated, may be specified within the {} brackets.
+=head1 Bld FILE FORMAT EXAMPLES
 
  Example Bld Files:
 
@@ -1426,47 +1366,6 @@ __END__
             ls -lfda; pwd;
             ls;
         }
-
-=head1 FILES
-
- $HOME directory files:
- .bldrc     - user bld run cmd file
-
- ~/bld directory files:
- .bldrc     - local bld run cmd file
- bld        - the bld perl script
- bld.rm     - script to clean the bld directory
- bld.README - for first point of contact quick start
- Bld        - the bld file which controls bld and the construction of a target
- Bld.gv     - the file of global values imported into the Bld file(unusually used only for multi-target builds)
- Bld.sig    - the signature(SHA1) file created from the Bld file
- bld.info   - information about the bld 
- bld.warn   - warnings from the bld 
- bld.fatal  - the fatal msg that ended the bld 
- bld.chg    - all files and their old/new signatures that have been added/deleted/changed
-
- ~/bld directories:
- Bld.<project>/<version> - has all files controlling <project> <version>s blds and bld target output files
- bld.<project>/<version> - source code for <project> <version>s
- aux                     - template scripts directory for <project> blds
-
- ~/bld/aux files:
- aux/bld.<project>       - template copied to Bld.<project>/<version> directories to bld multi-target projects
- aux/bld.<project>.rm    - template copied to Bld.<project>/<version> directories to clean multi-target projects
-
- ~/bld/Bld.<project>/<version> files:
- bld.<project>                 - for initiating single target, multi-target or all target blds of a <project>
- bld.<project>.rm              - for initiating single target, multi-target or all target clean of a <project>
- bld.<project>.targets         - list of all <project> targets
- bld.<project>.README          - <project> README
- bld.<project>.install         - <project> install script
- bld.<project>.script.<script> - scripts called by the Bld.<project>.<target> files
- Bld.<project>.<target>        - the Bld file for each <project> <target>
- Bld.gv.<project>              - global values imported into all Bld.<project>.<target> files
- Bld.sig.<project>.<target>    - the signature(SHA1) file for each <project> <target>
- bld.info.<project>.<target>   - the bld.info file for each <project> <target>
- bld.warn.<project>.<target>   - the bld.warn file for each <project> <target>
- bld.fatal.<project>.<target>  - the bld.fatal file for each <project> <target>
 
 =head1 BUILDING SINGLE TARGETS
     (a target is an executable or library(static or shared))
@@ -1649,8 +1548,8 @@ __END__
      the .o files.
 
   2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
-     into the same project directory before distribution for installation.  installation can
-     then rename and distribute targets in any way desired.
+     into the same project directory(in <target> subdirectories) before distribution for
+     installation.  installation can then rename and distribute targets in any way desired.
 
   3. Some projects(rarely) violate either or both of these target naming or object file
      naming/location requirements, but reconstructing these projects with bld should be
@@ -1681,7 +1580,7 @@ __END__
   7. A non C or C++ source will be re-built if its build command has been changed or the
      source file itself has been changed.  The re-built output will be put back in the
      directory where the source came from. The assumption is that it will be a file that will
-     then act a source for subsequent build steps e.g. a lex or yacc that will produce a C
+     then act as source for subsequent build steps e.g. a lex or yacc that will produce a C
      file as output which will then later need to be compiled.  Bld file cmd({}) blocks can
      modify this.
 
@@ -1692,7 +1591,7 @@ __END__
      {$CC -c $s;}.
 
   9. All cmds must end with a ';'.  If you miss this then you'll see msgs like - "sh: -c:
-     line 1: syntax error: unexpected end of file".  This includes the compiles and the
+     line 1: syntax error: unexpected end of file".  This includes the compile and the
      $bldcmd string.
 
  10. If you interrupt a bld(^C) you might get an object file left in the bld directory.
@@ -1704,24 +1603,21 @@ __END__
      matched by one of these strings will be missed.  New strings can be added to
      @stderr_err_strs in the BGC.pm module.
 
- 12. The git project needs work.  I ran ./configure before each bld.  I used no options.
-     How options affect the generated code and thus the Bld files is important.  Anyone
-     willing to investigate configure options and how these options affect the Bld files
-     is welcome.
+=head1 TODO
 
- 13. The bld.git.install scripts all need to be done.  These scripts need to build the
-     packages that 'dnf install <package>' would install or possibly packages tailored
-     to other systems.  I'd prefer to partner with someone knowledgeable about the
-     installation of git.
+ 1. The git project needs work.  I ran ./configure before each bld.  I used no options.
+    How options affect the generated code and thus the Bld files is important.  Anyone
+    willing to investigate configure options and how these options affect the Bld files
+    is welcome.
 
- 14. All the Bld.gv.<project> files should be vetted by a <project> knowledgeable builder.
+ 2. The bld.git.install scripts all need to be done.  These scripts need to build the
+    packages that 'dnf install <package>' would install or possibly packages tailored
+    to other systems.  I'd prefer to partner with someone knowledgeable about the
+    installation of git.
 
- 15. I need someone with substantial experience building the linux kernel to advise me or
-     partner with me on the construction of a 4.X kernel.
-
- 16. If you successfully bld a new project and wish to contribute the bld, please do so.
-     I'm interested in how others construct/organize/document/debug projects and their
-     Bld files.
+ 3. If you successfully bld a new project and wish to contribute the bld, please do so.
+    I'm interested in how others construct/organize/document/debug projects and their
+    Bld files.
 
 =head1 CALL TREE
 
@@ -1782,6 +1678,47 @@ __END__
  bld.fatal file.  Warnings all start with 'WARNING:' and fatals all start with 'FATAL:'.
  There are no other types of diagnostic msgs.
 
+=head1 FILES
+
+ For defining perl variables in the Bld file EVAL section.  Should be valid perl code.
+ Syntax errors will be reported.
+
+ $ENV{HOME}/.bldrc - user bld run cmd file 
+ .bldrc            - local bld run cmd file
+
+ The bld'ing of a single target uses the following:
+
+     ~/bld directory files:
+     bld         # script - the bld perl script
+     bld.rm      # script - script to clean the bld directory
+     bld.README  # file - for first point of contact quick start
+     Bld         # file - the bld file which controls bld and the construction of a target
+     Bld.gv      # file - the file of global values imported into the Bld file
+                          (unusually used only for multi-target builds)
+     Bld.sig     # file - the signature(SHA1) file created from the Bld file
+     bld.info    # file - information about the bld 
+     bld.warn    # file - warnings from the bld 
+     bld.fatal   # file - any fatal msg that ended the bld 
+
+ Complex multi-target projects are built with the use of(in the main bld directory):
+     aux/bld.<project>     # file - template copied to Bld.<project>/<version> directories to bld multi-target projects
+     aux/bld.<project>.rm  # file - template copied to Bld.<project>/<version> directories to clean multi-target projects
+     Bld.<project>/<version>    # directory - bld instructions for all project targets
+         bld.<project>              # script - bld all or specific targets
+         bld.<project>.rm           # script - target and bld.<info|warn|fatal>.<target> file removal
+         Bld.<project>.gv           # file - project global values
+         bld.<project>.install      # script - target and file install
+         bld.<project>.README       # file - project documentation
+         bld.<project>.targets      # file - list of all <project> targets
+         <target>                   # directory - holds all the files and scripts for the bld of a target
+             Bld.<project>.<target>        # file - the Bld file which controls bld and the construction of a target
+             Bld.<project>.<target>.script.<script name>  # script - script(s) to be run during target bld
+             bld.sig.<project>.<target>    # file - signatures(SHA1) of all source, headers, objects, cmds and target of the target bld
+             bld.info.<project>.<target>   # file - information about the bld
+             bld.warn.<project>.<target>   # file - warnings from the bld
+             bld.fatal.<project>.<target>  # file - any fatal msg that ended the bld
+     bld.<project>/<version>    # directory - a source code version of the project
+
 =head1 INCOMPATIBILITIES
 
  None Known
@@ -1823,15 +1760,6 @@ __END__
                         a. fixes for two gcc warnings in the example code(rdx and daa)
                         b. use 'print STDERR' for all prints - more immediate output
                         c. doc updates
-
-     bld-1.0.5.tar.gz - changes related to:
-                        a. change {cmds} block execution from 'system "cmds";' to '`{ cmds } 2>&1`;'
-                        b. add -c option to create bld.chg file with any file changes during a bld run
-                        c. add $ENV{HOME}/.bldrc and .bldrc files
-                        d. doc updates
-
-     bld-1.0.4.tar.gz - entirely perldoc updates.  example projects - bld-1.0.4-git.tar.xz, bld-1.0.4-svn.tar.xz
-                        and bld-1.0.4-systemd.tar.xz.
 
      Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
      about the most recent releases.  This may change in future.

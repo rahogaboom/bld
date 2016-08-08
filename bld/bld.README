@@ -4,7 +4,7 @@ INITIAL STEPS
 
 cd bld
 Do './bld -h' for the usage msg.
-Do 'perldoc bld' for the full man page.
+Do 'perldoc bld' for the full doc.
 Do './bld' to build the exec-c executable "Hello, world!" program.  This creates the
     bld.info, bld.warn and Bld.sig files which along with the Bld(and Bld.gv) file 
     gives an illustration of how to construct Bld files and the output that bld 
