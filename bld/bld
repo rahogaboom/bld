@@ -64,7 +64,7 @@ use BldRoutines;
 
         # mandatory variable definitions in the EVAL section of $BFN
             $bld,        # the target to build e.g. executable, libx.a, libx.so
-            $bldcmd,     # cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+            $bldcmd,     # cmd used in perl `` call to build $bld object - requires '$bld' and '$O'(object files) internally
             $lib_dirs,   # space separated list of directories to search for libraries
 
             # mandatory option related in the EVAL section of $BFN
@@ -982,7 +982,7 @@ __END__
 =head1 QUICK START
 
  1. Bld'ing the git project - http://www.git-scm.com/
-    a. cd Bld.git/git-2.3.0 # puts you into the git(git-2.3.0) project directory
+    a. cd Bld.git/git-2.9.2 # puts you into the git(git-2.9.2) project directory
     b. ./bld.git --all      # bld's all of the git targets and bld target output files -
                                   the bld.info.git.<target>,
                                   the bld.warn.git.<target>,
@@ -1024,7 +1024,7 @@ __END__
      # the target to build e.g. executable, libx.a, libx.so
      $bld="exec-c";
 
-     # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+     # cmd used in perl `` call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
      $bldcmd = "$CC $INCDIR -lm -o \$bld \$O";
 
      # space separated list of directories to search for libraries
@@ -1042,7 +1042,7 @@ __END__
  DIRS
  # '{cmds}' cmd blocks e.g. {ls;pwd;date;}
  # or
- # '[R] dir:regex:{cmds}' specifications e.g. bld.$PROJECT/git-2.3.0/:^zlib\.c$:{gcc $INCDIR -o zlib.o $s}
+ # '[R] dir:regex:{cmds}' specifications e.g. bld.$PROJECT/git-2.9.2/:^zlib\.c$:{gcc $INCDIR -o zlib.o $s}
  # see examples below in 'Bld FILE FORMAT AND EXAMPLES'.  both 'dir' and '{cmds}' fields below may have EVAL
  # defined variables interpolated into them.
 
@@ -1137,7 +1137,7 @@ __END__
 
      2. $bldcmd
 
-         # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+         # cmd used in perl `` call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
          $bldcmd = "$CC $INCDIR -lm -o \$bld \$O";
 
      3. $lib_dirs
@@ -1163,30 +1163,30 @@ __END__
  The previous description material focused on the construction of a single target.  This requires only
  the use of the bld program and Bld file.  To bld complex multi-target projects requires use of some
  standard directory structure conventions, several programs for bld'ing targets and cleaning project
- directories and directory/file naming conventions.  For example, using git-2.3.0 and a <project> name
+ directories and directory/file naming conventions.  For example, using git-2.9.2 and a <project> name
  of 'git':
 
-     Bld.git/git-2.3.0
+     Bld.git/git-2.9.2
          All of the target Bld files and bld run output files are here.  During development the initiation
          of target re-blds or full project re-blds are initiated from here.
 
-     bld.git/git-2.3.0
-         The git-2.3.0.tar.gz file is unzipped here 'make configure' and/or ./configure is run against the
+     bld.git/git-2.9.2
+         The git-2.9.2.tar.gz file is unzipped here 'make configure' and/or ./configure is run against the
          git project source code.
 
      aux
-         Template scripts for use in the Bld.git/git-2.3.0 directory.  The bld.<project> script is copied
-         to Bld.git/git-2.3.0 as bld.git.  The bld.<project>.rm is copied to Bld.git/git-2.3.0 as bld.git.rm.
+         Template scripts for use in the Bld.git/git-2.9.2 directory.  The bld.<project> script is copied
+         to Bld.git/git-2.9.2 as bld.git.  The bld.<project>.rm is copied to Bld.git/git-2.9.2 as bld.git.rm.
          No changes are required to the scripts code.
 
      aux/bld.git
-         The bld.<project> file would be copied to Bld.git/git-2.3.0 as bld.git.  There is no need to change
+         The bld.<project> file would be copied to Bld.git/git-2.9.2 as bld.git.  There is no need to change
          the file; the file name is picked up internally.  This is the main project bld script.  It is
          executed either with a sequence of target names or with '--all' for building all targets. Do
          'perldoc bld.git' for the man page.
 
      aux/bld.git.rm
-         The bld.<project>.rm file would be copied to Bld.git/git-2.3.0 as bld.git.rm.  There is no need to change
+         The bld.<project>.rm file would be copied to Bld.git/git-2.9.2 as bld.git.rm.  There is no need to change
          the file; the file name is picked up internally.  This script is used to remove build files related to
          specific targets or clean files related to all targets.  It is executed either with a sequence of target
          names or with '--all' for cleaning all targets.  For example, if test-wildmatch is used as a target then
@@ -1251,7 +1251,7 @@ __END__
             # the target to build e.g. executable, libx.a, libx.so
             $bld="helloworld-c";
 
-            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            # cmd used in perl `` call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
             $bldcmd = "$CC -o \$bld \$O";
 
             # space separated list of directories to search for libraries
@@ -1289,7 +1289,7 @@ __END__
             # the target to build e.g. executable, libx.a, libx.so
             $bld="exec-c";
 
-            # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+            # cmd used in perl `` call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
             $bldcmd = "$CC -lm -o \$bld \$O";
 
             # space separated list of directories to search for libraries
@@ -1387,12 +1387,12 @@ __END__
 
     2. In the main bld directory(the location of the bld script) create a bld.<project>
        directory.  Create another directory, bld.<project>/<version>, that describes the
-       version of the code it will hold e.g. git-2.3.0.  Any number of these version
+       version of the code it will hold e.g. git-2.9.2.  Any number of these version
        directories may be created to maintain different versions of the code.  Unpack the
-       source code in the version directory e.g. bld.git/git-2.3.0/<git-2.3.0 src code>.
+       source code in the version directory e.g. bld.git/git-2.9.2/<git-2.9.2 src code>.
 
     3. Create a Bld.<project> directory.  Create another directory, Bld.<project>/<version>,
-       that describes the version of the code it will maintain e.g. git-2.3.0.  There
+       that describes the version of the code it will maintain e.g. git-2.9.2.  There
        should be one version directory for each version of the code being maintained.
        The version directory will hold the following files:
            bld.<project>
@@ -1406,7 +1406,7 @@ __END__
        removed by bld.<project>.rm.
 
     4. Create in the Bld.<project>/<version> directory a directory for each target e.g.
-       Bld.git/git-2.3.0/git.
+       Bld.git/git-2.9.2/git.
        These target directories will hold:
            a. all of the Bld.<project>.<target> files that control the construction of
               each project target(along with Bld.gv.<project>)
@@ -1446,8 +1446,8 @@ __END__
            # the target to built e.g. executable, libx.a, libx.so
            $bld="accelerometer";
 
-           # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
-           $bldcmd = "$CC $LIBSLINKOPTS -o \$bld \$O -LBld.git/git-2.3.0 -ludev -lm -lrt -ldl";
+           # cmd used in perl `` call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+           $bldcmd = "$CC $LIBSLINKOPTS -o \$bld \$O -LBld.git/git-2.9.2 -ludev -lm -lrt -ldl";
 
        The definition of these variables may be spread between the Bld.<project>.<target> and the imported Bld.gv.<project>
        files.  See the Bld FILE FORMAT section below for detailed instructions on Bld file construction.

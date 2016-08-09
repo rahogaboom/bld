@@ -872,7 +872,7 @@ package BldRoutines
     # Purpose    : write initial info to the bld.info file
     #
     # Parameters : $bld             - the target to built e.g. executable or libx.a or libx.so
-    #            : $bldcmd          - cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+    #            : $bldcmd          - cmd used in perl `` call to build $bld object - requires '$bld' and '$O'(object files) internally
     #            : $lib_dirs        - space separated list of directories to search for libraries
     #            : $opt_s           - to use system header files in dependency checking("system" or "nosystem")
     #            : $opt_r           - to inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
@@ -1105,7 +1105,7 @@ package BldRoutines
     #            :     3. signature of target exists in signature file but is changed from actual existing target
     #
     # Parameters : $bld         - the target to built e.g. executable or libx.a or libx.so
-    #            : $bldcmd      - cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+    #            : $bldcmd      - cmd used in perl `` call to build $bld object - requires '$bld' and '$O'(object files) internally
     #            : $lib_dirs    - space separated list of directories to search for libraries
     #            : $opt_lib     - to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
     #            : \%Sigdata    - hash holding $SIGFN file signature data
@@ -1275,7 +1275,7 @@ package BldRoutines
     # Purpose    : use $bldcmd with $bld and $O to rebuild the target
     #
     # Parameters : $bld         - the target to built e.g. executable or libx.a or libx.so
-    #            : $bldcmd      - cmd used in perl system() call to build $bld object - requires '$bld' and '$O'(object files) internally
+    #            : $bldcmd      - cmd used in perl `` call to build $bld object - requires '$bld' and '$O'(object files) internally
     #            : $lib_dirs    - space separated list of directories to search for libraries
     #            : $opt_lib     - to do dependency checking on libraries("nolibcheck", "libcheck", "warnlibcheck" or "fatallibcheck")
     #            : \%Objects    - object files for the build
@@ -2783,7 +2783,7 @@ package BldRoutines
     # 
     # Usage      : $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
     #
-    # Purpose    : evaluate the error return from the system() call perl builtin
+    # Purpose    : evaluate the error return from the `` call perl builtin
     #
     # Parameters : $?($CHILD_ERROR) - indicate the status return from the ``; call
     #            : $!($OS_ERROR     - indicate the C(errno) value returned on error

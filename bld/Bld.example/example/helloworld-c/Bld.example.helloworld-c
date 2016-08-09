@@ -10,7 +10,7 @@ $CC = "gcc";
     # the target to build e.g. executable, libx.a, libx.so
     $bld="helloworld-c";
 
-    # cmd used in perl system() call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
+    # cmd used in perl `` call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
     $bldcmd = "$CC -o \$bld \$O;";
 
     # space separated list of directories to search for libraries
