@@ -1,4 +1,24 @@
 
+
+ bld-1.0.9.tar.gz - changes related to:
+                    a. minor code and doc changes to bld itself.
+                    b. changes to multi-target bld scripts:
+
+                           Bld.<project>/<version>/bld.<project>
+                           Bld.<project>/<version>/bld.<project>.rm
+
+                       that allow bld'ing of targets(executables or libraries) of the same
+                       name differentiated by the directory containing them e.g. from git -
+                       xdiff/lib.a and vcs-svn/lib.a.
+                    c. removed git versions 1.9.0, 2.3.0 and 2.9.2.  added git version 2.12.0.
+                       the git bld is NOT a vetted full construction of the git code.  it is
+                       used to illustrate the successful compilation of all git execuatables
+                       and libraries to bld complex multi-target projects.
+                    d. verify example and git code correct operation with latest:
+                       1. gcc/g++ - gcc (GCC) 6.3.1 20161221 (Red Hat 6.3.1-1)
+                       2. clang   - clang version 3.8.1 (tags/RELEASE_381/final)
+                    e. use perl 5.24.1
+
  bld-1.0.8.tar.gz - changes related to:
                     a. remove svn as an example.  this allows greater focus on multiple versions
                        of git as the single example of a complex project build.  added git

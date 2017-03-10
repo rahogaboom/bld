@@ -2,30 +2,15 @@
 # each line is a valid target argument to bld.<project> e.g. './bld.<project> target'
 # and will build one(that named) library or executable.  the order of target bld's
 # is important.  if 'bld.<project> --all' is used to bld all targets then dependencies
-# must be built first, that is, libraries that executables depend on must be built at
-# the start.
+# must be built first, that is, libraries then executables.  if a line begins with
+# "END" then all targets after the "END" are ignored.
 
-#
 bfix-c
-
-#
 daa-c
-
-#
 exec-cpp
-
-#
 helloworld-c
-
-#
 libbfix.so
-
-#
 libdaa.so
-
-#
 MKRdxPat_test
-
-#
 exec-c
 

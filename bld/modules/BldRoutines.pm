@@ -97,8 +97,6 @@ package BldRoutines
     # installed modules
     #
 
-    #use Modern::Perl 2014;
-
     # this module allows the use of experimental perl language features(given, when, ~~) without generating warnings.
     # to see exactly where smartmatch features are being used just comment out this line.  bld will run, but with warnings
     # everyplace an experimental smartmatch feature is used.
@@ -311,8 +309,8 @@ package BldRoutines
 
                 $cmd_var_sub =~ s{!!!}{\n}g;
 
-                # execute {cmds}
-                $std_out_err = `{ $cmd_var_sub } 2>&1`;
+                # execute cmds
+                $std_out_err = `$cmd_var_sub 2>&1`;
 
                 foreach my $err ( @stderr_err_strs )
                 {
@@ -1303,7 +1301,7 @@ package BldRoutines
            ) = @_;
 
         my ( $std_out_err );
-        my ( $tmp, $O );
+        my ( $cmd, $O );
 
 
         # extract %Objects hash object file keys and concatenate onto $O
@@ -1312,22 +1310,34 @@ package BldRoutines
            $O .= "$o ";
         }
 
-        $tmp = $bldcmd;
-        $tmp =~ s{(\$\w+)}{$1}gee;
-
-        $tmp =~ s{!!!}{\n}g;
+        $cmd = $bldcmd;
+        $cmd =~ s{(\$\w+)}{$1}gee;
 
         # execute $bldcmd
-        $std_out_err = `{ $tmp } 2>&1`;
+        $std_out_err = `$cmd 2>&1`;
 
+        # fail if the target was not rebuilt
         if ( not -e $bld )
         {
             my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $tmp, $std_out_err;
+            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd, $std_out_err;
             fatal($msg);
         }
 
+        # fail if errors in $std_out_err
+        foreach my $err ( @stderr_err_strs )
+        {
+            if ( $std_out_err =~ m/$err/ )
+            {
+                my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
+
+                my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd, $std_out_err;
+                fatal($msg);
+            }
+        }
+
+        # calculate and store signature of target
         $SigdataNew_ref->{$bld}[$SIG_SRC] = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
 
         if ( $opt_lib ne "nolibcheck" )
@@ -1359,7 +1369,7 @@ package BldRoutines
             }
         }
 
-        print STDERR "$tmp\n";
+        print STDERR "$cmd\n";
         print STDERR "$bld re-built.\n";
     }
 

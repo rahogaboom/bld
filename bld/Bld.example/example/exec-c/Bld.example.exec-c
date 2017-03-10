@@ -97,3 +97,8 @@ bld.example/example/C/z   : ^(w|w1)\.c$    : {$CC -c $INCLUDE $s;}
     ls;
 }
 
+# if you want finer grained error reporting use multiple blocks to execute cmds separately
+{ls -lfda}
+{pwd}
+{ls}
+

@@ -18,28 +18,31 @@ use Carp qw(
 
 my
 (
+    # the project name
+    $project,
+
+    # bld all targets
     $opt_all,
 
     # the bld.$project.targets file
     @TargetsFile,
 
-    # hash(set to undef) and array of all possible valid targets from bld.$project.targets file
-    %ValidTargets,
+    # hash(set to undef) and array of all valid targets in the bld.$project.targets file
+    %ValidTargetsTargetsFile,
+    @ValidTargetsTargetsFile,
+
+    # array of all valid(not) targets from bld.$project.targets file or cmd line.
     @ValidTargets,
+    @notValidTargets,
 
-    # valid targets specified on the cmd line
-    @ValidTargetsCmdLine,
-
-    # any not valid targets specified on the cmd line
-    @notValidTargetsCmdLine,
-
-    # the project name
-    $project,
+    # the bld directory i.e. location of ./bld perl script
+    $BLDDIR,
 
     # regexs
     $RGX_BLANK_LINE,
     $RGX_COMMENT_LINE,
     $RGX_VALID_TARGET_CHARS,
+    $END,
 
     # file names
     $TARGETSFN,
@@ -61,9 +64,13 @@ BEGIN
         croak("$0: project name not matched at end of $0\n");
     }
 
+    # the bld directory will always be two directories above - Bld.<project>/<version>/bld.<project>
+    $BLDDIR    = `cd ../..;pwd;`;
+    chomp $BLDDIR;
+
     $RGX_BLANK_LINE         = qr{ ^\s*$ }x;
     $RGX_COMMENT_LINE       = qr{ ^\s*\# }x;
-    $RGX_VALID_TARGET_CHARS = qr{ [A-Za-z0-9-_.] }x;
+    $RGX_VALID_TARGET_CHARS = qr{ [/A-Za-z0-9-_.] }x;
 
     $TARGETSFN = "bld.$project.targets";
     $BFN       = "Bld";
@@ -72,6 +79,9 @@ BEGIN
     $BIFN      = "bld.info";
     $BWFN      = "bld.warn";
     $BFFN      = "bld.fatal";
+
+    # stops processing bld.<project>.targets file
+    $END       = "END";
 }
 
 GetOptions
@@ -104,40 +114,50 @@ foreach my $target ( @TargetsFile )
     # ignore if comment or blank line
     next if ( $target =~ $RGX_COMMENT_LINE or $target =~ $RGX_BLANK_LINE );
 
+    # if line starts with "END" ignore rest of file - for development/debugging
+    last if ( $target =~ m/^$END/ );
+
     # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
     if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
     {
-        print "bld.$project: Invalid target line: \'$target\' in $TARGETSFN file.\n";
+        print "bld.$project: Invalid target line(invalid chars): \'$target\' in $TARGETSFN file.\n";
         exit 1;
     }
 
-    push @ValidTargets, $target;
-    $ValidTargets{$target} = undef;
+    # check if more than one forward slash
+    if ( (my $count = ($target =~ tr/\///)) > 1 )
+    {
+        print "bld.$project: Invalid target line(more than one '/'): \'$target\' in $TARGETSFN file.\n";
+        exit 1;
+    }
+
+    push @ValidTargetsTargetsFile, $target;
+    $ValidTargetsTargetsFile{$target} = undef;
 }
 
 if ( $opt_all )
 {
-    @ValidTargetsCmdLine = @ValidTargets;
+    @ValidTargets = @ValidTargetsTargetsFile;
 }
 else
 {
     # add valid cmd line targets to @ValidTargetsCmdLine and not valid cmd line targets to @notValidTargetsCmdLine
     foreach my $arg ( @ARGV )
     {
-        if ( exists $ValidTargets{$arg} )
+        if ( exists $ValidTargetsTargetsFile{$arg} )
         {
-            push @ValidTargetsCmdLine, $arg;
+            push @ValidTargets, $arg;
         }
         else
         {
-            push @notValidTargetsCmdLine, $arg;
+            push @notValidTargets, $arg;
         }
     }
 
     # if a cmd line specified target is not valid, exit
-    if ( @notValidTargetsCmdLine )
+    if ( @notValidTargets )
     {
-        print "bld.$project: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
+        print "bld.$project: \@notValidTargets: @notValidTargets\n";
         exit 1;
     }
 }
@@ -145,49 +165,66 @@ else
 # copy bld global variables
 if ( -e "$BGVFN.$project" )
 {
-    `cp $BGVFN.$project ../../$BGVFN;`;
+    `cp $BGVFN.$project $BLDDIR/$BGVFN;`;
 }
 else
 {
-    `rm -f ../../$BGVFN;`;
+    `rm -f $BLDDIR/$BGVFN;`;
 }
 
-# bld each of the cmd line targets
-foreach my $target ( @ValidTargetsCmdLine )
+# bld each of the valid targets
+foreach my $target ( @ValidTargets )
 {
-    print "#####################################\n";
-    print "'bld'ing $target\n";
-
-    if ( -e "$target/$BFN.$project.$target" )
+    # if one forward slash, separate directory name from target name - identical
+    # $target names can be accommodated, disambiguated in different directories.
+    # see perldoc USAGE below.
+    my $dir = "";
+    if ( $target =~ m/^(.*\/)(.*)/ )
     {
-        `cp "$target/$BFN.$project.$target" ../../$BFN;`;
+        $dir = $1;
+        $target = $2;
+    }
+
+    print "#####################################\n";
+    print "'bld'ing $dir$target\n";
+
+    if ( -e "$dir$target/$BFN.$project.$target" )
+    {
+        `cp "$dir$target/$BFN.$project.$target" $BLDDIR/$BFN;`;
     }
     else
     {
-        print "bld.$project: Missing $target/$BFN.$project.$target file.\n";
+        print "bld.$project: Missing $dir$target/$BFN.$project.$target file.\n";
         exit 1;
     }
 
-    `rm -f ../../$SIGFN;`;
-
-    if ( -e "$target/$SIGFN.$project.$target" )
+    if ( -e "$dir$target/$target" )
     {
-        `cp "$target/$SIGFN.$project.$target" ../../$SIGFN;`;
+        `cp "$dir$target/$target" $BLDDIR;`;
     }
 
-    print `
-              cd ../..;
-              ./bld;
-              cd - >/dev/null; # the >/dev/null gets rid of a path print
-              cp ../../$SIGFN "$target/$SIGFN.$project.$target";
-              cp ../../$BIFN "$target/$BIFN.$project.$target";
-              cp ../../$BWFN "$target/$BWFN.$project.$target";
-              cp ../../$BFFN "$target/$BFFN.$project.$target";
+    `rm -f $BLDDIR/$SIGFN;`;
+
+    if ( -e "$dir$target/$SIGFN.$project.$target" )
+    {
+        `cp "$dir$target/$SIGFN.$project.$target" $BLDDIR/$SIGFN;`;
+    }
+
+    # execute ./bld to bld the current target
+    print `                    # the stdout print will normally not print anything
+              cd $BLDDIR;      # the main bld dir two up
+              ./bld;           # do bld - bld outputs to stderr
+              cd - >/dev/null; # cd back to Bld.<project>/<version> dir - the >/dev/null gets rid of a path print
+              cp $BLDDIR/$SIGFN "$dir$target/$SIGFN.$project.$target";
+              cp $BLDDIR/$BIFN "$dir$target/$BIFN.$project.$target";
+              cp $BLDDIR/$BWFN "$dir$target/$BWFN.$project.$target";
+              cp $BLDDIR/$BFFN "$dir$target/$BFFN.$project.$target";
           `;
 
-    if ( -e "../../$target" )
+    if ( -e "$BLDDIR/$target" )
     {
-        `cp ../../$target "$target/$target";`;
+        `cp $BLDDIR/$target "$dir$target/$target";`;
+        `cd $BLDDIR;./bld.rm;`;
     }
 }
 
@@ -206,8 +243,8 @@ __END__
                 target will have a target directory named for the target.  the
                 Bld.$project.$target file and bld.$project.$target.script.*
                 file(s) which describe what is to be built for the target are
-                in these directories.
-                mutually exclusive of specifying any cmd line targets.
+                in these directories.  mutually exclusive of specifying any
+                cmd line targets.
      [target] - bld a target specified in the bld.<project>.targets file.
                 mutually exclusive of specifying --all.
 
@@ -215,6 +252,11 @@ __END__
      related to any particular target and any other project files.  all target
      directories may contain subdirectories with specific target related
      infomation.  these will not be affected by bld.<project>.rm.
+
+     bld.<project> supports bld'ing targets with identical names.  They must,
+     however, be disambiguated in different directories.  targets may be named
+     in the bld.<project>.targets file in the <dir>/<target> format.  only one
+     slash is allowed e.g. xdiff/lib.a and vcs-svn/lib.a.
 
 =head1 REQUIRED ARGUMENTS
 
@@ -251,13 +293,16 @@ __END__
 
  bld.<project>.targets - all of the project targets - one to a line.
 
+ If a line begins with "END" then all targets after the "END" are ignored.
+
 =head1 DEPENDENCIES
 
  None
 
 =head1 EXAMPLES
 
- './bld.$project credential-store lib.a' - bld the 'credential-store' executable and the 'lib.a' library
+ './bld.$project credential-store xdiff/lib.a' - bld the 'credential-store' executable and
+  the 'lib.a' library
  './bld.$project --all' - bld all valid targets if option is '--all'(no args allowed)
 
 =head1 SEE ALSO

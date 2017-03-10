@@ -3,7 +3,7 @@
 bld
 ===
 
-bld(1.0.8) is a simple flexible non-hierarchical perl program that builds a single C/C++/
+bld(1.0.9) is a simple flexible non-hierarchical perl program that builds a single C/C++/
 Objective C/Objective C++/Assembler target(executable or library(static or shared)) and,
 unlike 'make', uses SHA1 signatures(no dates) for building software and GNU cpp for
 automatic header file dependency checking.  The operation of bld depends entirely on the
@@ -25,21 +25,30 @@ Current example projects:
     The following is an example of building a complex multi-target project.  It is
     provided with releases. Unpack it in the main bld directory in the same place as
     the bld.example and Bld.example directories:
-        bld-1.0.8-git.tar.gz -
+        bld-1.0.9-git.tar.gz -
             the git project http://git-scm.com/
 
 Dependencies:
     Required for execution:
+        Text::Balanced - for '{}' brace pairs parsing in Bld files
         experimental.pm(3pm) - for smartmatch and switch features
         cpp(1) - gnu cpp cmd is required for dependency determination
         ldd(1) - used for library dependency determination
 
-        Do: cpan install cpanm
-            cpanm experimental.pm
+        Do: Install cpanm(App::cpanminus) with cpan
+            cpanm Text::Balanced
+            cpanm experimental
 
     Required for test:
         gcc(1)/g++(1) (http://gcc.gnu.org/)
         clang(1) (http://llvm.org/)
+
+    Some variation might be required on(for git test):
+        dnf install gcc.x86_64
+        dnf install gcc-c++.x86_64
+        dnf install clang.x86_64
+        dnf install zlib.x86_64
+        dnf install zlib-devel.x86_64
 
 cd bld
 Do './bld -h' for the usage msg.

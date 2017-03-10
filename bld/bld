@@ -1,11 +1,11 @@
-#!/home/hogaboom/perl5/perlbrew/perls/perl-5.24.0/bin/perl
+#!/usr/bin/perl
 
 #
 # bld - do "perldoc bld" for the full doc - see bld.README.  do "bld -h" for command help
 #
 
 # use modern perl
-use 5.24.0;
+use 5.24.1;
 
 #
 # standard modules
@@ -37,8 +37,6 @@ use Digest::SHA qw(
 #
 # installed modules
 #
-
-#use Modern::Perl 2014;
 
 # this module allows the use of experimental perl language features(given, when, ~~) without generating warnings.
 # to see exactly where smartmatch features are being used just comment out this line.  bld will run, but with warnings
@@ -508,15 +506,12 @@ use BldRoutines;
                 # interpolate perl variables in $cmd
                 $cmd_var_sub = var_sub( $cmd );
 
+                $cmd_var_sub =~ s{!!!}{\n}g;
+
                 if ( $cmd_var_sub ne $EMPTY )
                 {
-                    my ( $std_out_err );
-
-                    # convert '!!!' strings back to newlines for execution
-                    $cmd_var_sub =~ s{!!!}{\n}g;
-
-                    # execute {cmds}
-                    $std_out_err = `{ $cmd_var_sub } 2>&1`;
+                    # execute $cmd_var_sub
+                    my $std_out_err = `$cmd_var_sub 2>&1`;
 
                     foreach my $err ( @stderr_err_strs )
                     {
@@ -524,18 +519,22 @@ use BldRoutines;
                         {
                             my $error_msg = system_error_msg( $CHILD_ERROR, $ERRNO );
 
-                            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd_var_sub, $std_out_err;
+                            my $msg = sprintf "FATAL: Error msg: %s\nCmd: \"%s\"\nFail status: %s", $error_msg, $cmd, $std_out_err;
                             fatal($msg);
                         }
                     }
 
-                    print STDERR "{cmds}: $cmd_var_sub\n";
+                    # DEBUG
+                    # if debugging, for dumping executed cmds and their output
+=for
+                    print STDERR "cmd: $cmd\n";
                     print STDERR "std-out/err: $std_out_err\n";
-
+=cut
                 }
 
                 next;
             }
+
             when ( m{$RGX_VALID_DIRS_LINE} )
             {
                 my ( $dir, $regex_srcs, $cmd );
@@ -583,6 +582,7 @@ use BldRoutines;
                     }
                 } # END: foreach my $s (@Sources){}
             }
+
             default
             {
                 my $msg = sprintf "FATAL: %s DIRS section line is incorrectly formatted(see %s): %s", $BFN, $BIFN, $line;
@@ -788,15 +788,22 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.8
+ bld version 1.0.9
 
 =head1 USAGE
 
- usage: bld [-hc]
-     -h - help message(exit)
-     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
-          their old/new signatures that have been added/deleted/changed.  Successive runs will
-          append to this file with a time stamp.
+ bld [-hc]
+
+ usage:
+ bld -h
+
+    Version = 1.0.9
+    -h - help message(exit)
+    -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
+        their old/new signatures that have been added/deleted/changed.  Successive runs will
+        append to this file with a time stamp.
+
+    Do 'perldoc bld' for the full doc
 
 =head1 ARGUMENTS
 
@@ -804,10 +811,10 @@ __END__
 
 =head1 OPTIONS
 
-     -h - help message(exit)
-     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
-          their old/new signatures that have been added/deleted/changed.  Successive runs will
-          append to this file with a time stamp.
+ -h - help message(exit)
+ -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
+      their old/new signatures that have been added/deleted/changed.  Successive runs will
+      append to this file with a time stamp.
 
 =head1 ENVIRONMENT VARIABLES
 
@@ -823,7 +830,7 @@ __END__
 
 =head1 DESCRIPTION
 
- bld(1.0.8) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.9) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
  SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
@@ -879,7 +886,7 @@ __END__
      clocks, networked host clocks or files touched by command activities are eliminated.  Modern signature
      algorithms are strongly randomized even for small file changes - for the 160 bit SHA1 hash collisions are
      unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
-     is small relative to the expense of programmer time.  An investigation of some other make alternatives
+     is small relative to the expense of programmer time.  An investigation of some other 'make' alternatives
      e.g. scons, cook - will disclose that they too are using signatures - for exactly for the same reasons.
   2. bld is REALLY simple to use.  There are no arguments and no environment variables.  The entire bld is
      controlled from the Bld(and Bld.gv file) file.  Only a minimal knowledge of perl is needed - variable
@@ -896,7 +903,7 @@ __END__
      bld.<project>/<version> and each target Bld file(Bld.<project>.<target>) encapsulates all the build
      information for all the source directories under bld.<project>/<version>.  All the built targets and
      build information files go into the Bld.<project>/<version>/<target> directory.  See "'make' and it's
-     difficulties:" below for reasons why recursive make causes problems.
+     difficulties:" below for reasons why recursive 'make' causes problems.
   6. Each source file will have three signatures associated with it - one for the source file, one for the
      corresponding object file and one for the cmds use to re-build the source.  A change in any of these will
      result in a re-build.  A change in the target signature will result in a re-build.  Optionally, the
@@ -922,35 +929,35 @@ __END__
      signatures that have been added/deleted/changed.  Successive runs will append to this file with a time stamp.
  14. 'make' and it's difficulties:
          http://www.scons.org/wiki/FromMakeToScons
-             a detailed critique of make and some alternatives(Adrian Neagu)
+             a detailed critique of 'make' and some alternatives(Adrian Neagu)
          http://freecode.com/articles/what-is-wrong-with-make
              What is Wrong with Make?(Adrian Neagu)
          http://www.scons.org/architecture/
              a description of the scons architecture and in particular the reasons for the use of signatures instead of dates
          ftp://ftp.gnu.org/old-gnu/Manuals/autoconf/html_mono/autoconf.html#SEC3
-             a brief critique of make and how GNU automake from the GNU Build System contributes
+             a brief critique of 'make' and how GNU automake from the GNU Build System contributes
          http://aegis.sourceforge.net/auug97.pdf
              an article "Recursive Make Considered Harmful" by Peter Miller from the Australian UNIX Users Group
          http://www.conifersystems.com/whitepapers/gnu-make/
-             an in depth critique of make
+             an in depth critique of 'make'
          http://www.conifersystems.com/whitepapers/gnu-make/
-             What's Wrong With GNU make?
+             What's Wrong With GNU 'make'?
          http://www.leosimons.com/2006/bettermake/what-is-a-better-make.html
-             What is a better make?
+             What is a better 'make'?
          http://www.leosimons.com/2006/a-better-make.html
              Building a better (make|ant|maven|...)
 
 =head1 DEPENDENCIES
 
-    I use Fedora for development on an x86_64 architecture.  Dnf is the package installation tool.
-
     Required for execution:
+        Text::Balanced - for '{}' brace pairs parsing in Bld files
         experimental.pm(3pm) - for smartmatch and switch features
         cpp(1) - gnu cpp cmd is required for dependency determination
         ldd(1) - used for library dependency determination
 
-        Do: cpan install cpanm
-            cpanm experimental.pm
+        Do: Install cpanm(App::cpanminus) with cpan
+            cpanm Text::Balanced
+            cpanm experimental
 
     Required for test:
         gcc(1)/g++(1) (http://gcc.gnu.org/)
@@ -1367,6 +1374,11 @@ __END__
             ls;
         }
 
+        # if you want finer grained error reporting use multiple blocks to execute cmds separately
+        {ls -lfda}
+        {pwd}
+        {ls}
+
 =head1 BUILDING SINGLE TARGETS
     (a target is an executable or library(static or shared))
 
@@ -1494,48 +1506,48 @@ __END__
     13. As an example, an edited run of 'tree Bld.git/git-2.9.2' after a './bld.git --all':
 
         Bld.git/git-2.9.2/
-        ├── bld.git
-        ├── bld.git.install
-        ├── bld.git.README
-        ├── bld.git.rm
-        ├── bld.git.targets
-        ├── Bld.gv.git
-        ├── git
-        │   ├── bld.fatal.git.git
-        │   ├── Bld.git.git
-        │   ├── bld.git.git.script.sc1
-        │   ├── bld.info.git.git
-        │   ├── Bld.sig.git.git
-        │   ├── bld.warn.git.git
-        │   └── git
-        ├── git-credential-cache
-        │   ├── bld.fatal.git.git-credential-cache
-        │   ├── Bld.git.git-credential-cache
-        │   ├── bld.info.git.git-credential-cache
-        │   ├── Bld.sig.git.git-credential-cache
-        │   ├── bld.warn.git.git-credential-cache
-        │   └── git-credential-cache
-        ├── libgit.a
-        │   ├── bld.fatal.git.libgit.a
-        │   ├── Bld.git.libgit.a
-        │   ├── bld.info.git.libgit.a
-        │   ├── Bld.sig.git.libgit.a
-        │   ├── bld.warn.git.libgit.a
-        │   └── libgit.a
-        ├── libvcs-svn.a
-        │   ├── bld.fatal.git.libvcs-svn.a
-        │   ├── Bld.git.libvcs-svn.a
-        │   ├── bld.info.git.libvcs-svn.a
-        │   ├── Bld.sig.git.libvcs-svn.a
-        │   ├── bld.warn.git.libvcs-svn.a
-        │   └── libvcs-svn.a
-        ├── test-chmtime
-        │   ├── bld.fatal.git.test-chmtime
-        │   ├── Bld.git.test-chmtime
-        │   ├── bld.info.git.test-chmtime
-        │   ├── Bld.sig.git.test-chmtime
-        │   ├── bld.warn.git.test-chmtime
-        │   └── test-chmtime
+        --- bld.git
+        --- bld.git.install
+        --- bld.git.README
+        --- bld.git.rm
+        --- bld.git.targets
+        --- Bld.gv.git
+        --- git
+        ------- bld.fatal.git.git
+        ------- Bld.git.git
+        ------- bld.git.git.script.sc1
+        ------- bld.info.git.git
+        ------- Bld.sig.git.git
+        ------- bld.warn.git.git
+        ------- git
+        --- git-credential-cache
+        ------- bld.fatal.git.git-credential-cache
+        ------- Bld.git.git-credential-cache
+        ------- bld.info.git.git-credential-cache
+        ------- Bld.sig.git.git-credential-cache
+        ------- bld.warn.git.git-credential-cache
+        ------- git-credential-cache
+        --- libgit.a
+        ------- bld.fatal.git.libgit.a
+        ------- Bld.git.libgit.a
+        ------- bld.info.git.libgit.a
+        ------- Bld.sig.git.libgit.a
+        ------- bld.warn.git.libgit.a
+        ------- libgit.a
+        --- libvcs-svn.a
+        ------- bld.fatal.git.libvcs-svn.a
+        ------- Bld.git.libvcs-svn.a
+        ------- bld.info.git.libvcs-svn.a
+        ------- Bld.sig.git.libvcs-svn.a
+        ------- bld.warn.git.libvcs-svn.a
+        ------- libvcs-svn.a
+        --- test-chmtime
+        ------- bld.fatal.git.test-chmtime
+        ------- Bld.git.test-chmtime
+        ------- bld.info.git.test-chmtime
+        ------- Bld.sig.git.test-chmtime
+        ------- bld.warn.git.test-chmtime
+        ------- test-chmtime
 
         .
         .
@@ -1547,13 +1559,16 @@ __END__
      have the same root name as the source.  a subsequent Bld file {} block can rename and move
      the .o files.
 
-  2. bld assumes that all targets in multi-target bld's will be uniquely named - all targets go
-     into the same project directory(in <target> subdirectories) before distribution for
-     installation.  installation can then rename and distribute targets in any way desired.
+  2. Recently(2017), SHA-1 hashes have been found to  be cryptographically insecure.  bld use of
+     SHA-1 only seeks to insure that source code or derived files are disambiguated by these
+     hashes.  SHA-1 is not used cryptographically.  At 160 almost random bits collisions are
+     extremely unlikely.
 
-  3. Some projects(rarely) violate either or both of these target naming or object file
-     naming/location requirements, but reconstructing these projects with bld should be
-     relatively easy.
+  3. Multi-target bld scripts:
+         Bld.<project>/<version>/bld.<project>
+         Bld.<project>/<version>/bld.<project>.rm
+     allow bld'ing of targets(executables or libraries) of the same name differentiated by the
+     directory containing them e.g. from git - xdiff/lib.a and vcs-svn/lib.a.
 
   4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
      source directory.
@@ -1598,7 +1613,7 @@ __END__
      The next time bld is run this will not be recognized as a new file and mv'ed to the
      source file directory.  Just remove these before a new bld run.
 
- 11. { cmds } are executed within `{ cmds } 2>&1`; and the return stdout/stderr matched
+ 11. cmds are executed within `cmds 2>&1`; and the return stdout/stderr matched
      against strings stored in the @stderr_err_strs array.  Any actual error return not
      matched by one of these strings will be missed.  New strings can be added to
      @stderr_err_strs in the BGC.pm module.
@@ -1738,6 +1753,25 @@ __END__
 
  https://github.com/rahogaboom/bld
 
+     bld-1.0.9.tar.gz - changes related to:
+                        a. minor code and doc changes to bld itself.
+                        b. changes to multi-target bld scripts:
+
+                               Bld.<project>/<version>/bld.<project>
+                               Bld.<project>/<version>/bld.<project>.rm
+
+                           that allow bld'ing of targets(executables or libraries) of the same
+                           name differentiated by the directory containing them e.g. from git -
+                           xdiff/lib.a and vcs-svn/lib.a.
+                        c. removed git versions 1.9.0, 2.3.0 and 2.9.2.  added git version 2.12.0.
+                           the git bld is NOT a vetted full construction of the git code.  it is
+                           used to illustrate the successful compilation of all git execuatables
+                           and libraries to bld complex multi-target projects.
+                        d. verify example and git code correct operation with latest:
+                           1. gcc/g++ - gcc (GCC) 6.3.1 20161221 (Red Hat 6.3.1-1)
+                           2. clang   - clang version 3.8.1 (tags/RELEASE_381/final)
+                        e. use perl 5.24.1
+
      bld-1.0.8.tar.gz - changes related to:
                         a. remove svn as an example.  this allows greater focus on multiple versions
                            of git as the single example of a complex project build.  added git
@@ -1765,6 +1799,8 @@ __END__
      about the most recent releases.  This may change in future.
  
 =head1 AUTHOR
+
+ Complexity is the enemy.
 
  Richard A Hogaboom
  richard.hogaboom@gmail.com

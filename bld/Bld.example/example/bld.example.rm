@@ -21,16 +21,25 @@ my
     # the project name
     $project,
 
-    # true if all directories are to be cleaned
+    # clean all targets
     $opt_all,
 
-    # target directories to clean
-    @targets,
+    # the bld.$project.targets file
+    @TargetsFile,
+
+    # hash(set to undef) and array of all valid targets in the bld.$project.targets file
+    %ValidTargetsTargetsFile,
+    @ValidTargetsTargetsFile,
+
+    # array of all valid(not) targets from bld.$project.targets file or cmd line.
+    @ValidTargets,
+    @notValidTargets,
 
     # regexs
     $RGX_BLANK_LINE,
     $RGX_COMMENT_LINE,
     $RGX_VALID_TARGET_CHARS,
+    $END,
 
     # file names
     $TARGETSFN,
@@ -49,10 +58,13 @@ BEGIN
 
     $RGX_BLANK_LINE         = qr{ ^\s*$ }x;
     $RGX_COMMENT_LINE       = qr{ ^\s*\# }x;
-    $RGX_VALID_TARGET_CHARS = qr{ [A-Za-z0-9-_.] }x;
+    $RGX_VALID_TARGET_CHARS = qr{ [/A-Za-z0-9-_.] }x;
 
     $TARGETSFN = "bld.$project.targets";
     $BFN       = "Bld";
+
+    # stops processing bld.<project>.targets file
+    $END       = "END";
 }
 
 GetOptions
@@ -69,85 +81,86 @@ else
     croak("One or more arguments required if --all option not specified.") if @ARGV <= 0;
 }
 
+# each not blank or not a comment line is a valid target argument to bld.$project e.g. './bld.$project $target'
+# and will build one(that named) library or executable
+if ( not -e $TARGETSFN )
+{
+    croak("$TARGETSFN cannot be opened.");
+}
+open my $fh, "<", $TARGETSFN;
+@TargetsFile = <$fh>;
+close $fh;
+chomp @TargetsFile;
+
+foreach my $target ( @TargetsFile )
+{
+    # ignore if comment or blank line
+    next if ( $target =~ $RGX_COMMENT_LINE or $target =~ $RGX_BLANK_LINE );
+
+    # if line starts with "END" ignore rest of file - for development/debugging
+    last if ( $target =~ m/^$END/ );
+
+    # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
+    if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
+    {
+        print "bld.$project.rm: Invalid target line(invalid chars): \'$target\' in $TARGETSFN file.\n";
+        exit 1;
+    }
+
+    # check if more than one forward slash
+    if ( (my $count = ($target =~ tr/\///)) > 1 )
+    {
+        print "bld.$project: Invalid target line(more than one '/'): \'$target\' in $TARGETSFN file.\n";
+        exit 1;
+    }
+
+    push @ValidTargetsTargetsFile, $target;
+    $ValidTargetsTargetsFile{$target} = undef;
+}
+
 if ( $opt_all )
 {
-    # all subdirectories should be target directories - clean them -
-    # ignore bld.<$project>.targets file
-    @targets = `ls -d */`;
-    chop(@targets); # last space
-    chop(@targets); # last /
+    @ValidTargets = @ValidTargetsTargetsFile;
 }
 else
 {
-    # clean only cmd line specified target directories
-
-    my
-    (
-        # the bld.$project.targets file
-        @TargetsFile,
-
-        # hash(set to undef) of all possible valid targets from bld.$project.targets file
-        %ValidTargets,
-
-        # valid targets specified on the cmd line
-        @ValidTargetsCmdLine,
-
-        # any not valid targets specified on the cmd line
-        @notValidTargetsCmdLine,
-    );
-
-    # each not blank or not a comment line is a valid target argument to bld.$project e.g. './bld.$project $target'
-    # and will build one(that named) library or executable
-    if ( not -e $TARGETSFN )
-    {
-        croak("$TARGETSFN cannot be opened.");
-    }
-    open my $fh, "<", $TARGETSFN;
-    @TargetsFile = <$fh>;
-    close $fh;
-    chomp @TargetsFile;
-
-    foreach my $target ( @TargetsFile )
-    {
-        # ignore if comment or blank line
-        next if ( $target =~ $RGX_COMMENT_LINE or $target =~ $RGX_BLANK_LINE );
-
-        # if target line is not a single token of valid target chars warn and exit(fix $TARGETSFN file)
-        if ( not $target =~ m{^$RGX_VALID_TARGET_CHARS+$} )
-        {
-            print "bld.$project.rm: Invalid target line: \'$target\' in $TARGETSFN file.\n";
-            exit 1;
-        }
-
-        $ValidTargets{$target} = undef;
-    }
-
     # add valid cmd line targets to @ValidTargetsCmdLine and not valid cmd line targets to @notValidTargetsCmdLine
     foreach my $arg ( @ARGV )
     {
-        if ( exists $ValidTargets{$arg} )
+        if ( exists $ValidTargetsTargetsFile{$arg} )
         {
-            push @ValidTargetsCmdLine, $arg;
+            push @ValidTargets, $arg;
         }
         else
         {
-            push @notValidTargetsCmdLine, $arg;
+            push @notValidTargets, $arg;
         }
     }
 
     # if a cmd line specified target is not valid, exit
-    if ( @notValidTargetsCmdLine )
+    if ( @notValidTargets )
     {
-        print "bld.$project.rm: \@notValidTargetsCmdLine: @notValidTargetsCmdLine\n";
+        print "bld.$project: \@notValidTargets: @notValidTargets\n";
         exit 1;
     }
-
-    @targets = @ValidTargetsCmdLine;
 }
 
-foreach my $target ( @targets )
+# clean each of the valid targets
+foreach my $target ( @ValidTargets )
 {
-    chdir $target;
+    # if one forward slash, separate directory name from target name - identical
+    # $target names can be accommodated, disambiguated in different directories.
+    # see perldoc USAGE below.
+    my $dir = "";
+    if ( $target =~ m/^(.*\/)(.*)/ )
+    {
+        $dir = $1;
+        $target = $2;
+    }
+
+    print "Cleaning $dir$target\n";
+
+    chdir "$dir$target";
     my @files = `ls`;
     foreach my $file ( @files )
     {
@@ -164,6 +177,10 @@ foreach my $target ( @targets )
         }
     }
     chdir "..";
+    if ( $dir ne "" )
+    {
+        chdir "..";
+    }
 }
 
 1;
@@ -177,7 +194,7 @@ __END__
 =head1 USAGE
 
  usage: bld.<project>.rm <[--all] | [target] [target] ...>
-     --all    - remove in all directories all files not matching:
+     --all    - remove in all valid targets all files not matching:
                 bld.$project.$target.script.* file(s)
                 Bld.$project.$target file
                 mutually exclusive of specifying any cmd line [target]s.
@@ -215,6 +232,8 @@ __END__
 =head1 FILES
 
  bld.<project>.targets - all of the project targets are specified, one to a line.
+
+ If a line begins with "END" then all targets after the "END" are ignored.
 
 =head1 DEPENDENCIES
 
