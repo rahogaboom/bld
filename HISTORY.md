@@ -54,7 +54,7 @@
         bld-1.0.4-svn.tar.gz
         bld-1.0.4-systemd.tar.gz
 
- Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
- about the most recent releases.  This may change in future.
+ Why are there no releases beyond the latest three?  For now, I only intend to maintain
+ and answer questions about the most recent releases.  This may change in future.
 
 ```
