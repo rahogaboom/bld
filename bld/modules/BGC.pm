@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-#          Copyright Richard Allen Hogaboom 1997 - 2016.
+#          Copyright Richard Allen Hogaboom 1997 - 2017.
 # Distributed under the Boost Software License, Version 1.0.
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
@@ -73,7 +73,7 @@ package BGC
     use diagnostics;
     use autodie;
 
-    $VERSION = "1.0.9";
+    $VERSION = "1.0.10";
 
     # file names
     $SIGFN = "Bld.sig";       # SIGnature File Name
@@ -114,43 +114,43 @@ package BGC
     # regex related
         # match all header file extensions(without the period)
         $RGX_HDR_EXT = qr{
-                                 (?:
-                                     h   | # C
-                                     hh  | # C++
-                                     hp  | # C++
-                                     hxx | # C++
-                                     hpp | # C++
-                                     HPP | # C++
-                                     h++ | # C++
-                                     tcc   # C++
-                                 )
-                             }x;
+                             (?:
+                                 h   | # C
+                                 hh  | # C++
+                                 hp  | # C++
+                                 hxx | # C++
+                                 hpp | # C++
+                                 HPP | # C++
+                                 h++ | # C++
+                                 tcc   # C++
+                             )
+                         }x;
 
         # match all source file extensions(without the period)
         $RGX_SRC_EXT = qr{
-                                 (?:
-                                     c   | # C
-                                     cc  | # C++
-                                     cp  | # C++
-                                     cxx | # C++
-                                     cpp | # C++
-                                     CPP | # C++
-                                     c++ | # C++
-                                     C   | # C++
-                                     m   | # ObjC
-                                     mm  | # ObjC++
-                                     M   | # ObjC++
-                                     S   | # Assembler
-                                     sx  | # Assembler
-                                     i   | # C - no headers
-                                     ii  | # C++ - no headers
-                                     mi  | # ObjC - no headers
-                                     mii | # ObjC++ - no headers
-                                     s   | # Assembler - no headers
-                                     l   | # lex
-                                     y     # yacc
-                                 )
-                             }x;
+                             (?:
+                                 c   | # C
+                                 cc  | # C++
+                                 cp  | # C++
+                                 cxx | # C++
+                                 cpp | # C++
+                                 CPP | # C++
+                                 c++ | # C++
+                                 C   | # C++
+                                 m   | # ObjC
+                                 mm  | # ObjC++
+                                 M   | # ObjC++
+                                 S   | # Assembler
+                                 sx  | # Assembler
+                                 i   | # C - no headers
+                                 ii  | # C++ - no headers
+                                 mi  | # ObjC - no headers
+                                 mii | # ObjC++ - no headers
+                                 s   | # Assembler - no headers
+                                 l   | # lex
+                                 y     # yacc
+                             )
+                         }x;
 
         # match any file name extension(without the period)
         $RGX_FILE_EXT = qr{

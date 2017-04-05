@@ -29,11 +29,6 @@ use Text::Balanced qw(
                          extract_bracketed
                      );
 
-# sha1_hex - the bld program SHA1 generator
-use Digest::SHA qw(
-                      sha1_hex
-                  );
-
 #
 # installed modules
 #
@@ -788,7 +783,7 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.9
+ bld version 1.0.10
 
 =head1 USAGE
 
@@ -797,7 +792,7 @@ __END__
  usage:
  bld -h
 
-    Version = 1.0.9
+    Version = 1.0.10
     -h - help message(exit)
     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
         their old/new signatures that have been added/deleted/changed.  Successive runs will
@@ -830,9 +825,9 @@ __END__
 
 =head1 DESCRIPTION
 
- bld(1.0.9) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.10) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
- SHA1 signatures(no dates) for building software and GNU cpp for automatic header file dependency
+ SHA256 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
  and Bld.gv(bld global values) files.  See the bld.README file.  There are no cmd line arguments.
  A bld.rm program is provided to clean up the main bld directory.
@@ -850,7 +845,7 @@ __END__
      Bld         # file - the bld file which controls bld and the construction of a target
      Bld.gv      # file - the file of global values imported into the Bld file
                           (unusually used only for multi-target builds)
-     Bld.sig     # file - the signature(SHA1) file created from the Bld file
+     Bld.sig     # file - the signature(SHA256) file created from the Bld file
      bld.info    # file - information about the bld 
      bld.warn    # file - warnings from the bld 
      bld.fatal   # file - any fatal msg that ended the bld 
@@ -868,7 +863,7 @@ __END__
          <target>                   # directory - holds all the files and scripts for the bld of a target
              Bld.<project>.<target>        # file - the Bld file which controls bld and the construction of a target
              Bld.<project>.<target>.script.<script name>  # script - script(s) to be run during target bld
-             bld.sig.<project>.<target>    # file - signatures(SHA1) of all source, headers, objects, cmds and target of the target bld
+             bld.sig.<project>.<target>    # file - signatures(SHA256) of all source, headers, objects, cmds and target of the target bld
              bld.info.<project>.<target>   # file - information about the bld
              bld.warn.<project>.<target>   # file - warnings from the bld
              bld.fatal.<project>.<target>  # file - any fatal msg that ended the bld
@@ -881,10 +876,10 @@ __END__
 
 =head1 FEATURES AND ADVANTAGES
 
-  1. Everything is done with SHA1 signatures.  No dates are used anywhere.  Signatures are a property of the
+  1. Everything is done with SHA256 signatures.  No dates are used anywhere.  Signatures are a property of the
      file and not meta data from the system used for the build.  Any time issues, whether related to local
      clocks, networked host clocks or files touched by command activities are eliminated.  Modern signature
-     algorithms are strongly randomized even for small file changes - for the 160 bit SHA1 hash collisions are
+     algorithms are strongly randomized even for small file changes - for the 160 bit SHA256 hash collisions are
      unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
      is small relative to the expense of programmer time.  An investigation of some other 'make' alternatives
      e.g. scons, cook - will disclose that they too are using signatures - for exactly for the same reasons.
@@ -1710,7 +1705,7 @@ __END__
      Bld         # file - the bld file which controls bld and the construction of a target
      Bld.gv      # file - the file of global values imported into the Bld file
                           (unusually used only for multi-target builds)
-     Bld.sig     # file - the signature(SHA1) file created from the Bld file
+     Bld.sig     # file - the signature(SHA256) file created from the Bld file
      bld.info    # file - information about the bld 
      bld.warn    # file - warnings from the bld 
      bld.fatal   # file - any fatal msg that ended the bld 
@@ -1728,7 +1723,7 @@ __END__
          <target>                   # directory - holds all the files and scripts for the bld of a target
              Bld.<project>.<target>        # file - the Bld file which controls bld and the construction of a target
              Bld.<project>.<target>.script.<script name>  # script - script(s) to be run during target bld
-             bld.sig.<project>.<target>    # file - signatures(SHA1) of all source, headers, objects, cmds and target of the target bld
+             bld.sig.<project>.<target>    # file - signatures(SHA256) of all source, headers, objects, cmds and target of the target bld
              bld.info.<project>.<target>   # file - information about the bld
              bld.warn.<project>.<target>   # file - warnings from the bld
              bld.fatal.<project>.<target>  # file - any fatal msg that ended the bld
@@ -1753,50 +1748,54 @@ __END__
 
  https://github.com/rahogaboom/bld
 
-     bld-1.0.9.tar.gz - changes related to:
-                        a. minor code and doc changes to bld itself.
-                        b. changes to multi-target bld scripts:
+ bld-1.0.10.tar.gz - changes related to:
+     a. change from SHA1 to SHA256
+     b. add -c option for cleaning
 
-                               Bld.<project>/<version>/bld.<project>
-                               Bld.<project>/<version>/bld.<project>.rm
+ bld-1.0.9.tar.gz - changes related to:
+     a. minor code and doc changes to bld itself.
+     b. changes to multi-target bld scripts:
 
-                           that allow bld'ing of targets(executables or libraries) of the same
-                           name differentiated by the directory containing them e.g. from git -
-                           xdiff/lib.a and vcs-svn/lib.a.
-                        c. removed git versions 1.9.0, 2.3.0 and 2.9.2.  added git version 2.12.0.
-                           the git bld is NOT a vetted full construction of the git code.  it is
-                           used to illustrate the successful compilation of all git execuatables
-                           and libraries to bld complex multi-target projects.
-                        d. verify example and git code correct operation with latest:
-                           1. gcc/g++ - gcc (GCC) 6.3.1 20161221 (Red Hat 6.3.1-1)
-                           2. clang   - clang version 3.8.1 (tags/RELEASE_381/final)
-                        e. use perl 5.24.1
+            Bld.<project>/<version>/bld.<project>
+            Bld.<project>/<version>/bld.<project>.rm
 
-     bld-1.0.8.tar.gz - changes related to:
-                        a. remove svn as an example.  this allows greater focus on multiple versions
-                           of git as the single example of a complex project build.  added git
-                           version 2.9.2.
-                        b. modify bld.<project> and bld.<project>.rm to work with all target files
-                           under the same target named directory.  this unclutters the project
-                           directory to hold only target directories and the project build
-                           configuration and build executables.
-                        c. minor code changes.
+        that allow bld'ing of targets(executables or libraries) of the same
+        name differentiated by the directory containing them e.g. from git -
+        xdiff/lib.a and vcs-svn/lib.a.
+     c. removed git versions 1.9.0, 2.3.0 and 2.9.2.  added git version 2.12.0.
+        the git bld is NOT a vetted full construction of the git code.  it is
+        used to illustrate the successful compilation of all git execuatables
+        and libraries to bld complex multi-target projects.
+     d. verify example and git code correct operation with latest:
+        1. gcc/g++ - gcc (GCC) 6.3.1 20161221 (Red Hat 6.3.1-1)
+        2. clang   - clang version 3.8.1 (tags/RELEASE_381/final)
+     e. use perl 5.24.1
 
-     bld-1.0.7.tar.gz - changes related to:
-                        a. upgrade to perl 5.24.0
-                        b. remove systemd as an example.  ./configure is complicated by many
-                           dependencies.
-                        c. update license to Boost
-                        d. remove Obj C and yacc/lex examples.  requires dependencies.  I
-                           wanted the examples to run with only gcc/g++/clang more or less.
+ bld-1.0.8.tar.gz - changes related to:
+     a. remove svn as an example.  this allows greater focus on multiple versions
+        of git as the single example of a complex project build.  added git
+        version 2.9.2.
+     b. modify bld.<project> and bld.<project>.rm to work with all target files
+        under the same target named directory.  this unclutters the project
+        directory to hold only target directories and the project build
+        configuration and build executables.
+     c. minor code changes.
 
-     bld-1.0.6.tar.gz - changes related to:
-                        a. fixes for two gcc warnings in the example code(rdx and daa)
-                        b. use 'print STDERR' for all prints - more immediate output
-                        c. doc updates
+ bld-1.0.7.tar.gz - changes related to:
+     a. upgrade to perl 5.24.0
+     b. remove systemd as an example.  ./configure is complicated by many
+        dependencies.
+     c. update license to Boost
+     d. remove Obj C and yacc/lex examples.  requires dependencies.  I
+        wanted the examples to run with only gcc/g++/clang more or less.
 
-     Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
-     about the most recent releases.  This may change in future.
+ bld-1.0.6.tar.gz - changes related to:
+     a. fixes for two gcc warnings in the example code(rdx and daa)
+     b. use 'print STDERR' for all prints - more immediate output
+     c. doc updates
+
+ Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
+ about the most recent releases.  This may change in future.
  
 =head1 AUTHOR
 
@@ -1807,7 +1806,7 @@ __END__
 
 =head1 LICENSE and COPYRIGHT and (DISCLAIMER OF) WARRANTY
 
-          Copyright Richard Allen Hogaboom 1997 - 2016.
+          Copyright Richard Allen Hogaboom 1997 - 2017.
  Distributed under the Boost Software License, Version 1.0.
     (See accompanying file LICENSE_1_0.txt or copy at
           http://www.boost.org/LICENSE_1_0.txt)

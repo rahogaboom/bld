@@ -1,4 +1,8 @@
 ```
+ bld-1.0.10.tar.gz - changes related to:
+     a. change from SHA1 to SHA256
+     b. add -c option for cleaning
+
  bld-1.0.9.tar.gz - changes related to:
      a. minor code and doc changes to bld itself.
      b. changes to multi-target bld scripts:
@@ -14,8 +18,8 @@
         used to illustrate the successful compilation of all git execuatables
         and libraries to bld complex multi-target projects.
      d. verify example and git code correct operation with latest:
-        1. gcc/g++ - gcc (GCC) 6.3.1 20161221 (Red Hat 6.3.1-1)
-        2. clang   - clang version 3.8.1 (tags/RELEASE_381/final)
+        1. gcc/g++       - gcc (GCC) 6.3.1 20161221 (Red Hat 6.3.1-1)
+        2. clang/clang++ - clang version 3.8.1 (tags/RELEASE_381/final)
      e. use perl 5.24.1
 
  bld-1.0.8.tar.gz - changes related to:

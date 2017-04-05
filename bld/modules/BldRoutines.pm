@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-#          Copyright Richard Allen Hogaboom 1997 - 2016.
+#          Copyright Richard Allen Hogaboom 1997 - 2017.
 # Distributed under the Boost Software License, Version 1.0.
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
@@ -88,9 +88,9 @@ package BldRoutines
                    longmess
                );
 
-    # sha1_hex - the bld program SHA1 generator
+    # sha256_hex - the bld program SHA256 generator
     use Digest::SHA qw(
-                          sha1_hex
+                          sha256_hex
                       );
 
     #
@@ -219,7 +219,7 @@ package BldRoutines
             $cmd_sig =~ s{!!!}{}g;
 
             # calculate signature of variable substituted source $cmd_sig
-            $SigdataNew_tmp{$s}[$SIG_CMD] = sha1_hex( $cmd_sig );
+            $SigdataNew_tmp{$s}[$SIG_CMD] = sha256_hex( $cmd_sig );
         }
 
         # populate source signature hash %SourceSig - see definition above
@@ -237,7 +237,7 @@ package BldRoutines
 
             # calculate signatures of header files for this source code file($s).
             # For each header file $h(in @hdeps):
-            #     a. add $SigdataNew{$h}[SIG_SRC] = sha1_hex( $h );
+            #     a. add $SigdataNew{$h}[SIG_SRC] = sha256_hex( $h );
             #     b. add $SigdataNew{$s}[HDR_DEP]{$h} = undef;
 
             # for interpolated $cmd_var_sub of this source find the header file dependencies.
@@ -1024,7 +1024,7 @@ package BldRoutines
             return;
         }
 
-        my $RGX_SHA1 = "[0-9a-f]\{40\}";  # regex to validate SHA1 signatures - 40 chars and all 0-9a-f
+        my $RGX_SHA256 = "[0-9a-f]\{64\}";  # regex to validate SHA256 signatures - 40 chars and all 0-9a-f
 
         # open $SIGFN signature file
         open my $sigfn, "<", $SIGFN;
@@ -1036,14 +1036,14 @@ package BldRoutines
 
             given ( $line )
             {
-                when ( m{^'(.*?)'\s($RGX_SHA1)$} )
+                when ( m{^'(.*?)'\s($RGX_SHA256)$} )
                 {
                     my $file = $1;
                     my $sigsource = $2;
 
-                    if ( $sigsource !~ m{^$RGX_SHA1$} )
+                    if ( $sigsource !~ m{^$RGX_SHA256$} )
                     {
-                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigsource:\n%s", $SIGFN, $line;
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA256 signature \$sigsource:\n%s", $SIGFN, $line;
                         fatal($msg);
                     }
 
@@ -1054,28 +1054,28 @@ package BldRoutines
                         $Sigdata_ref->{$bld}[$LIB_DEP]{$file} = undef;
                     }
                 }
-                when ( m{^'(.*?)'\s($RGX_SHA1)\s($RGX_SHA1)\s($RGX_SHA1)$} )
+                when ( m{^'(.*?)'\s($RGX_SHA256)\s($RGX_SHA256)\s($RGX_SHA256)$} )
                 {
                     my $file = $1;
                     my $sigsource = $2;
                     my $sigcmd = $3;
                     my $sigtarget = $4;
 
-                    if ( $sigsource !~ m{^$RGX_SHA1$} )
+                    if ( $sigsource !~ m{^$RGX_SHA256$} )
                     {
-                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigsource:\n%s", $SIGFN, $line;
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA256 signature \$sigsource:\n%s", $SIGFN, $line;
                         fatal($msg);
                     }
 
-                    if ( $sigcmd !~ m{^$RGX_SHA1$} )
+                    if ( $sigcmd !~ m{^$RGX_SHA256$} )
                     {
-                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigcmd:\n%s", $SIGFN, $line;
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA256 signature \$sigcmd:\n%s", $SIGFN, $line;
                         fatal($msg);
                     }
 
-                    if ( $sigtarget !~ m{^$RGX_SHA1$} )
+                    if ( $sigtarget !~ m{^$RGX_SHA256$} )
                     {
-                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA1 signature \$sigtarget:\n%s", $SIGFN, $line;
+                        my $msg = sprintf "FATAL: Malformed %s file - invalid SHA256 signature \$sigtarget:\n%s", $SIGFN, $line;
                         fatal($msg);
                     }
 
@@ -2622,13 +2622,13 @@ package BldRoutines
     #            : $sig = file_sig_calc( $bld, $bld, $bldcmd, $lib_dirs );
     #            : $sig = file_sig_calc( $filename, @otherstrings );
     #
-    # Purpose    : calculate SHA1 signature of $filename and all remaining arguments concatenated together
+    # Purpose    : calculate SHA256 signature of $filename and all remaining arguments concatenated together
     #
     # Parameters : $filename     - file that will be opened and read in
     #            : @otherstrings - other strings to be concatenated to $filename
     #
     # Returns    : if $filename exists
-    #            :     return SHA1 signature of "$filename . @otherstrings"
+    #            :     return SHA256 signature of "$filename . @otherstrings"
     #            : else
     #            :     fatal()
     #
@@ -2682,7 +2682,7 @@ package BldRoutines
             $otherstrings .= $string;
         }
 
-        return sha1_hex( $inputfile . $otherstrings );
+        return sha256_hex( $inputfile . $otherstrings );
     }
 
 
