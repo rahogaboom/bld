@@ -1750,7 +1750,6 @@ __END__
 
  bld-1.0.10.tar.gz - changes related to:
      a. change from SHA1 to SHA256
-     b. add -c option for cleaning
 
  bld-1.0.9.tar.gz - changes related to:
      a. minor code and doc changes to bld itself.
