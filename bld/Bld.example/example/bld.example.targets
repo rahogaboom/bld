@@ -5,8 +5,8 @@
 # must be built first, that is, libraries then executables.  if a line begins with
 # "END" then all targets after the "END" are ignored.
 
-bfix-c
-daa-c
+bfix_test
+daa
 exec-cpp
 helloworld-c
 libbfix.so

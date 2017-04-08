@@ -20,14 +20,12 @@ use File::Find;
 use Carp qw(
                croak
            );
-use Data::Dumper;
 
-# extract_multiple - for parsing the $BFN DIRS section
-# extract_bracketed - used by extract_multiple for finding '{}''s
-use Text::Balanced qw(
-                         extract_multiple
-                         extract_bracketed
-                     );
+    # DEBUG
+    # if debugging, for dumping the primary program data structures
+=for
+use Data::Dumper;
+=cut
 
 #
 # installed modules
@@ -1747,6 +1745,10 @@ __END__
 =head1 GITHUB RELEASES
 
  https://github.com/rahogaboom/bld
+
+ bld-1.0.11.tar.gz - changes related to:
+     a. update bfix example test to version 1.0.4
+     b. 
 
  bld-1.0.10.tar.gz - changes related to:
      a. change from SHA1 to SHA256

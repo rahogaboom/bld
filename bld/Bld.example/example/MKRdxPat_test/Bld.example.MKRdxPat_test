@@ -3,7 +3,7 @@ Comment(s)
 
 EVAL
 
-$CC = "clang++";
+$CC = "g++";
 
 # mandatory defined variables
 
@@ -17,7 +17,7 @@ $CC = "clang++";
     $lib_dirs = "";
 
     # use system header files in dependency checking("system" or "nosystem")
-    $opt_s = "system";
+    $opt_s = "nosystem";
 
     # inform about any files that will require rebuilding, but do not rebuild("rebuild" or "norebuild")
     $opt_r = "rebuild";
@@ -27,6 +27,5 @@ $CC = "clang++";
 
 DIRS
 
-#clang++ -std=gnu++14 -g -pedantic -Wall -o MKRdxPat_test MKRdxPat_test.cpp -lstdc++
-bld.example/example/MKRdxPat_test : ^MKRdxPat_test\.cpp$ : { $CC -std=gnu++14 -g -pedantic -Wall -c $s; }
+bld.example/example/MKRdxPat_test/cpp : ^MKRdxPat_test\.cpp$ : { $CC -g -pedantic -Wall -c $s; }
 

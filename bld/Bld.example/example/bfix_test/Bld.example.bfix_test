@@ -8,7 +8,7 @@ $CC = "gcc";
 # mandatory defined variables
 
     # the target to build e.g. executable, libx.a, libx.so
-    $bld="bfix-c";
+    $bld="bfix_test";
 
     # cmd used in perl `` call to build $bld target - requires '$bld'(target) and '$O'(object files) internally
     $bldcmd = "$CC -o \$bld \$O;";
@@ -27,6 +27,6 @@ $CC = "gcc";
 
 DIRS
 
-bld.example/example/bfix/c : ^bfix\.c$      : { $CC -c $s; }
-bld.example/example/bfix/c : ^bfix_test\.c$ : { $CC -c $s; }
+bld.example/example/bfix/cpp : ^bfix\.cpp$      : { $CC -c $s; }
+bld.example/example/bfix/cpp : ^bfix_test\.cpp$ : { $CC -c $s; }
 
