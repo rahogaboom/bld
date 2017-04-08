@@ -8,7 +8,7 @@
 bfix_test
 daa
 exec-cpp
-helloworld-c
+helloworld
 libbfix.so
 libdaa.so
 MKRdxPat_test
