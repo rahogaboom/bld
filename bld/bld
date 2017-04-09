@@ -1748,7 +1748,11 @@ __END__
 
  bld-1.0.11.tar.gz - changes related to:
      a. update bfix example test to version 1.0.4
-     b. 
+     b. update rdx example to 1.1.4
+     c. add git-2.12.2.tar.xz version of the git project
+        to bld-1.0.11-git.tar.xz which now contains
+        both 2.12.0 and 2.12.2.
+     d. several mods to the bld.example/example code
 
  bld-1.0.10.tar.gz - changes related to:
      a. change from SHA1 to SHA256
@@ -1795,8 +1799,8 @@ __END__
      b. use 'print STDERR' for all prints - more immediate output
      c. doc updates
 
- Why are there no releases beyond the latest three?  For now, I only intend to maintain and answer questions
- about the most recent releases.  This may change in future.
+ Why are there no releases beyond the latest three on GitHub?  For now, I only intend to
+ maintain and answer questions about the most recent releases.  This may change in future.
  
 =head1 AUTHOR
 
