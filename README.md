@@ -65,7 +65,7 @@ bld example code:
     Do './bld.example --all'.
     Do './bld.example --all' again.
 
-cd Bld.git/git-2.12.0
+cd Bld.git/git-2.12.2
 bld git code:
     Do './bld.git --all'.
     Do './bld.git --all' again.

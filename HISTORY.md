@@ -1,6 +1,11 @@
 ```
  bld-1.0.11.tar.gz - changes related to:
-     a. 
+     a. update bfix example test to version 1.0.5
+     b. update rdx example to 1.1.4
+     c. add git-2.12.2.tar.xz version of the git project
+        to bld-1.0.11-git.tar.xz which now contains
+        both 2.12.0 and 2.12.2.
+     d. several mods to the bld.example/example code
 
  bld-1.0.10.tar.gz - changes related to:
      a. change from SHA1 to SHA256
