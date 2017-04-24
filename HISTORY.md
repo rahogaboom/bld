@@ -1,4 +1,7 @@
 ```
+ bld-1.0.12.tar.gz - changes related to:
+     a. minor code and doc changes
+
  bld-1.0.11.tar.gz - changes related to:
      a. update bfix example test to version 1.0.5
      b. update rdx example to 1.1.4
