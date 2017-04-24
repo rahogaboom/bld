@@ -1,4 +1,3 @@
-#!/usr/bin/perl
 
 #          Copyright Richard Allen Hogaboom 1997 - 2017.
 # Distributed under the Boost Software License, Version 1.0.
@@ -73,7 +72,7 @@ package BGC
     use diagnostics;
     use autodie;
 
-    $VERSION = "1.0.10";
+    $VERSION = "1.0.12";
 
     # file names
     $SIGFN = "Bld.sig";       # SIGnature File Name
@@ -104,7 +103,7 @@ package BGC
         $HDR_DEP = 3;     # constant subscript indexing header file dependencies in the next level hash
         $LIB_DEP = 4;     # constant subscript indexing library file dependencies in the next level hash
 
-    # strings for matching against `{ cmds } 2>&1` return
+    # strings for matching against `cmds 2>&1` return
     @stderr_err_strs = (
                            " error ",
                            " missing ",

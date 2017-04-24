@@ -1,4 +1,3 @@
-#!/usr/bin/perl
 
 #          Copyright Richard Allen Hogaboom 1997 - 2017.
 # Distributed under the Boost Software License, Version 1.0.

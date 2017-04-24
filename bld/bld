@@ -781,7 +781,7 @@ __END__
 
 =head1 VERSION
 
- bld version 1.0.10
+ bld version 1.0.12
 
 =head1 USAGE
 
@@ -790,7 +790,7 @@ __END__
  usage:
  bld -h
 
-    Version = 1.0.10
+    Version = 1.0.12
     -h - help message(exit)
     -c - The -c option will create, at the end of a bld run, a bld.chg file with all files and
         their old/new signatures that have been added/deleted/changed.  Successive runs will
@@ -823,7 +823,7 @@ __END__
 
 =head1 DESCRIPTION
 
- bld(1.0.10) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
+ bld(1.0.12) is a simple flexible non-hierarchical program that builds a single C/C++/Objective C
  /Objective C++/Assembler target(executable or library(static or shared)) and, unlike 'make', uses
  SHA256 signatures(no dates) for building software and GNU cpp for automatic header file dependency
  checking.  The operation of bld depends entirely on the construction of the Bld(bld specification)
@@ -877,7 +877,7 @@ __END__
   1. Everything is done with SHA256 signatures.  No dates are used anywhere.  Signatures are a property of the
      file and not meta data from the system used for the build.  Any time issues, whether related to local
      clocks, networked host clocks or files touched by command activities are eliminated.  Modern signature
-     algorithms are strongly randomized even for small file changes - for the 160 bit SHA256 hash collisions are
+     algorithms are strongly randomized even for small file changes - for the 256 bit SHA256 hash collisions are
      unlikely in the extreme.  The Digest::SHA module is fast.  The expense of signature calculation times 
      is small relative to the expense of programmer time.  An investigation of some other 'make' alternatives
      e.g. scons, cook - will disclose that they too are using signatures - for exactly for the same reasons.
@@ -1552,21 +1552,16 @@ __END__
      have the same root name as the source.  a subsequent Bld file {} block can rename and move
      the .o files.
 
-  2. Recently(2017), SHA-1 hashes have been found to  be cryptographically insecure.  bld use of
-     SHA-1 only seeks to insure that source code or derived files are disambiguated by these
-     hashes.  SHA-1 is not used cryptographically.  At 160 almost random bits collisions are
-     extremely unlikely.
-
-  3. Multi-target bld scripts:
+  2. Multi-target bld scripts:
          Bld.<project>/<version>/bld.<project>
          Bld.<project>/<version>/bld.<project>.rm
      allow bld'ing of targets(executables or libraries) of the same name differentiated by the
      directory containing them e.g. from git - xdiff/lib.a and vcs-svn/lib.a.
 
-  4. bld executes cmd fields({}) in the bld directory and then moves all created files to the
+  3. bld executes cmd fields({}) in the bld directory and then moves all created files to the
      source directory.
 
-  5. A bld run may be ^C interrupted.  When a normal uninterrupted run is completed the
+  4. A bld run may be ^C interrupted.  When a normal uninterrupted run is completed the
      Bld.sig file is rewritten using only those files that were included in the build.
      Thus, if files were added or deleted this would reflect in the new Bld.sig file.  If a
      run is interrupted, all files read in from the original Bld.sig file and any new files
@@ -1575,7 +1570,7 @@ __END__
      entries in the Bld.sig file that no longer exist, but this will be corrected at the end
      of the next normally completed run.
 
-  6. The Bld.sig signature file is automatically created and updated.  It contains one line
+  5. The Bld.sig signature file is automatically created and updated.  It contains one line
      for each source, one line for each header file, optionally one line for each library and
      one line for the executable.  The header file lines and the executable line have two
      fields: the file name and its signature.  The source lines have four fields: the file
@@ -1585,28 +1580,28 @@ __END__
      file, or build command string will do the same thing.  Removing the Bld.sig file will
      re-build the entire target.
 
-  7. A non C or C++ source will be re-built if its build command has been changed or the
+  6. A non C or C++ source will be re-built if its build command has been changed or the
      source file itself has been changed.  The re-built output will be put back in the
      directory where the source came from. The assumption is that it will be a file that will
      then act as source for subsequent build steps e.g. a lex or yacc that will produce a C
      file as output which will then later need to be compiled.  Bld file cmd({}) blocks can
      modify this.
 
-  8. When blocks of cmds({}) are executed by the perl `{ cmds } 2>&1`; operator, error
+  7. When blocks of cmds({}) are executed by the perl `cmds 2>&1`; operator, error
      reporting is per ``; call.  If you are executing multiple cmds and want more granular
      error reporting then break up the cmd block into multiple cmd blocks e.g {ls;pwd;} ->
      {ls;} {pwd;} or dir:regex:{ls;pwd;$CC -c $s;} -> {dir/ls;} {dir/pwd;} dir:regex:
      {$CC -c $s;}.
 
-  9. All cmds must end with a ';'.  If you miss this then you'll see msgs like - "sh: -c:
+  8. All cmds must end with a ';'.  If you miss this then you'll see msgs like - "sh: -c:
      line 1: syntax error: unexpected end of file".  This includes the compile and the
      $bldcmd string.
 
- 10. If you interrupt a bld(^C) you might get an object file left in the bld directory.
+  9. If you interrupt a bld(^C) you might get an object file left in the bld directory.
      The next time bld is run this will not be recognized as a new file and mv'ed to the
      source file directory.  Just remove these before a new bld run.
 
- 11. cmds are executed within `cmds 2>&1`; and the return stdout/stderr matched
+ 10. cmds are executed within `cmds 2>&1`; and the return stdout/stderr matched
      against strings stored in the @stderr_err_strs array.  Any actual error return not
      matched by one of these strings will be missed.  New strings can be added to
      @stderr_err_strs in the BGC.pm module.
